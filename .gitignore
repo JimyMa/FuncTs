@@ -1,0 +1,17 @@
+.vscode
+.idea
+cmake-build-debug
+build
+*.pt
+*.pth
+*.pyc
+*.rb
+*.so
+compile_commands.json
+
+.cache
+*.cu
+*.out
+
+*.egg-info
+
