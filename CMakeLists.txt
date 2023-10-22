@@ -22,6 +22,7 @@ set(CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS} ${TORCH_CXX_FLAGS})
 include_directories(${PROJECT_SOURCE_DIR})
 
 file(GLOB SOURCES
+  ${PROJECT_SOURCE_DIR}/functs/csrc/jit/ir/*.cpp
   ${PROJECT_SOURCE_DIR}/functs/csrc/jit/passes/*.cpp
   ${PROJECT_SOURCE_DIR}/functs/csrc/jit/python/*.cpp
   ${PROJECT_SOURCE_DIR}/functs/csrc/*.cpp)

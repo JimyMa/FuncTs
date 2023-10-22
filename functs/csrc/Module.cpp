@@ -1,22 +1,20 @@
-#include <vector>
 #include <Python.h>
+#include <vector>
 
 #include <functs/csrc/jit/python/init.h>
 
-extern "C" PyObject* initModule();
+extern "C" PyObject *initModule();
 
-PyObject* module;
+PyObject *module;
 
 static std::vector<PyMethodDef> methods;
 
-PyObject* initModule() {
-  static struct PyModuleDef functsmodule = {
-      PyModuleDef_HEAD_INIT, "functs._C", nullptr, -1, methods.data()};
+PyObject *initModule() {
+  static struct PyModuleDef functsmodule = {PyModuleDef_HEAD_INIT, "functs._C",
+                                            nullptr, -1, methods.data()};
   module = PyModule_Create(&functsmodule);
 
   torch::jit::initJITFuncBindings(module);
 
   return module;
 }
-
-

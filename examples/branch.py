@@ -6,12 +6,17 @@ import functs._C
 
 
 def func(a: torch.Tensor, c: torch.Tensor):
+    x = a + c
+    y = x[0]
     if (a.nonzero() > 1):
         b = a[0]
     else:
         b = c[1]
     b.add_(0.5)
-    return b
+    q = []
+    q.append(y)
+    q.append(b)
+    return q
 
 
 func = torch.jit.script(func)
