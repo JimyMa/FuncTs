@@ -173,6 +173,21 @@ public:
   const ska::flat_hash_map<const Value *, Element *> &elementMap() const {
     return elementMap_;
   }
+  ska::flat_hash_map<const Value *, Element *> &elementMapMutable() {
+    return elementMap_;
+  }
+
+  void elementMapErase(const Value *v) { elementMap_.erase(v); }
+
+  const c10::optional<ska::flat_hash_map<Node *, MemoryLocations>> &
+  writeIndex() const {
+    return writeIndex_;
+  };
+
+  c10::optional<ska::flat_hash_map<Node *, MemoryLocations>> &
+  writeIndexMutable() {
+    return writeIndex_;
+  };
 
   Element *fromIndex(unsigned x) { return memoryDAG_->fromIndex(x); }
   std::string getElementName(const Element *e) const;

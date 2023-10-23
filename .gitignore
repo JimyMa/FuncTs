@@ -16,4 +16,4 @@ compile_commands.json
 *.egg-info
 
 *.png
-
+*.dot
