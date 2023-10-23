@@ -170,10 +170,12 @@ public:
 
   friend struct MutationRemover;
 
-  // const std::unique_ptr<MemoryDAG> &memoryDAG() const { return memoryDAG_; }
-  // const ska::flat_hash_map<const Value *, Element *> &elementMap() const {
-  //   return elementMap_;
-  // }
+  const ska::flat_hash_map<const Value *, Element *> &elementMap() const {
+    return elementMap_;
+  }
+
+  Element *fromIndex(unsigned x) { return memoryDAG_->fromIndex(x); }
+  std::string getElementName(const Element *e) const;
 
 private:
   // Helper for topologically-safe node moves.
@@ -308,7 +310,7 @@ private:
 
   std::unordered_set<const Value *> wildcards_;
 
-  std::string getElementName(const Element *e) const;
+  // std::string getElementName(const Element *e) const;
 
   // friend void Lint(const AliasDbCopy *db);
 };

@@ -24,12 +24,28 @@ void ConvertToTensorSSA(std::shared_ptr<Graph> graph) {
   graph->dump();
 
   // AliasDb
-  auto aliasDb = AliasDbCopy(graph);
-  aliasDb.dump();
+  auto aliasDb_origin = AliasDbCopy(graph);
+  auto aliasDb_intra_procedure = AliasDbCopy(graph);
+  aliasDb_origin.dump();
 
   // ConvertToTensorSSAImpl(graph->block(), &aliasDb);
-  // auto elementMap = aliasDb.elementMap();
-  // auto memoryDAG = aliasDb.memoryDAG();
+  auto elementMap = aliasDb_origin.elementMap();
+
+  for (const auto &ptrPair : elementMap) {
+    const auto element = ptrPair.second;
+    int ct = 0;
+    if (!element->pointsTo.empty()) {
+      auto begin_name = aliasDb_origin.getElementName(element);
+      std::cout << "begin name: " << begin_name << std::endl;
+
+      for (const auto pointedTo : element->pointsTo) {
+        auto end_name =
+            aliasDb_origin.getElementName(aliasDb_origin.fromIndex(pointedTo));
+        std::cout << "end name: " << end_name << std::endl;
+      }
+    }
+    ct = 0;
+  }
 }
 
 } // namespace jit
