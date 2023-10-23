@@ -62,7 +62,7 @@ void GetBufferTree(std::shared_ptr<Graph> g, AliasDbCopy &aliasDb_buffer_tree) {
 
 void TensorSSAAliasRemoval(Block *b, AliasDbCopy *buffer_forest) {
   auto nodes = b->nodes();
-  for (auto node : nodes) {
+  for (auto node = nodes.front(); node != nodes.back();) {
     auto blocks = node->blocks();
     for (auto block : blocks) {
       TensorSSAAliasRemoval(block, buffer_forest);
@@ -83,18 +83,18 @@ void TensorSSAAliasRemoval(Block *b, AliasDbCopy *buffer_forest) {
         if (points_to_elem->values.size() > 0) {
           points_to = *(points_to_elem->values.begin());
           Node *pass_up_node;
-          auto node = leaf_value->node();
-          if (aten::select == node->kind() ||
-              immutable::SelectImmutable == node->kind()) {
+          auto leaf_node = leaf_value->node();
+          if (aten::select == leaf_node->kind() ||
+              immutable::SelectImmutable == leaf_node->kind()) {
             pass_up_node = b->owningGraph()->create(
                 immutable::SelectReverse, leaf_value->node()->inputs(), 1);
-          } else if (aten::copy_ == node->kind() ||
-                     immutable::Assign == node->kind()) {
+          } else if (aten::copy_ == leaf_node->kind() ||
+                     immutable::Assign == leaf_node->kind()) {
             pass_up_node = b->owningGraph()->create(
                 immutable::Assign, leaf_value->node()->inputs(), 1);
           } else {
             AT_ASSERT(false, "Unknown alias operator",
-                      node->kind().toQualString());
+                      leaf_node->kind().toQualString());
           }
           pass_up_node->output(0)->copyMetadata(leaf_value);
           pass_up_node->replaceInput(0, pass_up_value);
@@ -108,17 +108,95 @@ void TensorSSAAliasRemoval(Block *b, AliasDbCopy *buffer_forest) {
 
       } while (points_to);
 
-      std::cout << "leaf value: " << leaf_value->debugName() << std::endl;
-      std::cout << "pass up value: " << pass_up_value->debugName() << std::endl;
-
       // Step 2. pass down
-      // element = buffer_forest
+      // reconstruct elementMap_
+      Value *pass_down_value = pass_up_value;
+      Value *root_value = leaf_value;
+
+      root_value->replaceAllUsesAfterNodeWith(node, pass_down_value);
+
+      std::function<void()> pass_down;
+      pass_down = [&]() -> void {
+        buffer_forest->createValue(pass_down_value);
+        for (auto pointedFromIndex : elementMap[root_value]->pointedFrom) {
+          auto from_elem = buffer_forest->fromIndex(pointedFromIndex);
+          auto from_node = (*from_elem->values.begin())->node();
+
+          if (!(from_node->isAfter(node))) {
+            if (aten::select == from_node->kind() ||
+                immutable::SelectImmutable == from_node->kind()) {
+              // generate new node
+              auto pass_down_node = b->owningGraph()->create(
+                  immutable::SelectImmutable,
+                  const_cast<Node *>(from_node)->inputs(), 1);
+              b->owningGraph()->insertNode(pass_down_node);
+              b->owningGraph()->setInsertPoint(pass_down_node->next());
+              buffer_forest->makePointerTo(node->output(0), pass_down_value);
+              pass_down_value = pass_down_node->output(0);
+              pass_down_value->copyMetadata(
+                  const_cast<Node *>(from_node)->output(0));
+              from_node->output(0)->replaceAllUsesAfterNodeWith(
+                  node, pass_down_value);
+              root_value = from_node->output(0);
+              pass_down();
+            } else if (aten::copy_ == node->kind() ||
+                       immutable::Assign == node->kind()) {
+              // generate new node
+              auto pass_down_node = b->owningGraph()->create(
+                  immutable::Assign, const_cast<Node *>(from_node)->inputs(),
+                  1);
+              b->owningGraph()->insertNode(pass_down_node);
+              b->owningGraph()->setInsertPoint(pass_down_node->next());
+              buffer_forest->makePointerTo(node->output(0), pass_down_value);
+              pass_down_value = pass_down_node->output(0);
+              pass_down_value->copyMetadata(
+                  const_cast<Node *>(from_node)->output(0));
+              from_node->output(0)->replaceAllUsesAfterNodeWith(
+                  node, pass_down_value);
+              root_value = from_node->output(0);
+              pass_down();
+            }
+          } else {
+          }
+        }
+      };
+      pass_down();
+      node->destroy();
+      node = b->owningGraph()->insertPoint()->next();
+    } else {
+      node = node->next();
     }
   }
 }
 
 void TensorSSAPropagation(std::shared_ptr<Graph> graph);
 void TensorSSARename(std::shared_ptr<Graph> graph);
+
+void TensorSSAImmutableize(Block *b, AliasDbCopy *buffer_forest) {
+  auto nodes = b->nodes();
+  for (auto node = nodes.front(); node != nodes.back();) {
+    auto blocks = node->blocks();
+    for (auto block : blocks) {
+      TensorSSAImmutableize(block, buffer_forest);
+    }
+    auto elementMap = buffer_forest->elementMap();
+    if (elementMap.count(node->output(0))) {
+      if (aten::select == node->kind()) {
+        auto immutableNode = b->owningGraph()->create(
+            immutable::SelectImmutable, node->inputs(), 1);
+        immutableNode->output()->copyMetadata(node->output());
+        immutableNode->insertAfter(node);
+        node->output()->replaceFirstUseWith(immutableNode->output());
+        node->destroy();
+        node = immutableNode->next();
+      } else {
+        node = node->next();
+      }
+    } else {
+      node = node->next();
+    }
+  }
+}
 
 void ConvertToTensorSSA(std::shared_ptr<Graph> graph) {
   std::cout << "Origin Graph: " << std::endl;
@@ -134,6 +212,9 @@ void ConvertToTensorSSA(std::shared_ptr<Graph> graph) {
 
   // Step 2. Convert to TensorSSA
   TensorSSAAliasRemoval(graph->block(), &aliasDb_buffer_tree);
+
+  // Step 3. Immutablize
+  TensorSSAImmutableize(graph->block(), &aliasDb_buffer_tree);
   graph->dump();
 }
 

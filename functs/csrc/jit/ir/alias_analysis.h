@@ -194,6 +194,7 @@ public:
   // temp expose private method to public
   std::string getElementName(const Element *e) const;
   Element *getOrCreateElement(const Value *value);
+  void makePointerTo(const Value *value, const Value *to);
 
 private:
   // Helper for topologically-safe node moves.
@@ -263,7 +264,7 @@ private:
    * Alias manipulation methods
    */
   void makeAllAlias(const std::vector<Value *> &values);
-  void makePointerTo(const Value *value, const Value *to);
+  // void makePointerTo(const Value *value, const Value *to);
   TORCH_API void addToContainedElements(const Value *element,
                                         const Value *container);
   void mapAliases(at::ArrayRef<Value *> to, at::ArrayRef<Value *> from);
