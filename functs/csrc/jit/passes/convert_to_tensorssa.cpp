@@ -69,12 +69,13 @@ void TensorSSAAliasRemoval(Block *b, AliasDbCopy *buffer_forest) {
     }
 
     // Judge if a node is a write node, if true, convert to immutable equivalent
+    // Step 1. Pass Up
     if (buffer_forest->isMutable(node)) {
       auto elementMap = buffer_forest->elementMapMutable();
       // TODO: only tensor values are considered...
-      // Pass Up
       const Value *points_to;
       Value *leaf_value = node->output(0);
+      Value *pass_up_value = node->input(0);
       b->owningGraph()->setInsertPoint(node->next());
       do {
         auto points_to_elem =
@@ -84,20 +85,20 @@ void TensorSSAAliasRemoval(Block *b, AliasDbCopy *buffer_forest) {
           Node *pass_up_node;
           auto node = leaf_value->node();
           if (aten::select == node->kind() ||
-              tssa::SelectImmutable == node->kind()) {
+              immutable::SelectImmutable == node->kind()) {
             pass_up_node = b->owningGraph()->create(
-                tssa::SelectImmutable, leaf_value->node()->inputs(), 1);
-            pass_up_node->output(0)->copyMetadata(leaf_value);
+                immutable::SelectReverse, leaf_value->node()->inputs(), 1);
           } else if (aten::copy_ == node->kind() ||
-                     tssa::Assign == node->kind()) {
+                     immutable::Assign == node->kind()) {
             pass_up_node = b->owningGraph()->create(
-                tssa::Assign, leaf_value->node()->inputs(), 1);
-            pass_up_node->output(0)->copyMetadata(leaf_value);
-
+                immutable::Assign, leaf_value->node()->inputs(), 1);
           } else {
             AT_ASSERT(false, "Unknown alias operator",
                       node->kind().toQualString());
           }
+          pass_up_node->output(0)->copyMetadata(leaf_value);
+          pass_up_node->replaceInput(0, pass_up_value);
+          pass_up_value = pass_up_node->output(0);
           b->owningGraph()->insertNode(pass_up_node);
           b->owningGraph()->setInsertPoint(pass_up_node->next());
           leaf_value = const_cast<Value *>(points_to);
@@ -106,14 +107,18 @@ void TensorSSAAliasRemoval(Block *b, AliasDbCopy *buffer_forest) {
         }
 
       } while (points_to);
-      // auto assign = b->owningGraph()->create(tssa::Assign, 1);
-      // for (auto &input :node->inputs()) {
-      //   assign->addInput(input);
-      // }
-      // assign->output(0)->copyMetadata(node->output(0));
+
+      std::cout << "leaf value: " << leaf_value->debugName() << std::endl;
+      std::cout << "pass up value: " << pass_up_value->debugName() << std::endl;
+
+      // Step 2. pass down
+      // element = buffer_forest
     }
   }
 }
+
+void TensorSSAPropagation(std::shared_ptr<Graph> graph);
+void TensorSSARename(std::shared_ptr<Graph> graph);
 
 void ConvertToTensorSSA(std::shared_ptr<Graph> graph) {
   std::cout << "Origin Graph: " << std::endl;

@@ -190,7 +190,10 @@ public:
   };
 
   Element *fromIndex(unsigned x) { return memoryDAG_->fromIndex(x); }
+
+  // temp expose private method to public
   std::string getElementName(const Element *e) const;
+  Element *getOrCreateElement(const Value *value);
 
 private:
   // Helper for topologically-safe node moves.
@@ -266,7 +269,7 @@ private:
   void mapAliases(at::ArrayRef<Value *> to, at::ArrayRef<Value *> from);
   void giveFreshAlias(const Value *value,
                       bool add_wildcard_to_contained_elems = true);
-  Element *getOrCreateElement(const Value *value);
+  // Element *getOrCreateElement(const Value *value);
 
   const AliasTypeSet *mapTypeToAliasTypeSetPtr(const TypePtr &type) const;
   bool functionalNonEscapingListUse(const Use &use) const;

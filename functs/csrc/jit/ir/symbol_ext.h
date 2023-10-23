@@ -3,7 +3,7 @@
 #include <torch/csrc/jit/ir/ir.h>
 
 namespace c10 {
-namespace tssa {
+namespace immutable {
 
 static const Symbol ns = Symbol::fromQualString("namespaces::immutable");
 
