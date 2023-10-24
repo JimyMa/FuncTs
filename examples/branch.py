@@ -1,6 +1,7 @@
 import pydot
 
 import torch
+from torch.testing import FileCheck
 
 import functs._C
 

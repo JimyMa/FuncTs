@@ -7,6 +7,7 @@
 #include <torch/csrc/jit/api/function_impl.h>
 #include <torch/csrc/jit/jit_log.h>
 #include <torch/csrc/jit/passes/inliner.h>
+#include <torch/csrc/jit/passes/utils/memory_dag.h>
 #include <torch/csrc/jit/passes/utils/subgraph_utils.h>
 #include <torch/csrc/jit/runtime/operator.h>
 #include <torch/csrc/utils/memory.h>
@@ -1295,6 +1296,18 @@ bool AliasDbCopy::nonAliasingValue(const Value *elem) const {
   return elem->mustBeNone() || elem->node()->kind() == prim::Uninitialized;
 }
 
+void AliasDbCopy::deletePointerTo(const Value *from, const Value *to) {
+  // delete connect edge from memoryDAG
+  auto from_el = getOrCreateElement(from);
+  auto to_el = getOrCreateElement(to);
+  from_el->pointsTo.reset(to_el->index);
+  to_el->pointedFrom.reset(from_el->index);
+
+  // delete element from ElementMap
+  if (elementMap_[from]->pointsTo.empty())
+    elementMap_.erase(from);
+}
+
 // Register the fact that `from` is a pointer to `to`
 void AliasDbCopy::makePointerTo(const Value *from, const Value *to) {
   if (nonAliasingValue(from) || nonAliasingValue(to)) {
@@ -1444,7 +1457,6 @@ void AliasDbCopy::giveFreshAlias(const Value *value,
     // skip
     return;
   }
-
   auto new_elem = memoryDAGBuilder_->makeFreshValue(value);
   elementMap_[value] = new_elem;
   if (add_wildcard_to_contained_elems) {
@@ -1477,6 +1489,38 @@ void AliasDbCopy::replaceWithNewValue(Value *existing, Value *new_value) {
   elementMap_[new_value] = existing_elem;
   elementMap_.erase(existing);
   existing_elem->values = {new_value};
+}
+
+TORCH_API void AliasDbCopy::destroyValue(Value *v) {
+  auto v_elem = elementMap_[v];
+  for (auto v_elemPointsTo : v_elem->pointsTo) {
+    auto from_v =
+        elementMap_[*memoryDAG_->fromIndex(v_elemPointsTo)->values.begin()];
+    from_v->pointedFrom.reset(v_elem->index);
+  }
+  for (auto v_elemPointedFrom : v_elem->pointedFrom) {
+    auto to_v =
+        elementMap_[*memoryDAG_->fromIndex(v_elemPointedFrom)->values.begin()];
+    to_v->pointsTo.reset(v_elem->index);
+  }
+
+  elementMap_.erase(v);
+}
+
+TORCH_API void AliasDbCopy::createValueByCopy(const Value *value, Value *from) {
+  createValue(value);
+  auto value_elem = elementMap_[value];
+  value_elem->pointedFrom = elementMap_[from]->pointedFrom;
+  value_elem->pointsTo = elementMap_[from]->pointsTo;
+  elementMap_[value] = value_elem;
+
+  for (auto point_from_value : value_elem->pointsTo) {
+    fromIndex(point_from_value)->pointedFrom.set(value_elem->index);
+  }
+
+  for (auto point_to_value : value_elem->pointedFrom) {
+    fromIndex(point_to_value)->pointsTo.set(value_elem->index);
+  }
 }
 
 void AliasDbCopy::copyValue(Value *from, Value *to) {

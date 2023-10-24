@@ -160,7 +160,10 @@ public:
    */
   // Copy `existing`s aliasing info to `new_value`, and remove `existing`.
   TORCH_API void replaceWithNewValue(Value *existing, Value *new_value);
+  // Delete aliasing info `v`
+  TORCH_API void destroyValue(Value* v);
   // Copy `from`s aliasing info to `to`.
+  TORCH_API void createValueByCopy(const Value *value, Value* from);
   TORCH_API void copyValue(Value *from, Value *to);
   // Create a new `value` that does not alias anything else.
   TORCH_API void createValue(const Value *value);
@@ -195,6 +198,7 @@ public:
   std::string getElementName(const Element *e) const;
   Element *getOrCreateElement(const Value *value);
   void makePointerTo(const Value *value, const Value *to);
+  void deletePointerTo(const Value *from, const Value *to);
 
 private:
   // Helper for topologically-safe node moves.

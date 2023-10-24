@@ -197,6 +197,40 @@ void TensorSSAImmutablize(Block *b, AliasDbCopy *buffer_forest) {
   }
 }
 
+void TensorSSABufferTreeViewImmutablize(Block *b, AliasDbCopy *buffer_forest) {
+  // traversal aliasDb buffer forest, convert aten::view to immut::select
+  // and change the alias relationship at the same time.
+  auto elementMap = buffer_forest->elementMap();
+  bool anyChanged = true;
+
+  auto get_all_buffer_nodes = [&]() -> std::vector<Node *> {
+    std::vector<Node *> result;
+    for (auto elementMapPtr : elementMap) {
+      auto from_value = elementMapPtr.first;
+      if (aten::select == from_value->node()->kind()) {
+        result.push_back(const_cast<Value *>(from_value)->node());
+      }
+    }
+    return result;
+  };
+  auto all_buffer_nodes = get_all_buffer_nodes();
+  for (auto &node : all_buffer_nodes) {
+    // add a new immutable operator
+    auto new_node =
+        b->owningGraph()->create(immutable::Select, node->inputs(), 1);
+
+    new_node->output()->copyMetadata(node->output());
+    new_node->insertAfter(node);
+    node->output()->replaceAllUsesWith(new_node->output());
+
+    // change alias relationship
+    buffer_forest->createValueByCopy(new_node->output(), node->output());
+    buffer_forest->destroyValue(const_cast<Value *>(node->output()));
+
+    node->destroy();
+  }
+}
+
 void ConvertToTensorSSA(std::shared_ptr<Graph> graph) {
   std::cout << "Origin Graph: " << std::endl;
   graph->dump();
@@ -212,13 +246,19 @@ void ConvertToTensorSSA(std::shared_ptr<Graph> graph) {
   aliasDb_buffer_tree.dump();
   aliasDb_buffer_tree.dumpToGraphvizFile("buffer_tree.dot");
 
+  // Step 2. Regularization `aten::view`, `aten::copy_` to
+  // `immut::access`, `immut::assign`
+  TensorSSABufferTreeViewImmutablize(graph->block(), &aliasDb_buffer_tree);
+
+  // graph->dump();
+
   // Step 2. Convert to TensorSSA
   // LOG(INFO) << "Step 2. Functionaliazation" << std::endl;
   TensorSSAAliasRemoval(graph->block(), &aliasDb_buffer_tree);
 
   // Step 3. Immutablize
   // LOG(INFO) << "Step 3(temp). Immutablize" << std::endl;
-  TensorSSAImmutablize(graph->block(), &aliasDb_buffer_tree);
+  // TensorSSAImmutablize(graph->block(), &aliasDb_buffer_tree);
   graph->dump();
 }
 

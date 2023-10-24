@@ -3,7 +3,9 @@
 ### TODOLIST
 
 - [ ] Deep dive into AliasDb
-- [X] Define `immut` operator `aliasInfo`, `inferShape`
+- [X] Define `immut` operator `aliasInfo`
+- [ ] Define `immut` operator `inferShape`
+- [ ] Define `immut` operator `fallback`
 - [ ] Define memory SSA representation (`immut::access`, `immut::assign`)
 - [ ] Completely support control flow
 
