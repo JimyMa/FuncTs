@@ -3,7 +3,7 @@
 #include <functs/csrc/jit/ir/symbol_ext.h>
 #include <functs/csrc/jit/passes/convert_to_tensorssa.h>
 #include <torch/csrc/jit/ir/ir.h>
-#include <torch/csrc/jit/passes/utils/memory_dag.h>
+// #include <torch/csrc/jit/passes/utils/memory_dag.h>
 
 using namespace c10;
 
