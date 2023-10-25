@@ -8,19 +8,15 @@ import functs._C
 
 def func(a: torch.Tensor, c: torch.Tensor, d: torch.Tensor):
     tmp_0 = d
-    tmp_1 = tmp_0[1]
-    tmp_1 = tmp_1[0]
     if (a.nonzero() > 1):
-        b = a[0]
-        if (a.nonzero() > 2):
-            b = a[1]
-        else:
-            b = a[2] + tmp_1
+        x = tmp_0 + d
+        
+        tmp_0.add_(tmp_0[0])
     else:
-        b = c[1]
-    tmp_1.add_(b[0])
-    tmp_1.add_(b[1])
-    return b + tmp_1
+        
+        tmp_0.copy_(tmp_0[1])
+    tmp_0.add_(d[0])
+    return tmp_0
 
 
 func = torch.jit.script(func)

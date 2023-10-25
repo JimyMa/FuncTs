@@ -1,10 +1,12 @@
 #include <ATen/core/ivalue.h>
 #include <ATen/core/jit_type.h>
+#include <memory>
 #include <set>
 
 #include <ATen/core/symbol.h>
 #include <c10/util/Exception.h>
 #include <functs/csrc/jit/ir/alias_analysis.h>
+#include <functs/csrc/jit/ir/buffer_forest.h>
 #include <functs/csrc/jit/ir/symbol_ext.h>
 #include <functs/csrc/jit/passes/convert_to_tensorssa.h>
 #include <functs/csrc/jit/passes/remove_inplace.h>
@@ -80,7 +82,8 @@ void TensorSSAAliasRemoval(Block *b, AliasDbCopy *buffer_forest) {
     // Step 1. Pass Up
     // Unsupported has been eliminated from alias set
     auto elementMap = buffer_forest->elementMapMutable();
-    if (aten::copy_ == node->kind() && elementMap.count(node->output())) {
+
+    if (aten::copy_ == node->kind() && elementMap.count(node->input(0))) {
       // TODO: only tensor values are considered...
       const Value *points_to;
       Value *leaf_value = node->output(0);
@@ -288,6 +291,23 @@ void ConvertToTensorSSA(std::shared_ptr<Graph> graph) {
 
   aliasDb_buffer_tree.dump();
   aliasDb_buffer_tree.dumpToGraphvizFile("buffer_tree.dot");
+
+  auto bufferForest = std::make_shared<BufferForest>();
+  auto elementMap = aliasDb_buffer_tree.elementMap();
+  for (auto &elemPtr : elementMap) {
+    auto value = elemPtr.first;
+    auto elem = elemPtr.second;
+    for (auto pointToIndex : elem->pointsTo) {
+      bufferForest->addEdgeToBufferForest(
+          const_cast<Value *>(value),
+          const_cast<Value *>(
+              *aliasDb_buffer_tree.fromIndex(pointToIndex)->values.begin()));
+    }
+  }
+  auto writeIndex = aliasDb_buffer_tree.writeIndexMutable();
+  for (auto node_vs_idx : *writeIndex) {
+    bufferForest->addMutationToBufferForest(node_vs_idx.first);
+  }
 
   // Step 2. Regularization `aten::view`, `aten::copy_` to
   // `immut::access`, `immut::assign`
