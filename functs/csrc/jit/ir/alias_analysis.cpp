@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <functs/csrc/jit/ir/alias_analysis.h>
 
 #include <ATen/core/interned_strings.h>
@@ -337,6 +338,8 @@ void AliasDbCopy::getWritesImpl(Node *n, MemoryLocations &ret) const {
 
 // Does `n` write to an alias of one of the values in `vs`?
 bool AliasDbCopy::writesToAlias(Node *n, const ValueSet &vs) const {
+  std::cout << ">>" << std::endl;
+  n->dump();
   const auto writtenTo = getWrites(n);
   if (writtenTo.empty()) {
     return false;
@@ -346,6 +349,7 @@ bool AliasDbCopy::writesToAlias(Node *n, const ValueSet &vs) const {
   for (const auto v : vs) {
     auto it = elementMap_.find(v);
     if (it != elementMap_.end()) {
+      std::cout << v->debugName() << "<<>>>>" << std::endl;
       const auto &vlocs = memoryDAG_->getMemoryLocations(it->second);
       if (writtenTo.intersects(vlocs)) {
         return true;
@@ -932,6 +936,21 @@ void AliasDbCopy::registerWrite(const Value *v, Node *n,
     writeRegistry_->registerWriteToAllContained(v, n);
   } else {
     writeRegistry_->registerWrite(v, n);
+  }
+}
+
+void AliasDbCopy::replaceAllWriteWith(const Value *from, const Value *to) {
+  // std::cout << "x" << std::endl;
+  for (auto &write : *writeIndex_) {
+    auto mutate_node = write.first;
+    auto values = write.second;
+    for (auto value_index : values) {
+      if (*(memoryDAG_->fromIndex(value_index)->values.begin()) == from) {
+        write.second.set(elementMap_[to]->index);
+        write.second.reset(value_index);
+        break;
+      }
+    }
   }
 }
 

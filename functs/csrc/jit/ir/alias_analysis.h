@@ -161,9 +161,9 @@ public:
   // Copy `existing`s aliasing info to `new_value`, and remove `existing`.
   TORCH_API void replaceWithNewValue(Value *existing, Value *new_value);
   // Delete aliasing info `v`
-  TORCH_API void destroyValue(Value* v);
+  TORCH_API void destroyValue(Value *v);
   // Copy `from`s aliasing info to `to`.
-  TORCH_API void createValueByCopy(const Value *value, Value* from);
+  TORCH_API void createValueByCopy(const Value *value, Value *from);
   TORCH_API void copyValue(Value *from, Value *to);
   // Create a new `value` that does not alias anything else.
   TORCH_API void createValue(const Value *value);
@@ -194,11 +194,15 @@ public:
 
   Element *fromIndex(unsigned x) { return memoryDAG_->fromIndex(x); }
 
+  void replaceAllWriteWith(const Value *from, const Value *to);
+
   // temp expose private method to public
   std::string getElementName(const Element *e) const;
   Element *getOrCreateElement(const Value *value);
   void makePointerTo(const Value *value, const Value *to);
   void deletePointerTo(const Value *from, const Value *to);
+  bool mayAliasWildcard(const Value *v) const;
+  bool mayAliasWildcard(const at::ArrayRef<Value *> vs) const;
 
 private:
   // Helper for topologically-safe node moves.
@@ -308,8 +312,8 @@ private:
                                                 const AliasTypeSet &mut_types);
 
   std::vector<Element *> getElements(at::ArrayRef<Value *> vs) const;
-  bool mayAliasWildcard(const Value *v) const;
-  bool mayAliasWildcard(const at::ArrayRef<Value *> vs) const;
+  // bool mayAliasWildcard(const Value *v) const;
+  // bool mayAliasWildcard(const at::ArrayRef<Value *> vs) const;
   bool hasWriters(const at::ArrayRef<Value *> &values) const;
 
   // Cached mapping of type ptrs to their mutable types

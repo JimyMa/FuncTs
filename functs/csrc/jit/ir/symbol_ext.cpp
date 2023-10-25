@@ -5,7 +5,9 @@ namespace torch {
 namespace jit {
 at::Tensor Access(at::Tensor src) { return src; }
 
-at::Tensor Assign(at::Tensor self, at::Tensor src, bool n) { return self; }
+at::Tensor Assign(at::Tensor self, at::Tensor src, c10::optional<bool> n) {
+  return self;
+}
 
 at::Tensor ImmutSelect(at::Tensor src, int64_t dim, int64_t index) {
   return src;
@@ -32,7 +34,8 @@ static auto _registry =
         .op("immut::access(Tensor src) -> Tensor", Access,
             RegisterOperators::options().aliasAnalysis(
                 c10::AliasAnalysisKind::PURE_FUNCTION))
-        .op("immut::assign(Tensor self, Tensor src, bool n) -> Tensor", Assign,
+        .op("immut::assign(Tensor self, Tensor src, bool? n=None) -> Tensor",
+            Assign,
             RegisterOperators::options().aliasAnalysis(
                 c10::AliasAnalysisKind::PURE_FUNCTION))
         .op("immut::select(Tensor src, int dim, int index) -> Tensor",
