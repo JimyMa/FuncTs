@@ -25,7 +25,7 @@ struct BufferNode {
 
 struct BufferTree {
   std::shared_ptr<BufferNode> root;
-  std::vector<Node *> mutations;
+  std::set<Node *> mutations;
 
   BufferTree(std::shared_ptr<BufferNode> node) : root(node) {}
 
@@ -52,6 +52,7 @@ public:
   BufferForest() = default;
   void mergeBufferTree(Value *from, Value *to);
   void replaceValue(Value *from, Value *to);
+  void replaceMutation(Node *from, Node *to);
   void addEdgeToBufferForest(Value *from, Value *to);
   void addMutationToBufferForest(Node *node);
   bool isBufferMutation(Node *node);

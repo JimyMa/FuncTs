@@ -158,6 +158,19 @@ void BufferForest::replaceValue(Value *from, Value *to) {
   from_node->bufferNode_->var = to;
 }
 
+void BufferForest::replaceMutation(Node *from, Node *to) {
+  for (auto &bufferTree : bufferForest_) {
+    if (bufferTree->mutations.count(from)) {
+      bufferTree->mutations.insert(to);
+      bufferTree->mutations.erase(from);
+      return;
+    }
+  }
+  std::cout << "[WARNING] cannot find mutation when replace mutation!!!"
+            << std::endl;
+  return;
+}
+
 void BufferForest::addEdgeToBufferForest(Value *from, Value *to) {
   auto from_tree = getBufferTreeOrNone(from);
   auto to_tree = getBufferTreeOrNone(to);
@@ -191,7 +204,7 @@ void BufferForest::addMutationToBufferForest(Node *node) {
     return;
   }
   auto bufferTree = getBufferTreeOrNone(node->output());
-  bufferTree->mutations.push_back(node);
+  bufferTree->mutations.insert(node);
 }
 
 bool BufferForest::isBufferMutation(Node *node) {
