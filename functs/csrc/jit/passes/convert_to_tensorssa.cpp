@@ -70,31 +70,60 @@ void GetBufferTree(std::shared_ptr<Graph> g, AliasDbCopy &aliasDb_buffer_tree) {
   }
 }
 
-void TensorSSAAliasRemoval(Block *b, AliasDbCopy *buffer_forest) {
+std::shared_ptr<BufferForest>
+TensorSSAGetBufferForest(std::shared_ptr<Graph> graph) { // AliasDb
+  auto aliasDb_buffer_tree = AliasDbCopy(graph);
+
+  GetBufferTree(graph, aliasDb_buffer_tree);
+
+  auto bufferForest = std::make_shared<BufferForest>();
+  auto elementMap = aliasDb_buffer_tree.elementMap();
+  for (auto &elemPtr : elementMap) {
+    auto value = elemPtr.first;
+    auto elem = elemPtr.second;
+    for (auto pointToIndex : elem->pointsTo) {
+      bufferForest->addEdgeToBufferForest(
+          const_cast<Value *>(value),
+          const_cast<Value *>(
+              *aliasDb_buffer_tree.fromIndex(pointToIndex)->values.begin()));
+    }
+  }
+  auto writeIndex = aliasDb_buffer_tree.writeIndexMutable();
+  for (auto node_vs_idx : *writeIndex) {
+    bufferForest->addMutationToBufferForest(node_vs_idx.first);
+  }
+  return bufferForest;
+}
+
+void TensorSSAAliasRemoval(Block *b,
+                           std::shared_ptr<BufferForest> functs_buffer_forest) {
   auto nodes = b->nodes();
   for (auto node = nodes.front(); node != nodes.back();) {
     auto blocks = node->blocks();
     for (auto block : blocks) {
-      TensorSSAAliasRemoval(block, buffer_forest);
+      TensorSSAAliasRemoval(block, functs_buffer_forest);
     }
 
     // Judge if a node is a write node, if true, convert to immutable equivalent
-    // Step 1. Pass Up
-    // Unsupported has been eliminated from alias set
-    auto elementMap = buffer_forest->elementMapMutable();
-
-    if (aten::copy_ == node->kind() && elementMap.count(node->input(0))) {
+    // Note: Unsupported alias has been eliminated from alias set
+    if (functs_buffer_forest->isBufferMutation(node)) {
       // TODO: only tensor values are considered...
+      // Step 1. Pass Up
       const Value *points_to;
       Value *leaf_value = node->output(0);
       Value *pass_up_value = node->input(0);
-      b->owningGraph()->setInsertPoint(node->next());
+      WithInsertPoint insert_point(node->next());
       do {
-        auto points_to_elem =
-            buffer_forest->fromIndex(*elementMap[leaf_value]->pointsTo.begin());
+        // substitute to buffer node
+        auto leaf_buffer_node =
+            functs_buffer_forest->getBufferTreeOrNone(leaf_value)
+                ->getBufferNodeOrNone(leaf_value);
+        auto points_to_node = leaf_buffer_node->pointsTo;
 
-        if (points_to_elem->values.size() > 0) {
-          points_to = *(points_to_elem->values.begin());
+        // go up until meet the buffer root, the origin defined tensor who owns
+        // the storage.
+        if (points_to_node) {
+          points_to = points_to_node->bufferNode_->var;
           Node *pass_up_node;
           auto leaf_node = leaf_value->node();
           if (aten::select == leaf_node->kind() ||
@@ -125,21 +154,25 @@ void TensorSSAAliasRemoval(Block *b, AliasDbCopy *buffer_forest) {
       Value *pass_down_value = pass_up_value;
       Value *root_value = leaf_value;
 
-      buffer_forest->createValueByCopy(pass_down_value, root_value);
-      buffer_forest->destroyValue(root_value);
+      // functs_buffer_forest
+      functs_buffer_forest->replaceValue(root_value, pass_down_value);
 
       root_value->replaceAllUsesAfterNodeWith(pass_up_value->node(),
                                               pass_down_value);
 
-      b->owningGraph()->setInsertPoint(pass_up_value->node()->next());
+      WithInsertPoint pass_down_insert_point(pass_up_value->node()->next());
 
       std::function<void()> pass_down;
-      pass_down = [&]() -> void {
-        auto elementMap = buffer_forest->elementMapMutable();
-        for (auto pointedFromIndex : elementMap[pass_down_value]->pointedFrom) {
-          auto from_elem = buffer_forest->fromIndex(pointedFromIndex);
 
-          auto from_value = const_cast<Value *>(*from_elem->values.begin());
+      pass_down = [&]() -> void {
+        // auto elementMap = buffer_forest->elementMapMutable();
+        auto pass_down_buffer_node =
+            functs_buffer_forest->getBufferNodeOrNone(pass_down_value);
+        for (auto point_from_buffer_node : pass_down_buffer_node->pointedFrom) {
+          // auto from_elem = buffer_forest->fromIndex(pointedFromIndex);
+
+          // auto from_value = const_cast<Value *>(*from_elem->values.begin());
+          auto from_value = point_from_buffer_node->bufferNode_->var;
           auto from_node = from_value->node();
 
           if (!(from_node->isAfter(node))) {
@@ -149,7 +182,9 @@ void TensorSSAAliasRemoval(Block *b, AliasDbCopy *buffer_forest) {
                   immutable::Select, const_cast<Node *>(from_node)->inputs(),
                   1);
               pass_down_node->replaceInput(0, pass_down_value);
-            } else if (aten::copy_ == node->kind()) {
+            } else if (aten::copy_ == node->kind() ||
+                       immutable::Assign == node->kind()) {
+              std::cout << "??SDFSDFSD" << std::endl;
               pass_down_node = b->owningGraph()->create(
                   immutable::Assign, const_cast<Node *>(from_node)->inputs(),
                   1);
@@ -165,10 +200,11 @@ void TensorSSAAliasRemoval(Block *b, AliasDbCopy *buffer_forest) {
             pass_down_value = pass_down_node->output(0);
             pass_down_value->setType(
                 const_cast<Node *>(from_node)->output(0)->type());
-            buffer_forest->createValueByCopy(pass_down_value, from_value);
-            buffer_forest->destroyValue(from_value);
+
+            functs_buffer_forest->replaceValue(from_value, pass_down_value);
             from_node->output(0)->replaceAllUsesAfterNodeWith(pass_down_node,
                                                               pass_down_value);
+
             root_value = from_node->output(0);
             pass_down();
           }
@@ -187,21 +223,22 @@ void TensorSSAAliasRemoval(Block *b, AliasDbCopy *buffer_forest) {
 void TensorSSAPropagation(std::shared_ptr<Graph> graph);
 void TensorSSARename(std::shared_ptr<Graph> graph);
 
-void TensorSSAImmutablize(Block *b, AliasDbCopy *buffer_forest) {
+void TensorSSAImmutablize(Block *b,
+                          std::shared_ptr<BufferForest> buffer_forest) {
   auto nodes = b->nodes();
   for (auto node = nodes.front(); node != nodes.back();) {
     auto blocks = node->blocks();
     for (auto block : blocks) {
       TensorSSAImmutablize(block, buffer_forest);
     }
-    auto elementMap = buffer_forest->elementMap();
-    if (elementMap.count(node->output(0))) {
+    if (buffer_forest->getBufferNodeOrNone(node->output())) {
       if (aten::select == node->kind()) {
         auto immutableNode =
             b->owningGraph()->create(immutable::Select, node->inputs(), 1);
         immutableNode->output()->setType(node->output()->type());
         immutableNode->insertAfter(node);
         node->output()->replaceAllUsesWith(immutableNode->output());
+        buffer_forest->replaceValue(node->output(), immutableNode->output());
         node->destroy();
         node = immutableNode->next();
       } else {
@@ -213,37 +250,41 @@ void TensorSSAImmutablize(Block *b, AliasDbCopy *buffer_forest) {
   }
 }
 
-void TensorSSABufferTreeViewImmutablize(Block *b, AliasDbCopy *buffer_forest) {
-  // traversal aliasDb buffer forest, convert aten::view to immut::select
-  // and change the alias relationship at the same time.
-  auto elementMap = buffer_forest->elementMap();
-  bool anyChanged = true;
+void TensorSSABufferTreeViewImmutablize(
+    Block *b, std::shared_ptr<BufferForest> functs_buffer_forest) {
 
-  auto get_all_buffer_nodes = [&]() -> std::vector<Node *> {
-    std::vector<Node *> result;
-    for (auto elementMapPtr : elementMap) {
-      auto from_value = elementMapPtr.first;
-      if (aten::select == from_value->node()->kind()) {
-        result.push_back(const_cast<Value *>(from_value)->node());
-      }
+  auto nodes = b->nodes();
+
+  for (auto node = nodes.front(); node != nodes.back();) {
+    auto blocks = node->blocks();
+    for (auto &block : blocks) {
+      TensorSSABufferTreeViewImmutablize(block, functs_buffer_forest);
     }
-    return result;
-  };
-  auto all_buffer_nodes = get_all_buffer_nodes();
-  for (auto &node : all_buffer_nodes) {
-    // add a new immutable operator
-    auto new_node =
-        b->owningGraph()->create(immutable::Select, node->inputs(), 1);
 
-    new_node->output()->setType(node->output()->type());
-    new_node->insertAfter(node);
-    node->output()->replaceAllUsesWith(new_node->output());
+    auto output_value = node->output();
+    auto buffer_node = functs_buffer_forest->getBufferNodeOrNone(output_value);
 
-    // change alias relationship
-    buffer_forest->createValueByCopy(new_node->output(), node->output());
-    buffer_forest->destroyValue(const_cast<Value *>(node->output()));
+    if (buffer_node) {
+      if (aten::select == node->kind()) {
+        // add a new immutable operator
+        auto new_node =
+            b->owningGraph()->create(immutable::Select, node->inputs(), 1);
 
-    node->destroy();
+        new_node->output()->setType(node->output()->type());
+        new_node->insertBefore(node);
+        node->output()->replaceAllUsesWith(new_node->output());
+
+        functs_buffer_forest->replaceValue(output_value, new_node->output());
+        node->dump();
+        new_node->dump();
+        node->destroy();
+        node = new_node->next();
+      } else {
+        node = node->next();
+      }
+    } else {
+      node = node->next();
+    }
   }
 }
 
@@ -275,50 +316,22 @@ void ConvertToTensorSSA(std::shared_ptr<Graph> graph) {
   RemoveInplace(graph);
   std::cout << "remove inplace end..." << std::endl;
 
-  // AliasDb
-  auto aliasDb_origin = AliasDbCopy(graph);
-  auto aliasDb_buffer_tree = AliasDbCopy(graph);
-  aliasDb_origin.dump();
-
-  graph->dump();
-  aliasDb_buffer_tree.dump();
-
-  // Step 1. Get Buffer Tree
-  // LOG(INFO) << "Step 1. Get Buffer Tree" << std::endl;
+  // Step 1. Get Buffer Forest
   std::cout << "get Buffer Tree begin..." << std::endl;
-  GetBufferTree(graph, aliasDb_buffer_tree);
+  auto bufferForest = TensorSSAGetBufferForest(graph);
   std::cout << "get Buffer Tree end..." << std::endl;
-
-  aliasDb_buffer_tree.dump();
-  aliasDb_buffer_tree.dumpToGraphvizFile("buffer_tree.dot");
-
-  auto bufferForest = std::make_shared<BufferForest>();
-  auto elementMap = aliasDb_buffer_tree.elementMap();
-  for (auto &elemPtr : elementMap) {
-    auto value = elemPtr.first;
-    auto elem = elemPtr.second;
-    for (auto pointToIndex : elem->pointsTo) {
-      bufferForest->addEdgeToBufferForest(
-          const_cast<Value *>(value),
-          const_cast<Value *>(
-              *aliasDb_buffer_tree.fromIndex(pointToIndex)->values.begin()));
-    }
-  }
-  auto writeIndex = aliasDb_buffer_tree.writeIndexMutable();
-  for (auto node_vs_idx : *writeIndex) {
-    bufferForest->addMutationToBufferForest(node_vs_idx.first);
-  }
 
   bufferForest->dump();
 
   // Step 2. Regularization `aten::view`, `aten::copy_` to
   // `immut::access`, `immut::assign`
-  TensorSSABufferTreeViewImmutablize(graph->block(), &aliasDb_buffer_tree);
+  TensorSSAImmutablize(graph->block(), bufferForest);
   // graph->dump();
+  bufferForest->dump();
 
   // Step 2. Convert to TensorSSA
   // LOG(INFO) << "Step 2. Functionaliazation" << std::endl;
-  TensorSSAAliasRemoval(graph->block(), &aliasDb_buffer_tree);
+  TensorSSAAliasRemoval(graph->block(), bufferForest);
 
   graph->dump();
 }

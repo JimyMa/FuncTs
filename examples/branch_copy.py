@@ -18,7 +18,6 @@ def func(a: torch.Tensor, c: torch.Tensor, d: torch.Tensor):
     tmp_0.add_(d[0])
     return tmp_0
 
-
 func = torch.jit.script(func)
 g = func.graph
 

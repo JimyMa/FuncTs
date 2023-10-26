@@ -51,11 +51,13 @@ class BufferForest {
 public:
   BufferForest() = default;
   void mergeBufferTree(Value *from, Value *to);
+  void replaceValue(Value *from, Value *to);
   void addEdgeToBufferForest(Value *from, Value *to);
   void addMutationToBufferForest(Node *node);
   bool isBufferMutation(Node *node);
 
   std::shared_ptr<BufferTree> getBufferTreeOrNone(Value *v);
+  std::shared_ptr<BufferNode> getBufferNodeOrNone(Value *v);
 
   std::set<std::shared_ptr<BufferTree>> bufferForest_;
   void dump() const;

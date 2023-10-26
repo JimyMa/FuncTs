@@ -48,6 +48,9 @@ std::shared_ptr<BufferNode> BufferTree::getBufferNodeOrNone(Value *v) {
     }
   }
 
+  std::cout << "[WARN] Cannot find node for %" << v->debugName()
+            << ", forget it when buffer forest construction" << std::endl;
+
   return nullptr;
 }
 
@@ -120,6 +123,15 @@ std::shared_ptr<BufferTree> BufferForest::getBufferTreeOrNone(Value *v) {
     if (bufferTree->find(v))
       return bufferTree;
   }
+  std::cout << "[WARN] Cannot find tree for %" << v->debugName()
+            << ", forget it when buffer forest construction" << std::endl;
+  ;
+  return nullptr;
+}
+
+std::shared_ptr<BufferNode> BufferForest::getBufferNodeOrNone(Value *v) {
+  if (auto tree = getBufferTreeOrNone(v))
+    return tree->getBufferNodeOrNone(v);
   return nullptr;
 }
 
@@ -139,6 +151,11 @@ void BufferForest::mergeBufferTree(Value *from, Value *to) {
   to_node->pointedFrom.push_back(from_node);
 
   bufferForest_.erase(from_tree);
+}
+
+void BufferForest::replaceValue(Value *from, Value *to) {
+  auto from_node = getBufferTreeOrNone(from)->getBufferNodeOrNone(from);
+  from_node->bufferNode_->var = to;
 }
 
 void BufferForest::addEdgeToBufferForest(Value *from, Value *to) {
@@ -176,13 +193,14 @@ void BufferForest::addMutationToBufferForest(Node *node) {
   auto bufferTree = getBufferTreeOrNone(node->output());
   bufferTree->mutations.push_back(node);
 }
+
 bool BufferForest::isBufferMutation(Node *node) {
-  auto tree = getBufferTreeOrNone(node->output());
-  if (!tree) {
-    return false;
+  for (auto &bufferTree : bufferForest_) {
+    if (std::find(bufferTree->mutations.begin(), bufferTree->mutations.end(),
+                  node) != bufferTree->mutations.end())
+      return true;
   }
-  return std::find(tree->mutations.begin(), tree->mutations.end(), node) !=
-         tree->mutations.end();
+  return false;
 }
 
 void BufferForest::dump() const {
