@@ -10,7 +10,7 @@ def func(a: torch.Tensor, c: torch.Tensor, d: torch.Tensor):
     tmp_0 = d
     tmp_1 = tmp_0[1]
     if (a.nonzero() > 1):
-        tmp_1.copy_(tmp_0[1])
+        tmp_0 = tmp_0 + 1
     else:
         tmp_1.copy_(tmp_0[2])
     return tmp_1

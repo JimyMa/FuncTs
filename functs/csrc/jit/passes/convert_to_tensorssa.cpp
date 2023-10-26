@@ -186,7 +186,7 @@ TensorSSAAliasRemoval(Block *b, std::shared_ptr<BufferForest> bufferForest,
 
       // generate a strong update to beacon mutation
       auto update_node = b->owningGraph()->create(
-          tensorssa::Update, {pass_down_node->output(), root_value});
+          tensorssa::Update, {pass_down_node->output(), root_value}, 0);
       update_node->insertAfter(node_insert);
       node_insert = update_node;
 
@@ -205,7 +205,7 @@ TensorSSAAliasRemoval(Block *b, std::shared_ptr<BufferForest> bufferForest,
           auto from_value = point_from_buffer_node->bufferNode_->var;
           auto from_node = from_value->node();
 
-          if (from_node->isBefore(node)) {
+          if (from_node->isBefore(node) && node->isDominatedBy(from_node)) {
             if (immutable::Select == from_node->kind()) {
               pass_down_node = b->owningGraph()->create(
                   immutable::Select, const_cast<Node *>(from_node)->inputs(),
@@ -230,7 +230,7 @@ TensorSSAAliasRemoval(Block *b, std::shared_ptr<BufferForest> bufferForest,
 
             // generate a strong update to beacon mutation
             auto update_node = b->owningGraph()->create(
-                tensorssa::Update, {pass_down_node->output(), from_value});
+                tensorssa::Update, {pass_down_node->output(), from_value}, 0);
             update_node->insertAfter(pass_down_node);
             node_insert = update_node;
 
@@ -383,7 +383,9 @@ static void renameValues(Block *block,
     else
       renameCounts.insert({mutated, 1});
   };
-  auto replaceInputsOf = [&](Node *node) {
+  auto replaceInputsOf = [&](Node *node) -> void {
+    if (tensorssa::Update == node->kind())
+      return;
     for (auto i = 0u; i < node->inputs().size(); i++) {
       auto input = node->input(i);
       if (!mutateInfo->valueToMut.count(input))
@@ -426,6 +428,8 @@ static void TensorSSARename(std::shared_ptr<Graph> graph,
     mutateInfo->renameStacks.insert({value, {}});
   renameValues(graph->block(), mutateInfo);
 }
+
+static void TensorSSARemoveUpdate(std::shared_ptr<Graph> graph) {}
 
 void ConvertToTensorSSA(std::shared_ptr<Graph> graph) {
   std::cout << "Origin Graph: " << std::endl;
