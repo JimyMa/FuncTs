@@ -6,6 +6,10 @@
 namespace torch {
 namespace jit {
 
+// TODO: use bit vector to speed up alias removal.
+// class BitVector {};
+// typedef c10::SparseBitVector<256> BufferLocations;
+
 struct VarVersion {
   VarVersion(Value *v) : var(v) {}
   Value *var;
@@ -26,7 +30,10 @@ struct BufferTree {
   BufferTree(std::shared_ptr<BufferNode> node) : root(node) {}
 
   void addEdgeToBufferTree(Value *from, Value *to);
-  bool find(Value* v);
+  std::shared_ptr<BufferNode> getBufferNodeOrNone(Value *v);
+  bool find(Value *v);
+
+  void dump() const;
 };
 
 // BufferForest to record alias relationship and version relationship
@@ -43,13 +50,18 @@ struct BufferTree {
 class BufferForest {
 public:
   BufferForest() = default;
+  void mergeBufferTree(Value *from, Value *to);
   void addEdgeToBufferForest(Value *from, Value *to);
   void addMutationToBufferForest(Node *node);
   bool isBufferMutation(Node *node);
 
   std::shared_ptr<BufferTree> getBufferTreeOrNone(Value *v);
 
-  std::vector<std::shared_ptr<BufferTree>> bufferForest_;
+  std::set<std::shared_ptr<BufferTree>> bufferForest_;
+  void dump() const;
 };
+
+// TORCH_API std::ostream &operator<<(std::ostream &out, const BufferForest &f);
+
 } // namespace jit
 } // namespace torch

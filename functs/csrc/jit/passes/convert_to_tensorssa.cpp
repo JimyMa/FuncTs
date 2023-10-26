@@ -309,6 +309,8 @@ void ConvertToTensorSSA(std::shared_ptr<Graph> graph) {
     bufferForest->addMutationToBufferForest(node_vs_idx.first);
   }
 
+  bufferForest->dump();
+
   // Step 2. Regularization `aten::view`, `aten::copy_` to
   // `immut::access`, `immut::assign`
   TensorSSABufferTreeViewImmutablize(graph->block(), &aliasDb_buffer_tree);
