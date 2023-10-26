@@ -6,6 +6,7 @@ import functs._C
 def loop(a: torch.Tensor, b: torch.Tensor):
     for i in range(10):
         a[i].add_(b[i+1])
+        a[i+1].add_(b[i+1])
     return a
 
 

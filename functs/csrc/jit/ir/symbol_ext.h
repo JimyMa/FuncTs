@@ -6,12 +6,18 @@
 #include <unordered_map>
 
 namespace c10 {
+namespace tensorssa {
+
+static const Symbol tssa = Symbol::fromQualString("namespaces::tssa");
+static Symbol Update = Symbol::fromQualString("tssa::update");
+
+} // namespace tensorssa
 namespace immutable {
 
-static const Symbol ns = Symbol::fromQualString("namespaces::immutable");
+static const Symbol immut = Symbol::fromQualString("namespaces::immutable");
 
+static Symbol Access = Symbol::fromQualString("immut::access");
 static Symbol Assign = Symbol::fromQualString("immut::assign");
-static Symbol Update = Symbol::fromQualString("immut::access");
 
 static auto Select = Symbol::fromQualString("immut::select");
 static auto SelectReverse = Symbol::fromQualString("immut::select_rev");
