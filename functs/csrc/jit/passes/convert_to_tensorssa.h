@@ -8,5 +8,6 @@ namespace torch {
 namespace jit {
 void DumbRemoveInterPrecedureMutation(std::shared_ptr<Graph> graph);
 void ConvertToTensorSSA(std::shared_ptr<Graph> graph);
+void TensorSSARemoveUpdate(std::shared_ptr<Graph> graph);
 } // namespace jit
 } // namespace torch

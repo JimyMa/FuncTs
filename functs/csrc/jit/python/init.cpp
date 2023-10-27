@@ -15,6 +15,7 @@ void initJITFuncBindings(PyObject *module) {
   m.def("_jit_pass_remove_inplace", RemoveInplace);
   m.def("_jit_pass_dump_remove_inter_precedure_mutation",
         DumbRemoveInterPrecedureMutation);
+  m.def("_jit_pass_tensorssa_remove_update", TensorSSARemoveUpdate);
 }
 } // namespace jit
 } // namespace torch

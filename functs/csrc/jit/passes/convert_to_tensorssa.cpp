@@ -135,8 +135,6 @@ TensorSSAAliasRemoval(Block *b, std::shared_ptr<BufferForest> bufferForest,
     // Judge if a node is a write node, if true, convert to immutable equivalent
     // Note: Unsupported alias has been eliminated from alias set
     if (bufferForest->isBufferMutation(node)) {
-      b->owningGraph()->dump();
-      bufferForest->dump();
       // TODO: only tensor values are considered...
       // Step 1. Pass Up
       const Value *points_to;
@@ -205,6 +203,16 @@ TensorSSAAliasRemoval(Block *b, std::shared_ptr<BufferForest> bufferForest,
           auto from_value = point_from_buffer_node->bufferNode_->var;
           auto from_node = from_value->node();
 
+          // node is dominated by from_node is nesessary!!!
+          // def func(a, b):
+          // // if cond:
+          // // // c = a[0]
+          // // else:
+          // // // pass
+          // // c.copy_(b)
+          // this pattern is unsupport
+          // a tensor which is not dominated by value try to mutate the value
+          // NOTE: this feature is unsupported in TorchScript either.
           if (from_node->isBefore(node) && node->isDominatedBy(from_node)) {
             if (immutable::Select == from_node->kind()) {
               pass_down_node = b->owningGraph()->create(
@@ -429,17 +437,30 @@ static void TensorSSARename(std::shared_ptr<Graph> graph,
   renameValues(graph->block(), mutateInfo);
 }
 
-static void TensorSSARemoveUpdate(std::shared_ptr<Graph> graph) {}
+void TensorSSARemoveUpdate(std::shared_ptr<Graph> graph) {
+  std::function<void(Block *)> removeUpdateImpl;
+  removeUpdateImpl = [&removeUpdateImpl](Block *b) -> void {
+    auto nodes = b->nodes();
+    for (auto node = nodes.front(); node != nodes.back(); node = node->next()) {
+      for (auto &block : node->blocks()) {
+        removeUpdateImpl(block);
+      }
+      if (tensorssa::Update == node->kind()) {
+        auto tmp = node->next();
+        node->destroy();
+        node = tmp;
+      }
+    }
+  };
+  removeUpdateImpl(graph->block());
+}
 
 void ConvertToTensorSSA(std::shared_ptr<Graph> graph) {
-  std::cout << "Origin Graph: " << std::endl;
-  graph->dump();
-
   // Preprocess: A dumb pass to eliminate interprecedure view
   std::cout << "dumb remove inter precedure mutation begin..." << std::endl;
   DumbRemoveInterPrecedureMutation(graph);
   std::cout << "dumb remove inter precedure mutation end..." << std::endl;
-  graph->dump();
+  // graph->dump();
 
   // Step 0. convert inplace operator (add_, mul_, ...) to copy
   std::cout << "remove inplace begin..." << std::endl;
@@ -454,8 +475,8 @@ void ConvertToTensorSSA(std::shared_ptr<Graph> graph) {
   // Step 2. Regularization `aten::view`, `aten::copy_` to
   // `immut::access`, `immut::assign`
   TensorSSAImmutablize(graph->block(), bufferForest);
-  graph->dump();
-  bufferForest->dump();
+  // graph->dump();
+  // bufferForest->dump();
 
   auto mutateInfo = std::make_shared<TensorSSAMutateInfo>();
   // Step 3. Convert to TensorSSA
@@ -463,25 +484,24 @@ void ConvertToTensorSSA(std::shared_ptr<Graph> graph) {
   std::cout << "Tensor Alias Removal begin..." << std::endl;
   TensorSSAAliasRemoval(graph->block(), bufferForest, mutateInfo);
   std::cout << "Tensor Alias Removal end..." << std::endl;
-  graph->dump();
+  // graph->dump();
 
   // Step 4. block propogation
   // add alias block arguments
   /////////////////////////////////
   //  IMPLEMENTED BY ZIHAN WANG  //
-  //            YYDS             //
   /////////////////////////////////
   std::cout << "Tensor Propagation begin..." << std::endl;
   TensorSSAPropagation(graph, mutateInfo);
   std::cout << "Tensor Propagation end..." << std::endl;
-  graph->dump();
+  // graph->dump();
 
   // Step 5. rename stack
   // rename by stack
   std::cout << "Tensor rename begin..." << std::endl;
   TensorSSARename(graph, mutateInfo);
   std::cout << "Tensor rename end..." << std::endl;
-  graph->dump();
+  // graph->dump();
 }
 
 } // namespace jit
