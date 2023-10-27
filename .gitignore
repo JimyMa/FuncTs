@@ -17,3 +17,8 @@ compile_commands.json
 
 *.png
 *.dot
+
+# pytest
+.hypothesis/
+.pytest_cache/
+.benchmarks/

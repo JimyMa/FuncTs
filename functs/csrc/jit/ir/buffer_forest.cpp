@@ -48,9 +48,10 @@ std::shared_ptr<BufferNode> BufferTree::getBufferNodeOrNone(Value *v) {
     }
   }
 
-  std::cout << "\033[1;31;40m[WARN]\033[0m  Cannot find node for %"
-            << v->debugName() << ", forget it when buffer forest construction"
-            << std::endl;
+  // std::cout << "\033[1;31;40m[WARN]\033[0m  Cannot find node for %"
+  //           << v->debugName() << ", forget it when buffer forest
+  //           construction"
+  //           << std::endl;
 
   return nullptr;
 }
@@ -124,10 +125,11 @@ std::shared_ptr<BufferTree> BufferForest::getBufferTreeOrNone(Value *v) {
     if (bufferTree->find(v))
       return bufferTree;
   }
-  std::cout << "\033[1;31;40m[WARN]\033[0m  Cannot find tree for %"
-            << v->debugName() << ", forget it when buffer forest construction"
-            << std::endl;
-  ;
+  // std::cout << "\033[1;31;40m[WARN]\033[0m  Cannot find tree for %"
+  //           << v->debugName() << ", forget it when buffer forest
+  //           construction"
+  //           << std::endl;
+
   return nullptr;
 }
 
@@ -168,9 +170,10 @@ void BufferForest::replaceMutation(Node *from, Node *to) {
       return;
     }
   }
-  std::cout << "\033[1;31;40m[WARN]\033[0m cannot find mutation when replace "
-               "mutation!!!"
-            << std::endl;
+  // std::cout << "\033[1;31;40m[WARN]\033[0m cannot find mutation when replace
+  // "
+  //              "mutation!!!"
+  //           << std::endl;
   return;
 }
 

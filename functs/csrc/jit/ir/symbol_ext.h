@@ -30,7 +30,7 @@ static std::unordered_map<Symbol, Symbol> immutableVersion{
     {aten::select, c10::immutable::Select},
     {aten::slice, c10::immutable::Slice}};
 
-static std::unordered_map<Symbol, Symbol> inverseVersion{
+static std::unordered_map<Symbol, Symbol> reverseVersion{
     {c10::immutable::Assign, c10::immutable::Assign},
     {c10::immutable::Select, c10::immutable::SelectReverse},
     {c10::immutable::Slice, c10::immutable::SliceReverse}};

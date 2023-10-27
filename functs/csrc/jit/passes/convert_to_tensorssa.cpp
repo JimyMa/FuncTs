@@ -73,7 +73,8 @@ static void GetBufferTreeAliasDb(std::shared_ptr<Graph> g,
 
     if (element->pointsTo.count() > 1 /* Step 1.1: count > 1 */ ||
         aliasDb_buffer_tree.mayAliasWildcard(value) /* wildcard node */ ||
-        prim::Loop == value->node()->kind()) {
+        prim::Loop == value->node()->kind() /* Loop carried dependency */ ||
+        element->values.size() > 1) {
       ambigious_alias[ptrPair.first] = ptrPair.second;
     }
   }
@@ -153,13 +154,13 @@ TensorSSAAliasRemoval(Block *b, std::shared_ptr<BufferForest> bufferForest,
           points_to = points_to_node->bufferNode_->var;
           Node *pass_up_node;
           auto leaf_node = leaf_value->node();
-          if (immutable::Select == leaf_node->kind()) {
+
+          if (immutable::reverseVersion.count(leaf_node->kind())) {
             pass_up_node = b->owningGraph()->create(
-                immutable::SelectReverse, leaf_value->node()->inputs(), 1);
-            pass_up_node->insertInput(1, pass_up_value);
-          } else if (immutable::Assign == leaf_node->kind()) {
-            pass_up_node = b->owningGraph()->create(
-                immutable::Assign, leaf_value->node()->inputs(), 1);
+                immutable::reverseVersion[leaf_node->kind()],
+                leaf_value->node()->inputs(), 1);
+            if (immutable::Assign != leaf_node->kind())
+              pass_up_node->insertInput(1, pass_up_value);
           } else {
             AT_ASSERT(false, "Unknown alias operator when pass up",
                       leaf_node->kind().toQualString());
@@ -214,18 +215,16 @@ TensorSSAAliasRemoval(Block *b, std::shared_ptr<BufferForest> bufferForest,
           // a tensor which is not dominated by value try to mutate the value
           // NOTE: this feature is unsupported in TorchScript either.
           if (from_node->isBefore(node) && node->isDominatedBy(from_node)) {
-            if (immutable::Select == from_node->kind()) {
+            if (immutable::reverseVersion.count(from_node->kind())) {
               pass_down_node = b->owningGraph()->create(
-                  immutable::Select, const_cast<Node *>(from_node)->inputs(),
+                  from_node->kind(), const_cast<Node *>(from_node)->inputs(),
                   1);
-              pass_down_node->replaceInput(0, pass_down_value);
-            } else if (aten::copy_ == node->kind() ||
-                       immutable::Assign == node->kind()) {
-              pass_down_node = b->owningGraph()->create(
-                  immutable::Assign, const_cast<Node *>(from_node)->inputs(),
-                  1);
-              pass_down_node->replaceInput(0, pass_down_value);
-              pass_down_node->replaceInput(1, pass_down_value);
+              if (immutable::Assign != from_node->kind())
+                pass_down_node->replaceInput(0, pass_down_value);
+              else {
+                pass_down_node->replaceInput(0, pass_down_value);
+                pass_down_node->replaceInput(1, pass_down_value);
+              }
             } else {
               AT_ASSERT(false, "Unknown alias operator when pass down",
                         from_node->kind().toQualString());
@@ -266,9 +265,7 @@ void TensorSSAImmutablize(Block *b,
       TensorSSAImmutablize(block, buffer_forest);
     }
 
-    switch (node->kind()) {
-    case aten::select:
-    case aten::copy_: {
+    if (immutable::immutableVersion.count(node->kind())) {
       if (buffer_forest->getBufferNodeOrNone(node->output())) {
         auto immutableNode = b->owningGraph()->create(
             c10::immutable::immutableVersion[node->kind()], node->inputs(), 1);
@@ -286,9 +283,7 @@ void TensorSSAImmutablize(Block *b,
       } else {
         node = node->next();
       }
-      break;
-    }
-    default:
+    } else {
       node = node->next();
     }
   }
@@ -457,51 +452,32 @@ void TensorSSARemoveUpdate(std::shared_ptr<Graph> graph) {
 
 void ConvertToTensorSSA(std::shared_ptr<Graph> graph) {
   // Preprocess: A dumb pass to eliminate interprecedure view
-  std::cout << "dumb remove inter precedure mutation begin..." << std::endl;
   DumbRemoveInterPrecedureMutation(graph);
-  std::cout << "dumb remove inter precedure mutation end..." << std::endl;
-  // graph->dump();
 
   // Step 0. convert inplace operator (add_, mul_, ...) to copy
-  std::cout << "remove inplace begin..." << std::endl;
   RemoveInplace(graph);
-  std::cout << "remove inplace end..." << std::endl;
 
   // Step 1. Get Buffer Forest
-  std::cout << "get Buffer Tree begin..." << std::endl;
   auto bufferForest = TensorSSAGetBufferForest(graph);
-  std::cout << "get Buffer Tree end..." << std::endl;
 
   // Step 2. Regularization `aten::view`, `aten::copy_` to
   // `immut::access`, `immut::assign`
   TensorSSAImmutablize(graph->block(), bufferForest);
-  // graph->dump();
-  // bufferForest->dump();
 
   auto mutateInfo = std::make_shared<TensorSSAMutateInfo>();
+
   // Step 3. Convert to TensorSSA
-  // LOG(INFO) << "Step 2. Functionaliazation" << std::endl;
-  std::cout << "Tensor Alias Removal begin..." << std::endl;
   TensorSSAAliasRemoval(graph->block(), bufferForest, mutateInfo);
-  std::cout << "Tensor Alias Removal end..." << std::endl;
-  // graph->dump();
 
   // Step 4. block propogation
   // add alias block arguments
   /////////////////////////////////
   //  IMPLEMENTED BY ZIHAN WANG  //
   /////////////////////////////////
-  std::cout << "Tensor Propagation begin..." << std::endl;
   TensorSSAPropagation(graph, mutateInfo);
-  std::cout << "Tensor Propagation end..." << std::endl;
-  // graph->dump();
 
   // Step 5. rename stack
-  // rename by stack
-  std::cout << "Tensor rename begin..." << std::endl;
   TensorSSARename(graph, mutateInfo);
-  std::cout << "Tensor rename end..." << std::endl;
-  // graph->dump();
 }
 
 } // namespace jit
