@@ -53,7 +53,7 @@ def main():
     build_cmake()
     setup(
         name="functs",
-        version="0.0.1",
+        version="0.0.2",
         ext_modules=[
             Extension(
                 "functs._C",
