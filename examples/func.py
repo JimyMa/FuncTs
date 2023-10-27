@@ -5,19 +5,18 @@ from torch.testing import FileCheck
 
 import functs._C
 
+
 def normal(a:torch.Tensor, b: torch.Tensor):
     a[0].copy_(b[0])
     a[1].copy_(b[1])
     return a
 
+
 def loop(a: torch.Tensor, b: torch.Tensor):
     for i in range(10):
-        if (b.sum() <= 0):
-            a[i].add_(b[i+1])
-        else:
-            a[i].add_(b[i])
-        a[i+1].add_(b[i+1])
+        a[i].copy_(b[i+1])
     return a
+
 
 def branch(a: torch.Tensor, c: torch.Tensor, d: torch.Tensor):
     tmp_0 = d
@@ -27,6 +26,7 @@ def branch(a: torch.Tensor, c: torch.Tensor, d: torch.Tensor):
     else:
         tmp_1.copy_(tmp_0[2])
     return tmp_1
+
 
 def branch_loop(a: torch.Tensor, c: torch.Tensor, d: torch.Tensor):
     tmp_0 = d
@@ -51,6 +51,7 @@ def branch_with_dependency(a: torch.Tensor, c: torch.Tensor, d: torch.Tensor):
         tmp_1.copy_(tmp_0[2])
     return tmp_1 + tmp_0
 
+
 def list_object(a: torch.Tensor, b: torch.Tensor):
     list_ = []
     list_.append(a)
@@ -64,7 +65,7 @@ def dump_graph_to_file(graph:torch.Graph, file_name:str):
     return
 
 
-func = branch_with_dependency
+func = loop
 jit_func = torch.jit.script(func)
 g = jit_func.graph
 print("\033[1;32;40mOrigin Graph:") 
@@ -90,4 +91,13 @@ dump_graph_to_file(g, "dce.rb")
 
 dot_graph, = pydot.graph_from_dot_data(g.alias_db().to_graphviz_str())
 dot_graph.write_png("alias_vis/func_alias_after_tensorssa.png")
+
+
+a: torch.Tensor = torch.ones([32, 32])
+b: torch.Tensor = torch.zeros([32, 32])
+
+print(jit_func(a.clone(), b.clone()))
+print(loop(a.clone(), b.clone()))
+
+
 
