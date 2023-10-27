@@ -60,7 +60,6 @@ def main():
                 libraries=["functs_python"],
                 library_dirs=[os.path.join(install_dir, "lib")],
                 sources=['functs/csrc/stub.c'],
-                # extra_compile_args=['-Wall', '-Wextra', '-Wno-strict-overflow', '-Wno-unused-parameter', '-Wno-missing-field-initializers', '-Wno-unknown-pragmas', '-Wno-deprecated-declarations', '-fno-strict-aliasing', '-Wno-missing-braces'],
                 include_dirs=[],
                 language="c",
                 extra_link_args=['-Wl,-rpath,$ORIGIN/lib']
