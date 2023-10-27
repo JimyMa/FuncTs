@@ -34,7 +34,6 @@ at::Tensor ImmutSliceRev(at::Tensor self, at::Tensor src, int64_t dim,
   return immut_self;
 }
 
-void profEnd(const at::Tensor src) {}
 static auto _registry =
     RegisterOperators()
         .op("immut::access(Tensor src) -> Tensor", Access,

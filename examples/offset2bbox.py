@@ -89,7 +89,13 @@ dot_graph.write_png("alias_vis/func_alias_after_tensorssa.png")
 
 a = torch.rand([1024, 1024])
 b = torch.rand([1024, 1024])
+weight: Tuple[float, float, float, float] = (1., 1., 1., 1.)
 
-print(jit_func(a.clone(), b.clone()))
-print(offset2bbox(a.clone(), b.clone()))
+torch._C._jit_pass_complete_shape_analysis(g, (a, b, weight), False)
+torch._C._jit_pass_fuse_tensorexprs(g)
+print(g)
+# torch._C._jit_pass_propagate_shapes_on_graph(g)
+
+# torch._C._jit_pass_fuse_tensorexprs(g)
+
 
