@@ -34,6 +34,13 @@ at::Tensor ImmutSliceRev(at::Tensor self, at::Tensor src, int64_t dim,
   return immut_self;
 }
 
+at::Tensor ImmutSqueeze(at::Tensor src, int64_t dim) {
+  return src.clone().squeeze(dim);
+}
+at::Tensor ImmutUnqueeze(at::Tensor src, int64_t dim) {
+  return src.clone().unsqueeze(dim);
+}
+
 static auto _registry =
     RegisterOperators()
         .op("immut::access(Tensor src) -> Tensor", Access,
@@ -61,7 +68,14 @@ static auto _registry =
             "start=None, SymInt? end=None, SymInt step=1) -> Tensor",
             ImmutSliceRev,
             RegisterOperators::options().aliasAnalysis(
+                c10::AliasAnalysisKind::PURE_FUNCTION))
+        .op("immut::squeeze(Tensor self, int dim) -> Tensor", ImmutSqueeze,
+            RegisterOperators::options().aliasAnalysis(
+                c10::AliasAnalysisKind::PURE_FUNCTION))
+        .op("immut::unsqueeze(Tensor self, int dim) -> Tensor", ImmutUnqueeze,
+            RegisterOperators::options().aliasAnalysis(
                 c10::AliasAnalysisKind::PURE_FUNCTION));
+;
 static auto x = 1;
 } // namespace jit
 } // namespace torch
