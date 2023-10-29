@@ -1,4 +1,5 @@
 #include "functs/csrc/jit/ir/alias_analysis.h"
+#include "functs/csrc/jit/ir/buffer_forest.h"
 #include <ATen/core/interned_strings.h>
 #include <c10/util/Optional.h>
 #include <functs/csrc/jit/passes/remove_inplace.h>
@@ -27,7 +28,10 @@ void RemoveInplaceImpl(Block *b, std::shared_ptr<AliasDbCopy> aliasDb) {
     // preprocess: convert `aten::compute_` buffer ==> `aten::compute` and
     // `aten::copy`
     if (isMutating(node) && aten::copy_ != node->kind() &&
-        aliasDb->elementMap().count(node->input(0))) {
+        aliasDb->elementMap().count(node->input(0)) &&
+        node->input(0)->type()->kind() != TypeKind::ListType &&
+        node->input(0)->type()->kind() != TypeKind::DictType &&
+        node->input(0)->type()->kind() != TypeKind::ClassType) {
       WithInsertPoint guard(b->param_node()->next());
       auto constant_false = b->owningGraph()->insertConstant(false);
 

@@ -35,6 +35,15 @@ static RegisterOperators const reg({
           push(stack, src.clone());
         },
         c10::AliasAnalysisKind::PURE_FUNCTION),
+    Operator(
+        "aten::clone(Tensor self, *, MemoryFormat? memory_format=None) -> "
+        "Tensor",
+        [](Stack &stack) {
+          auto pin = pop(stack);
+          auto src = pop(stack).toTensor();
+          push(stack, src.clone());
+        },
+        c10::AliasAnalysisKind::PURE_FUNCTION),
 });
 
 }

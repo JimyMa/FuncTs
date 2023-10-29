@@ -1,0 +1,1 @@
+from ._script import script

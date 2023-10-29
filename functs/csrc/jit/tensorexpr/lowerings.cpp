@@ -28,8 +28,20 @@ void init_nnc_ext() {
                                    at::Device device) {
     return computeImmutAssign(inputs, outputShape);
   };
-  registerNNCImmutLoweringFunction(immutAccessSchema, immut_access_assign_fn);
   registerNNCImmutLoweringFunction(immutAssignSchema, immut_access_assign_fn);
+
+  // const char *immutCloneSchema =
+  //     "aten::clone(Tensor self, *, MemoryFormat? memory_format=None) ->
+  //     Tensor";
+  // auto immut_clone_fn = [](const std::vector<ArgValue> &inputs,
+  //                          const std::vector<ExprHandle> &outputShape,
+  //                          const std::vector<ExprHandle> &outputStrides,
+  //                          const c10::optional<ScalarType> &outputType,
+  //                          at::Device device) {
+  //   return computeClone(inputs, outputShape);
+  // };
+  // registerNNCImmutLoweringFunction(immutCloneSchema, immut_clone_fn);
+  // registerNNCImmutLoweringFunction(immutAccessSchema, immut_clone_fn);
 
   const char *immutSelectSchema =
       "immut::select(Tensor src, int dim, int index) -> Tensor";
@@ -53,6 +65,30 @@ void init_nnc_ext() {
     return computeImmutSlice(inputs, outputShape);
   };
   registerNNCImmutLoweringFunction(immutSliceSchema, immut_slice_fn);
+
+  const char *immutSliceRevSchema =
+      "immut::slice_rev(Tensor self, Tensor src, int "
+      "dim=0, SymInt? start=None, SymInt? "
+      "end=None, SymInt step=1) -> Tensor";
+  auto immut_slice_rev_fn = [](const std::vector<ArgValue> &inputs,
+                               const std::vector<ExprHandle> &outputShape,
+                               const std::vector<ExprHandle> &outputStrides,
+                               const c10::optional<ScalarType> &outputType,
+                               at::Device device) {
+    return computeImmutSliceRev(inputs, outputShape);
+  };
+  registerNNCImmutLoweringFunction(immutSliceRevSchema, immut_slice_rev_fn);
+
+  const char *immutUnsqueezeSchema =
+      "immut::unsqueeze(Tensor self, int dim) -> Tensor";
+  auto immut_unsqueeze_fn = [](const std::vector<ArgValue> &inputs,
+                               const std::vector<ExprHandle> &outputShape,
+                               const std::vector<ExprHandle> &outputStrides,
+                               const c10::optional<ScalarType> &outputType,
+                               at::Device device) {
+    return computeImmutUnsqueeze(inputs, outputShape);
+  };
+  registerNNCImmutLoweringFunction(immutUnsqueezeSchema, immut_unsqueeze_fn);
 }
 
 // struct RegisterNNCLoweringsFunction;
