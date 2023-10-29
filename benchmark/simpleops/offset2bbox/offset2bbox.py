@@ -73,7 +73,7 @@ with open("offset2bbox.torchscript", "w") as f:
 
 print(jit_func(a, b))
 
-print(jit_func(a, b))
+print(jit_func.graph_for(a, b))
 
 
 

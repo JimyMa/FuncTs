@@ -32,7 +32,7 @@ void init_nnc_ext() {
   registerNNCImmutLoweringFunction(immutAssignSchema, immut_access_assign_fn);
 
   const char *immutSelectSchema =
-      "immut::select(Tensor self, int dim, int index) -> Tensor";
+      "immut::select(Tensor src, int dim, int index) -> Tensor";
   auto immut_select_fn = [](const std::vector<ArgValue> &inputs,
                             const std::vector<ExprHandle> &outputShape,
                             const std::vector<ExprHandle> &outputStrides,

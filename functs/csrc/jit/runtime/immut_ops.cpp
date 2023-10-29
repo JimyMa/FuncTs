@@ -9,7 +9,6 @@ static RegisterOperators const reg({
         "immut::slice(Tensor src, int dim=0, SymInt? start=None, SymInt? "
         "end=None, SymInt step=1) -> Tensor",
         [](Stack &stack) {
-          std::cout << "??zdfffffffffffffffffffffffff" << std::endl;
           auto step = pop(stack);
           auto end = pop(stack);
           auto start = pop(stack);
@@ -21,7 +20,6 @@ static RegisterOperators const reg({
     Operator(
         "immut::select(Tensor self, int dim, int index) -> Tensor",
         [](Stack &stack) {
-          std::cout << "sdfsdfsdfqqqqqqqqqqqqqqqqqqqq??" << std::endl;
           auto idx = pop(stack);
           auto dim = pop(stack);
           auto src = pop(stack).toTensor();
@@ -31,9 +29,8 @@ static RegisterOperators const reg({
     Operator(
         "immut::assign(Tensor self, Tensor src, bool? n=None) -> Tensor",
         [](Stack &stack) {
-          std::cout << "?sdfsdfsdfsdsdfqerrrrrrrrrrrrrrrrrrr?" << std::endl;
-          auto idx = pop(stack);
-          auto dim = pop(stack);
+          auto pin = pop(stack);
+          auto des = pop(stack);
           auto src = pop(stack).toTensor();
           push(stack, src.clone());
         },
