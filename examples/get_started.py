@@ -1,5 +1,8 @@
 import torch
+import torch._C._te as te
 import functs._C
+
+
 
 # substitute your own function here~
 def func(a: torch.Tensor, b: torch.Tensor):

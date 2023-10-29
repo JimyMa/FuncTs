@@ -71,7 +71,9 @@ torch._C._jit_pass_complete_shape_analysis(g, (a, b), False)
 with open("offset2bbox.torchscript", "w") as f:
     f.write(repr(g))
 
-print(jit_func.graph_for(a, b))
+print(jit_func(a, b))
+
+print(jit_func(a, b))
 
 
 

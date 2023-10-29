@@ -25,6 +25,7 @@ file(GLOB SOURCES
   ${PROJECT_SOURCE_DIR}/functs/csrc/jit/ir/*.cpp
   ${PROJECT_SOURCE_DIR}/functs/csrc/jit/passes/*.cpp
   ${PROJECT_SOURCE_DIR}/functs/csrc/jit/python/*.cpp
+  ${PROJECT_SOURCE_DIR}/functs/csrc/jit/runtime/*.cpp
   ${PROJECT_SOURCE_DIR}/functs/csrc/jit/tensorexpr/*.cpp
   ${PROJECT_SOURCE_DIR}/functs/csrc/*.cpp)
 

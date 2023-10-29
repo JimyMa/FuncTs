@@ -5,6 +5,16 @@ namespace torch {
 namespace jit {
 namespace tensorexpr {
 
+Tensor
+computeImmutAssign(const std::vector<ArgValue> &inputValues,
+                   const std::vector<ExprHandle> &outputShape,
+                   c10::optional<std::vector<ExprHandle>> outputStrides) {
+  return Compute("assign", outputShape, [&](ParameterList &axes) {
+    auto src = c10::get<torch::jit::tensorexpr::BufHandle>(inputValues[0]);
+    return src.load(axes);
+  });
+}
+
 Tensor computeImmutSlice(const std::vector<ArgValue> &inputValues,
                          const std::vector<ExprHandle> &outputShape,
                          c10::optional<std::vector<ExprHandle>> outputStrides) {
@@ -31,6 +41,26 @@ Tensor computeImmutSlice(const std::vector<ArgValue> &inputValues,
 
         return src.load(output_idx);
       });
+}
+
+Tensor
+computeImmutSelect(const std::vector<ArgValue> &inputValues,
+                   const std::vector<ExprHandle> &outputShape,
+                   c10::optional<std::vector<ExprHandle>> outputStrides) {
+  return Compute("select", outputShape, [&](ParameterList &axes) {
+    auto src = c10::get<torch::jit::tensorexpr::BufHandle>(inputValues[0]);
+    auto rank = src.dims().size();
+    auto dim = c10::get<int64_t>(inputValues[1]);
+    if (dim < 0)
+      dim += rank;
+    auto dimSize = src.dims().at(dim);
+    auto idx = c10::get<int64_t>(inputValues[2]);
+
+    std::vector<ExprHandle> output_idx(axes.begin(), axes.end());
+    output_idx.insert(output_idx.begin() + dim, idx);
+
+    return src.load(output_idx);
+  });
 }
 
 } // namespace tensorexpr

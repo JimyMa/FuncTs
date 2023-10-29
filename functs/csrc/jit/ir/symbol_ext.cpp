@@ -7,15 +7,18 @@ namespace jit {
 at::Tensor Access(at::Tensor src) { return src.clone(); }
 
 at::Tensor Assign(at::Tensor self, at::Tensor src, c10::optional<bool> n) {
+  std::cout << "assing" << std::endl;
   return src.clone();
 }
 
 at::Tensor ImmutSelect(at::Tensor src, int64_t dim, int64_t index) {
+  std::cout << "select" << std::endl;
   return src.select(dim, index).clone();
 }
 
 at::Tensor ImmutSelectRev(at::Tensor self, at::Tensor src, int64_t dim,
                           int64_t index) {
+  std::cout << "select_rev" << std::endl;
   auto immut_self = self.clone();
   immut_self.select(dim, index).copy_(src);
   return immut_self;
@@ -24,21 +27,25 @@ at::Tensor ImmutSelectRev(at::Tensor self, at::Tensor src, int64_t dim,
 at::Tensor ImmutSlice(at::Tensor src, int64_t dim,
                       c10::optional<int64_t> start = 0,
                       c10::optional<int64_t> end = 0, int64_t step = 1) {
+  std::cout << "slice" << std::endl;
   return src.slice(dim, start, end, step).clone();
 }
 at::Tensor ImmutSliceRev(at::Tensor self, at::Tensor src, int64_t dim,
                          c10::optional<int64_t> start = 0,
                          c10::optional<int64_t> end = 0, int64_t step = 1) {
+  std::cout << "slice_rev" << std::endl;
   auto immut_self = self.clone();
   immut_self.slice(dim, start, end, step).copy_(src);
   return immut_self;
 }
 
 at::Tensor ImmutSqueeze(at::Tensor src, int64_t dim) {
-  return src.clone().squeeze(dim);
+  std::cout << "immut_squeeze" << std::endl;
+  return src.squeeze(dim).clone();
 }
 at::Tensor ImmutUnqueeze(at::Tensor src, int64_t dim) {
-  return src.clone().unsqueeze(dim);
+  std::cout << "immut_unsqueeze" << std::endl;
+  return src.unsqueeze(dim).clone();
 }
 
 static auto _registry =
