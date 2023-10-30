@@ -149,6 +149,31 @@ computeImmutSelect(const std::vector<ArgValue> &inputValues,
 }
 
 Tensor
+computeImmutSelectRev(const std::vector<ArgValue> &inputValues,
+                      const std::vector<ExprHandle> &outputShape,
+                      c10::optional<std::vector<ExprHandle>> outputStrides) {
+  return Compute("select_rev", outputShape, [&](ParameterList &axes) {
+    auto self = c10::get<BufHandle>(inputValues[0]);
+    auto rank = self.dims().size();
+    auto src = c10::get<BufHandle>(inputValues[1]);
+    auto dim = c10::get<int64_t>(inputValues[2]);
+    if (dim < 0)
+      dim += rank;
+    auto dimSize = self.dims().at(dim);
+    auto idx = constant(inputValues[3]);
+    idx = IfThenElse::make(idx >= int64_t(0), idx, idx + dimSize);
+
+    std::vector<ExprHandle> srcAxes(axes.begin(), axes.end());
+    srcAxes.erase(srcAxes.begin() + dim);
+    auto cond =
+        CompareSelect::make(axes[dim], idx, src.load(srcAxes), self.load(axes),
+                            CompareSelectOperation::kEQ);
+
+    return cond;
+  });
+}
+
+Tensor
 computeImmutUnsqueeze(const std::vector<ArgValue> &inputValues,
                       const std::vector<ExprHandle> &outputShape,
                       c10::optional<std::vector<ExprHandle>> outputStrides) {

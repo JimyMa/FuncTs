@@ -30,18 +30,17 @@ void init_nnc_ext() {
   };
   registerNNCImmutLoweringFunction(immutAssignSchema, immut_access_assign_fn);
 
-  // const char *immutCloneSchema =
-  //     "aten::clone(Tensor self, *, MemoryFormat? memory_format=None) ->
-  //     Tensor";
-  // auto immut_clone_fn = [](const std::vector<ArgValue> &inputs,
-  //                          const std::vector<ExprHandle> &outputShape,
-  //                          const std::vector<ExprHandle> &outputStrides,
-  //                          const c10::optional<ScalarType> &outputType,
-  //                          at::Device device) {
-  //   return computeClone(inputs, outputShape);
-  // };
-  // registerNNCImmutLoweringFunction(immutCloneSchema, immut_clone_fn);
-  // registerNNCImmutLoweringFunction(immutAccessSchema, immut_clone_fn);
+  const char *immutCloneSchema = "aten::clone(Tensor self, *, MemoryFormat? "
+                                 "memory_format=None) -> Tensor ";
+  auto immut_clone_fn = [](const std::vector<ArgValue> &inputs,
+                           const std::vector<ExprHandle> &outputShape,
+                           const std::vector<ExprHandle> &outputStrides,
+                           const c10::optional<ScalarType> &outputType,
+                           at::Device device) {
+    return computeClone(inputs, outputShape);
+  };
+  registerNNCImmutLoweringFunction(immutCloneSchema, immut_clone_fn);
+  registerNNCImmutLoweringFunction(immutAccessSchema, immut_clone_fn);
 
   const char *immutSelectSchema =
       "immut::select(Tensor src, int dim, int index) -> Tensor";
@@ -53,6 +52,17 @@ void init_nnc_ext() {
     return computeImmutSelect(inputs, outputShape);
   };
   registerNNCImmutLoweringFunction(immutSelectSchema, immut_select_fn);
+
+  const char *immutSelectRevSchema = "immut::select_rev(Tensor self, Tensor "
+                                     "src, int dim, int index) -> Tensor";
+  auto immut_select_rev_fn = [](const std::vector<ArgValue> &inputs,
+                                const std::vector<ExprHandle> &outputShape,
+                                const std::vector<ExprHandle> &outputStrides,
+                                const c10::optional<ScalarType> &outputType,
+                                at::Device device) {
+    return computeImmutSelectRev(inputs, outputShape);
+  };
+  registerNNCImmutLoweringFunction(immutSelectRevSchema, immut_select_rev_fn);
 
   const char *immutSliceSchema =
       "immut::slice(Tensor src, int dim=0, SymInt? start=None, SymInt? "
