@@ -6,7 +6,7 @@ import torch
 import functs
 
 
-class BBoxTargetExpandTs(torch.nn.Module):
+class BBoxTargetExpand(torch.nn.Module):
     def forward(self, bbox_targets, bbox_weights, labels):
         bbox_targets_expand = bbox_targets.clone()
         bbox_weights_expand = bbox_weights.clone()
@@ -17,20 +17,9 @@ class BBoxTargetExpandTs(torch.nn.Module):
         return bbox_targets_expand.clone(), bbox_weights_expand.clone()
 
 
-class BBoxTargetExpandFuncTs(torch.nn.Module):
-    def forward(self, bbox_targets, bbox_weights, labels):
-        bbox_targets_expand = bbox_targets.clone()
-        bbox_weights_expand = bbox_weights.clone()
-        valid_label: List[int] = torch.nonzero(labels > 0).squeeze(-1).tolist()
-        for i in valid_label:
-            bbox_targets_expand[i] = bbox_targets[i]
-            bbox_weights_expand[i] = bbox_weights[i]
-        return bbox_targets_expand.clone(), bbox_weights_expand.clone()
-
-
-eager_fn = BBoxTargetExpandTs()
-jit_fn = torch.jit.script(BBoxTargetExpandTs())
-functs_fn = functs.jit.script(BBoxTargetExpandFuncTs())
+eager_fn = BBoxTargetExpand()
+jit_fn = torch.jit.script(BBoxTargetExpand())
+functs_fn = functs.jit.script(BBoxTargetExpand())
 
 M = 300
 N = 4

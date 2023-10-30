@@ -5,7 +5,7 @@ import torch
 import functs
 
 
-class NormalizeTs(torch.nn.Module):
+class Normalize(torch.nn.Module):
     def forward(self, src: torch.Tensor, mean: float, scale: float):
         # RGB to BGR
         dup = src.clone()
@@ -14,18 +14,9 @@ class NormalizeTs(torch.nn.Module):
         return (dup - mean) * scale
 
 
-class NormalizeFuncTs(torch.nn.Module):
-    def forward(self, src: torch.Tensor, mean: float, scale: float):
-        # RGB to BGR
-        dup = src.clone()
-        dup[:, :, 0] = src[:, :, 2]
-        dup[:, :, 2] = src[:, :, 0]
-        return (dup - mean) * scale
-
-
-eager_fn = NormalizeTs()
-jit_fn = torch.jit.script(NormalizeTs())
-functs_fn = functs.jit.script(NormalizeFuncTs())
+eager_fn = Normalize()
+jit_fn = torch.jit.script(Normalize())
+functs_fn = functs.jit.script(Normalize())
 
 a = torch.randn(800, 1333, 3).float().cuda()
 mean = 0.0

@@ -99,14 +99,29 @@ void init_nnc_ext() {
     return computeImmutUnsqueeze(inputs, outputShape);
   };
   registerNNCImmutLoweringFunction(immutUnsqueezeSchema, immut_unsqueeze_fn);
+
+  const char *immutViewSchema =
+      "immut::view(Tensor self, int[] size) -> Tensor";
+  auto immut_view_fn = [](const std::vector<ArgValue> &inputs,
+                          const std::vector<ExprHandle> &outputShape,
+                          const std::vector<ExprHandle> &outputStrides,
+                          const c10::optional<ScalarType> &outputType,
+                          at::Device device) {
+    return computeImmutView(inputs, outputShape);
+  };
+  registerNNCImmutLoweringFunction(immutViewSchema, immut_view_fn);
+
+  // const char *immutRepeatSchema =
+  //     "aten::repeat(Tensor self, int[] repeats) -> Tensor";
+  // auto immut_repeat_fn = [](const std::vector<ArgValue> &inputs,
+  //                           const std::vector<ExprHandle> &outputShape,
+  //                           const std::vector<ExprHandle> &outputStrides,
+  //                           const c10::optional<ScalarType> &outputType,
+  //                           at::Device device) {
+  //   return computeImmutRepeat(inputs, outputShape);
+  // };
+  // registerNNCImmutLoweringFunction(immutRepeatSchema, immut_repeat_fn);
 }
-
-// struct RegisterNNCLoweringsFunction;
-
-// static RegisterNNCLoweringsFunction immut_slice(
-//     {"immut::slice(Tensor src, int dim=0, SymInt? start=None, SymInt? "
-//      "end=None, SymInt step=1) -> Tensor"},
-//     );
 
 } // namespace tensorexpr
 } // namespace jit

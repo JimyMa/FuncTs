@@ -7,8 +7,7 @@ import functs._C
 def script(fn):
     """ 
     extend torchscript script module to support functionalization
-    Note: To divide the script function from functs and jit,
-    please use torch.nn.Module without python function as your first choice.
+    Note: CANNOT divide the script function from functs and jit by now
     
     >>> func_fn = functs.jit.script(py_fn)
     >>> jit_fn = torch.jit.script(py_fn)
@@ -18,13 +17,13 @@ def script(fn):
     >>> func_fn = functs.jit.script(NNModule())
     >>> jit_fn = torch.jit.script(NNModule())
     >>> func_fn == jit_fn
-    >>> False
+    >>> True
 
-    For break the linke of jit_fn and func_fn in the situation of py_fn,
-    bynow you should correct the function signature.
+    For break the link of jit_fn and func_fn in the situation of py_fn,
+    you should correct the function object name firstly.
 
     """
-    jit_fn = torch.jit.script(fn)
+    jit_fn = torch.jit.freeze(torch.jit.script(fn.cuda().eval()))
     g = jit_fn.graph
 
     # functs pass

@@ -12,18 +12,9 @@ def func(a: torch.Tensor, b: torch.Tensor):
   return a
 
 # to torchscript
-jit_func = torch.jit.script(func)
+jit_func = functs.jit.script(func)
 g = jit_func.graph
 
-# Note: only intra-procedure is supported!!!
-torch._C._jit_pass_inline(g)
-
-# tensorssa alias removal
-functs._C._jit_pass_convert_to_tensorssa(g)
-functs._C._jit_pass_tensorssa_remove_update(g)
-
-# dce
-torch._C._jit_pass_dce(g)
 print(g)
 
 # check equal

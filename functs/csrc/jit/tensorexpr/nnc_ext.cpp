@@ -190,6 +190,96 @@ computeImmutUnsqueeze(const std::vector<ArgValue> &inputValues,
                  });
 }
 
+Tensor computeImmutView(const std::vector<ArgValue> &inputValues,
+                        const std::vector<ExprHandle> &outputShape,
+                        c10::optional<std::vector<ExprHandle>> outputStrides) {
+  auto A = c10::get<BufHandle>(inputValues[0]);
+  if (A.ndim() == 0) {
+    return Compute("aten_view", outputShape,
+                   [&](const std::vector<VarHandle> &axes) {
+                     std::vector<ExprHandle> empty_indices;
+                     return A.load(empty_indices);
+                   });
+  }
+  return Compute(
+      "aten_reshape", outputShape, [&](const std::vector<VarHandle> &axes) {
+        std::vector<VarHandle> new_axes;
+        std::cout << "??" << std::endl;
+        assert(outputShape.size() == axes.size());
+        /*
+        Example for the index transformation. Assume we have a tensor A and
+        its view B:
+          A.size() = [6,2,3]
+          B = A.view(2,1,9,1,2)
+
+        In TE IR we would want to represent B as the following loopnest:
+          for (i1 in 0..2)
+            for (i2 in 0..1)
+              for (i3 in 0..9)
+                for (i4 in 0..1)
+                  for (i5 in 0..2)
+                    idx = i5 + i4*2 + i3*2 + i2*18 + i1*18
+                    B[i1,i2,i3,i4,i5] = A[idx/(3*2), (idx/3)%2, idx%3]
+        */
+        std::vector<ExprPtr> dims, indices;
+        for (size_t idx = 0; idx < outputShape.size(); idx++) {
+          dims.push_back(outputShape[idx].node());
+          indices.push_back(axes[idx].node());
+        }
+
+        auto ndim = dims.size();
+        std::vector<ExprPtr> strides(ndim);
+        strides[ndim - 1] = immLike(dims[ndim - 1], 1);
+        for (size_t i = 1; i < ndim; i++) {
+          strides[ndim - 1 - i] = alloc<Mul>(strides[ndim - i], dims[ndim - i]);
+        }
+
+        ExprHandle flat_idx = ExprHandle(flatten_index(dims, indices, strides));
+        std::vector<ExprHandle> orig_buf_indexes(A.ndim(), ExprHandle(0));
+        ExprHandle stride = ExprHandle(immLike(flat_idx, 1));
+        for (size_t idx = 0; idx < A.ndim(); idx++) {
+          size_t dim_idx = A.ndim() - idx - 1;
+          // We don't need to generate mod-div for the first dimension -
+          // ideally IRSimplifier would get rid of that for us, but for now
+          // let's just avoid generating it in the first place.
+          if (dim_idx > 0) {
+            orig_buf_indexes[dim_idx] = flat_idx / stride % A.dim(dim_idx);
+          } else {
+            orig_buf_indexes[dim_idx] = flat_idx / stride;
+          }
+          // In the example above the stride is initially 1 for dim_idx = 2,
+          // then it's 3 for dim_idx = 1, and then it's 3*2 for dim_idx = 0.
+          stride = stride * A.dim(dim_idx);
+        }
+        // NOLINTNEXTLINE(clang-analyzer-cplusplus.NewDeleteLeaks)
+        return A.load(orig_buf_indexes);
+      });
+}
+
+Tensor
+computeImmutRepeat(const std::vector<ArgValue> &inputValues,
+                   const std::vector<ExprHandle> &outputShape,
+                   c10::optional<std::vector<ExprHandle>> outputStrides) {
+  return Compute("repeat", outputShape, [&](ParameterList &axes) {
+    // Remove front axes
+    std::cout << "???" << std::endl;
+    auto self = c10::get<BufHandle>(inputValues[0]);
+    auto inShape = self.dims();
+    auto inRank = inShape.size(), outRank = outputShape.size();
+    std::vector<ExprHandle> loadAxes(axes.begin(), axes.end());
+    loadAxes.erase(loadAxes.begin(), loadAxes.begin() + outRank - inRank);
+
+    // Update load axes
+    for (auto i : c10::irange(inRank)) {
+      const auto &axis = loadAxes[i];
+      loadAxes[i] = IfThenElse::make(inShape[i] == outputShape[i], axis,
+                                     axis % inShape[i]);
+    }
+
+    return self.load(loadAxes);
+  });
+}
+
 } // namespace tensorexpr
 } // namespace jit
 } // namespace torch

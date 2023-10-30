@@ -74,7 +74,7 @@ static void GetBufferTreeAliasDb(std::shared_ptr<Graph> g,
     if (element->pointsTo.count() > 1 /* Step 1.1: count > 1 */ ||
         aliasDb_buffer_tree.mayAliasWildcard(value) /* wildcard node */ ||
         prim::Loop == value->node()->kind() /* Loop carried dependency */ ||
-        element->values.size() > 1 ||
+        element->values.size() > 1 || /* Container object */
         value->type()->kind() == TypeKind::ListType ||
         value->type()->kind() == TypeKind::DictType ||
         value->type()->kind() == TypeKind::ClassType) {
@@ -455,7 +455,7 @@ void TensorSSARemoveUpdate(std::shared_ptr<Graph> graph) {
 
 void ConvertToTensorSSA(std::shared_ptr<Graph> graph) {
   // Preprocess: A dumb pass to eliminate interprecedure view
-  DumbRemoveInterPrecedureMutation(graph);
+  // DumbRemoveInterPrecedureMutation(graph);
 
   // Step 0. convert inplace operator (add_, mul_, ...) to copy
   RemoveInplace(graph);
