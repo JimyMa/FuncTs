@@ -8,7 +8,7 @@ import functs._C
 
 
 def branch_loop(a: torch.Tensor, c: torch.Tensor, d: torch.Tensor):
-  tmp_0 = d
+  tmp_0 = d.clone()
   tmp_1 = tmp_0[1]
   if (a.nonzero().sum()):
     tmp_0 = tmp_0 + 1

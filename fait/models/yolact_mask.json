@@ -1,0 +1,33 @@
+[
+  {
+    "kind": "TupleType",
+    "elements": [
+      { "kind": "TensorType", "shape": [ 1, 12, 40, 40 ], "dtype": "Float" },
+      { "kind": "TensorType", "shape": [ 1, 12, 20, 20 ], "dtype": "Float" },
+      { "kind": "TensorType", "shape": [ 1, 12, 10, 10 ], "dtype": "Float" },
+      { "kind": "TensorType", "shape": [ 1, 12, 5, 5 ], "dtype": "Float" },
+      { "kind": "TensorType", "shape": [ 1, 12, 3, 3 ], "dtype": "Float" }
+    ]
+  },
+  {
+    "kind": "TupleType",
+    "elements": [
+      { "kind": "TensorType", "shape": [ 1, 243, 40, 40 ], "dtype": "Float" },
+      { "kind": "TensorType", "shape": [ 1, 243, 20, 20 ], "dtype": "Float" },
+      { "kind": "TensorType", "shape": [ 1, 243, 10, 10 ], "dtype": "Float" },
+      { "kind": "TensorType", "shape": [ 1, 243, 5, 5 ], "dtype": "Float" },
+      { "kind": "TensorType", "shape": [ 1, 243, 3, 3 ], "dtype": "Float" }
+    ]
+  },
+  {
+    "kind": "TupleType",
+    "elements": [
+      { "kind": "TensorType", "shape": [ 1, 96, 40, 40 ], "dtype": "Float" },
+      { "kind": "TensorType", "shape": [ 1, 96, 20, 20 ], "dtype": "Float" },
+      { "kind": "TensorType", "shape": [ 1, 96, 10, 10 ], "dtype": "Float" },
+      { "kind": "TensorType", "shape": [ 1, 96, 5, 5 ], "dtype": "Float" },
+      { "kind": "TensorType", "shape": [ 1, 96, 3, 3 ], "dtype": "Float" }
+    ]
+  },
+  { "kind": "TensorType", "shape": [ 1, 32, 80, 80 ], "dtype": "Float" }
+]

@@ -1,0 +1,18 @@
+[
+    {
+      "kind": "TupleType",
+      "elements": [
+        { "kind": "TensorType", "shape": [ 1, 80, 40, 40 ], "dtype": "Float" },
+        { "kind": "TensorType", "shape": [ 1, 80, 20, 20 ], "dtype": "Float" },
+        { "kind": "TensorType", "shape": [ 1, 80, 10, 10 ], "dtype": "Float" }
+      ]
+    },
+    {
+      "kind": "TupleType",
+      "elements": [
+        { "kind": "TensorType", "shape": [ 1, 4, 40, 40 ], "dtype": "Float" },
+        { "kind": "TensorType", "shape": [ 1, 4, 20, 20 ], "dtype": "Float" },
+        { "kind": "TensorType", "shape": [ 1, 4, 10, 10 ], "dtype": "Float" }
+      ]
+    }
+]

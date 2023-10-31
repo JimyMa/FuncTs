@@ -1,0 +1,5 @@
+[
+    { "kind": "TensorType", "shape": [ 1024, 1024 ], "dtype": "Float" },
+    { "kind": "TensorType", "shape": [ 1024 ], "dtype": "Float" },
+    { "kind": "Int" }
+]

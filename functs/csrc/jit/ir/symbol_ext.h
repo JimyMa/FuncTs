@@ -55,3 +55,11 @@ static std::unordered_map<Symbol, Symbol> reverseVersion{
 
 } // namespace immutable
 } // namespace c10
+
+namespace torch {
+namespace jit {
+
+void init_immut_ops();
+
+} // namespace jit
+} // namespace torch

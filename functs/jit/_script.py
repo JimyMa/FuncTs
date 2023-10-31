@@ -23,7 +23,7 @@ def script(fn):
     you should correct the function object name firstly.
 
     """
-    jit_fn = torch.jit.freeze(torch.jit.script(fn.cuda().eval()))
+    jit_fn = torch.jit.freeze(torch.jit.script(fn).cuda().eval())
     g = jit_fn.graph
 
     # functs pass

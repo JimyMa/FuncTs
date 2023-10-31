@@ -262,7 +262,6 @@ computeImmutRepeat(const std::vector<ArgValue> &inputValues,
                    c10::optional<std::vector<ExprHandle>> outputStrides) {
   return Compute("repeat", outputShape, [&](ParameterList &axes) {
     // Remove front axes
-    std::cout << "???" << std::endl;
     auto self = c10::get<BufHandle>(inputValues[0]);
     auto inShape = self.dims();
     auto inRank = inShape.size(), outRank = outputShape.size();

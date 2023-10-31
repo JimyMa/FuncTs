@@ -1,0 +1,3 @@
+[submodule "fait/json"]
+	path = fait/json
+	url = https://github.com/nlohmann/json
