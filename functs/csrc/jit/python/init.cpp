@@ -6,6 +6,7 @@
 #include <functs/csrc/jit/passes/remove_inplace.h>
 #include <functs/csrc/jit/passes/shape_analysis.h>
 #include <functs/csrc/jit/python/init.h>
+#include <passes/freeze_module.h>
 
 // #include <torch/csrc/Dtype.h>
 // #include <torch/csrc/jit/api/function_impl.h>
@@ -33,6 +34,8 @@ void initJITFuncBindings(PyObject *module) {
   m.def("_jit_pass_convert_to_tensorssa", ConvertToTensorSSA);
   m.def("_jit_pass_tensorssa_remove_update", TensorSSARemoveUpdate);
   m.def("_jit_pass_fait_pipeline", FaitPipeline);
+  m.def("_jit_pass_freeze", Freeze);
+  m.def("_jit_pass_clone", Clone);
 }
 } // namespace jit
 } // namespace torch

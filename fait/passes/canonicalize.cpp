@@ -50,10 +50,12 @@ Node *rewritePowTensorScalar(REWRITE_PARAMS) {
   // Replace with a series of multiplication if exponent is constant
   auto self = node->input(0);
   auto exp = constant_as<int64_t>(node->input(1));
-  if (!exp) return nullptr;
+  if (!exp)
+    return nullptr;
   Value *base = nullptr;
   while (*exp > 0) {
-    if ((*exp & 1) && base) self = graph->insert(aten::mul, {self, base});
+    if ((*exp & 1) && base)
+      self = graph->insert(aten::mul, {self, base});
     if (base)
       base = graph->insert(aten::mul, {base, base});
     else
@@ -129,6 +131,9 @@ OperatorMap<Node *(*)(REWRITE_PARAMS)> rewriteFuncs{
     {"aten::slice.Tensor(Tensor(a) self, int dim=0, SymInt? start=None, "
      "SymInt? end=None, SymInt step=1) -> Tensor(a)",
      rewriteSlice},
+    {"immut::slice(Tensor src, int dim=0, SymInt? start=None, SymInt? "
+     "end=None, SymInt step=1) -> Tensor",
+     rewriteSlice},
     {"aten::t(Tensor(a) self) -> Tensor(a)", rewriteT},
     {"aten::to.dtype(Tensor(a) self, ScalarType dtype, bool "
      "non_blocking=False, "
@@ -151,5 +156,5 @@ void CanonicalizeOps(const std::shared_ptr<Graph> &graph) {
   });
 }
 
-}  // namespace jit
-}  // namespace torch
+} // namespace jit
+} // namespace torch

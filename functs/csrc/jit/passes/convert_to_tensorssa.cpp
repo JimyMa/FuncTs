@@ -439,7 +439,7 @@ void TensorSSARemoveUpdate(std::shared_ptr<Graph> graph) {
   std::function<void(Block *)> removeUpdateImpl;
   removeUpdateImpl = [&removeUpdateImpl](Block *b) -> void {
     auto nodes = b->nodes();
-    for (auto node = nodes.front(); node != nodes.back(); node = node->next()) {
+    for (auto node = nodes.front(); node != nodes.back();) {
       for (auto &block : node->blocks()) {
         removeUpdateImpl(block);
       }
@@ -447,6 +447,13 @@ void TensorSSARemoveUpdate(std::shared_ptr<Graph> graph) {
         auto tmp = node->next();
         node->destroy();
         node = tmp;
+      } else if (immutable::Assign == node->kind()) {
+        node->output()->replaceAllUsesWith(node->input(1));
+        auto tmp = node->next();
+        node->destroy();
+        node = tmp;
+      } else {
+        node = node->next();
       }
     }
   };

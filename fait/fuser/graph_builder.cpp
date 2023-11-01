@@ -3,8 +3,6 @@
 //
 #include "fuser/graph_builder.h"
 
-#include <ATen/core/interned_strings.h>
-#include <c10/cuda/CUDAFunctions.h>
 #include <torch/csrc/jit/tensorexpr/analysis.h>
 #include <torch/csrc/jit/tensorexpr/ir_cloner.h>
 #include <torch/csrc/jit/tensorexpr/loopnest.h>
@@ -651,9 +649,12 @@ void GraphBuilder::compile() {
   }
 
   NameGenerator kernelNameGen(functorNameGen.generate() + "_");
-  for (auto &stmt : rootStmts)
+
+  for (auto &stmt : rootStmts) {
+    LONG_TAIL_LOG_INFO("code generating: " << functorNameGen.generate() + "_");
     codegens_.push_back(std::make_unique<CudaCodeGenTssa>(
         stmt, ParallelBufferArgs_, device_, kernelNameGen.generate()));
+  }
 
   {
     LONG_TAIL_LOG_INFO("after codegen: ");

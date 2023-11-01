@@ -5,32 +5,47 @@
 namespace torch {
 namespace jit {
 
-void FaitPipeline(std::shared_ptr<Graph> graph,
-                  std::vector<c10::TypePtr> type_hint) {
+static void dumpGraphToFile(const std::shared_ptr<Graph> &graph,
+                            const std::string &path) {
+  if (!getenv("DUMP_GRAPH"))
+    return;
+  std::ofstream ofs(path);
+  graph->print(ofs, false);
+}
+
+void FaitPipeline(Module module, std::vector<c10::TypePtr> type_hint) {
+  auto graph = module.get_method("forward").graph()->copy();
   vision::cuda_version();
   std::unordered_map<Value *, TypePtr> refinedTypes;
   // ConvertProfilingInstrumentation(graph);
   RefineInputTypes(graph, type_hint, refinedTypes);
   CanonicalizeOps(graph);
+  if (getenv("PRINT_GRAPH_STAT"))
+    CountMemoryIntensiveOps(graph);
+  // ToTensorSSA(graph);
+  dumpGraphToFile(graph, "after_tssa.rb");
   ParallelizeLoops(graph);
+  if (getenv("PRINT_GRAPH_STAT"))
+    CountLoops(graph);
   InferDtypeAndDevice(graph, refinedTypes);
   InferShape(graph, refinedTypes);
-
+  dumpGraphToFile(graph, "after_par.rb");
   FuseOps(graph, refinedTypes);
-
+  dumpGraphToFile(graph, "after_fuse.rb");
   UnrollLoopsWithDeps(graph, refinedTypes);
   UnrollSimpleMaps(graph, refinedTypes);
   InferShape(graph, refinedTypes);
   FuseOps(graph, refinedTypes);
-
+  dumpGraphToFile(graph, "after_unroll.rb");
   SplitParallelMaps(graph, refinedTypes);
-
+  dumpGraphToFile(graph, "after_split.rb");
+  ToMutableTensors(graph);
   ConvertInfusibleMapsToLoops(graph, refinedTypes);
   CanonicalizeFusableMaps(graph);
-
+  dumpGraphToFile(graph, "after_back.rb");
   MapFunctorToParallelization(graph, refinedTypes);
   FusedOpToParallelization(graph, refinedTypes);
-
+  dumpGraphToFile(graph, "after_codegen.rb");
   Validate(graph);
 }
 } // namespace jit

@@ -28,7 +28,7 @@
 namespace torch {
 namespace jit {
 
-void FaitPipeline(std::shared_ptr<Graph> graph, std::vector<c10::TypePtr>);
+void FaitPipeline(Module module, std::vector<c10::TypePtr>);
 
 } // namespace jit
 } // namespace torch

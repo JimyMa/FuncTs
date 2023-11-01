@@ -16,7 +16,7 @@ namespace jit {
 
 namespace {
 
-std::vector<std::string> splitName(const std::string& name) {
+std::vector<std::string> splitName(const std::string &name) {
   std::vector<std::string> result;
   std::string sub_name;
   std::istringstream name_stream(name);
@@ -27,10 +27,10 @@ std::vector<std::string> splitName(const std::string& name) {
 }
 
 template <typename Iter>
-std::string concatName(const Iter& begin, const Iter& end) {
+std::string concatName(const Iter &begin, const Iter &end) {
   std::string combined_name = "";
   for (Iter it = begin; it != end; ++it) {
-    const std::string& sub_name = *it;
+    const std::string &sub_name = *it;
     if (!combined_name.empty()) {
       combined_name += ".";
     }
@@ -40,14 +40,14 @@ std::string concatName(const Iter& begin, const Iter& end) {
 }
 
 class AttributePropagator {
- public:
-  AttributePropagator(Module& module) : module_(module) {
-    auto checkName = [this](std::string& name) {
+public:
+  AttributePropagator(Module &module) : module_(module) {
+    auto checkName = [this](std::string &name) {
       const auto resolved_name = resolveName(name);
 
       if (resolved_name) {
-        const auto& parent_module = resolved_name->first;
-        const auto& attr_name = resolved_name->second;
+        const auto &parent_module = resolved_name->first;
+        const auto &attr_name = resolved_name->second;
         if (parent_module.hasattr(attr_name)) {
           auto value = parent_module.attr(attr_name);
           // Freezing client wants to presever this submodule. When
@@ -75,16 +75,16 @@ class AttributePropagator {
     }
   }
 
-  void optimizeSubGraphs(
-      std::shared_ptr<Graph>& graph,
-      const std::function<void(std::shared_ptr<Graph>&)>& func) {
+  void
+  optimizeSubGraphs(std::shared_ptr<Graph> &graph,
+                    const std::function<void(std::shared_ptr<Graph> &)> &func) {
     func(graph);
-    std::stack<Block*> blocks({graph->block()});
+    std::stack<Block *> blocks({graph->block()});
     while (!blocks.empty()) {
-      Block* block = blocks.top();
+      Block *block = blocks.top();
       blocks.pop();
       for (auto n : block->nodes()) {
-        for (Block* sub_block : n->blocks()) {
+        for (Block *sub_block : n->blocks()) {
           blocks.push(sub_block);
         }
         if (n->kind() == prim::fork) {
@@ -96,10 +96,10 @@ class AttributePropagator {
   }
 
   void run() {
-    auto applyInline = [](std::shared_ptr<Graph>& subgraph) {
+    auto applyInline = [](std::shared_ptr<Graph> &subgraph) {
       Inline(*subgraph);
     };
-    auto applyOptimizations = [](std::shared_ptr<Graph>& subgraph) {
+    auto applyOptimizations = [](std::shared_ptr<Graph> &subgraph) {
       EliminateNoOps(subgraph);
       LowerSimpleTuples(subgraph);
       ConstantPropagation(subgraph);
@@ -136,7 +136,7 @@ class AttributePropagator {
     cleanupFrozenModule();
   }
 
- private:
+private:
   using ResolvedName = std::pair<Module, std::string>;
 
   // Try to resolve qualified names (submodule1.submodule2.foo). If
@@ -145,20 +145,20 @@ class AttributePropagator {
   // Examples:
   // submodule1.submodule2.foo -> {submodule2, "foo"}
   // submodule1.non_existent_module.foo -> nullopt
-  c10::optional<ResolvedName> resolveName(const std::string& name) {
+  c10::optional<ResolvedName> resolveName(const std::string &name) {
     auto sub_names = splitName(name);
     if (sub_names.empty()) {
       return c10::nullopt;
     }
-    auto& attr_name = sub_names.back();
+    auto &attr_name = sub_names.back();
     auto cur_module = module_;
     std::vector<ResolvedName> attr_infos;
     attr_infos.reserve(sub_names.size() - 1);
 
     for (size_t i = 0; i < sub_names.size() - 1; ++i) {
       bool found = false;
-      const auto& sub_name = sub_names[i];
-      for (const auto& child_module : cur_module.named_children()) {
+      const auto &sub_name = sub_names[i];
+      for (const auto &child_module : cur_module.named_children()) {
         if (child_module.name == sub_name) {
           attr_infos.emplace_back(cur_module._ivalue(), child_module.name);
           cur_module = child_module.value;
@@ -176,9 +176,9 @@ class AttributePropagator {
       // interfere with the inlining procedure. Instead, we'll record
       // the fact that the user wants to preserve them. They will be
       // processed during clean-up preparation (recordReferenceAttrs)
-      for (auto& attr_info : attr_infos) {
-        const auto& parent_module = attr_info.first;
-        auto& sub_name = attr_info.second;
+      for (auto &attr_info : attr_infos) {
+        const auto &parent_module = attr_info.first;
+        auto &sub_name = attr_info.second;
         userPreservedAttrs_[parent_module._ivalue()].insert(
             std::move(sub_name));
       }
@@ -188,8 +188,8 @@ class AttributePropagator {
     return c10::nullopt;
   }
 
-  bool _loadModulePath(Value* input, std::shared_ptr<Graph>& graph) {
-    Node* node = input->node();
+  bool _loadModulePath(Value *input, std::shared_ptr<Graph> &graph) {
+    Node *node = input->node();
     names_.clear();
     while (!(node->outputs()[0]->type() == graph->inputs()[0]->type())) {
       if (node->kind() == prim::GetAttr) {
@@ -203,8 +203,8 @@ class AttributePropagator {
     return true;
   }
 
-  c10::optional<std::deque<std::string>> getModulePath(
-      Value* input, std::shared_ptr<Graph>& graph) {
+  c10::optional<std::deque<std::string>>
+  getModulePath(Value *input, std::shared_ptr<Graph> &graph) {
     bool success = _loadModulePath(input, graph);
     if (!success) {
       return c10::nullopt;
@@ -213,10 +213,10 @@ class AttributePropagator {
   }
 
   template <typename Iter>
-  bool getModuleFromPath(Module& attrModule, const Iter& begin,
-                         const Iter& end) {
+  bool getModuleFromPath(Module &attrModule, const Iter &begin,
+                         const Iter &end) {
     for (Iter it = begin; it != end; ++it) {
-      const std::string& moduleName = *it;
+      const std::string &moduleName = *it;
       if (preservedAttrs_.count(attrModule.attr(moduleName))) {
         return false;
       }
@@ -225,7 +225,7 @@ class AttributePropagator {
     return true;
   }
 
-  bool isMutableType(const TypePtr& type) {
+  bool isMutableType(const TypePtr &type) {
     // Check common cases to avoid recursively constructing type in
     // `mapTypeToAliasTypeSetPtrImpl`
     auto kind = type->kind();
@@ -276,8 +276,8 @@ class AttributePropagator {
   // its corresponding value. Based on initial test on resnet50 and other
   // torch vision tests. GetAttrs are not too frequent so it is ok to chase
   // GetAttr chain to retrieve their values.
-  bool findConstantAttr(Value* input, std::string& name, Module& attrModule,
-                        std::shared_ptr<Graph>& graph) {
+  bool findConstantAttr(Value *input, std::string &name, Module &attrModule,
+                        std::shared_ptr<Graph> &graph) {
     if (!input->type()->cast<InterfaceType>() &&
         !input->type()->expectRef<ClassType>().is_module()) {
       return false;
@@ -303,7 +303,7 @@ class AttributePropagator {
       return false;
     }
     if (!attr.type()->cast<ClassType>()) {
-      for (auto& ivalue : preservedAttrs_) {
+      for (auto &ivalue : preservedAttrs_) {
         if (!ivalue.isObject() && ivalue.overlaps(attr)) {
           return false;
         }
@@ -312,8 +312,8 @@ class AttributePropagator {
     return true;
   }
 
-  void insertMutableAttr(const std::string& name, const IValue& attr,
-                         const ModulePtr& attrModule) {
+  void insertMutableAttr(const std::string &name, const IValue &attr,
+                         const ModulePtr &attrModule) {
     if (isMutableType(attr.type())) {
       preservedAttrs_.insert(attr);
     } else {
@@ -321,15 +321,15 @@ class AttributePropagator {
     }
   }
 
-  void recordMutableAttrs(std::shared_ptr<Graph>& graph) {
-    std::stack<Block*> blocks({graph->block()});
+  void recordMutableAttrs(std::shared_ptr<Graph> &graph) {
+    std::stack<Block *> blocks({graph->block()});
     std::unique_ptr<AliasDb> aliasDb =
         torch::make_unique<AliasDb>(graph, /* isFrozen */ true);
     while (!blocks.empty()) {
-      Block* block = blocks.top();
+      Block *block = blocks.top();
       blocks.pop();
       for (auto n : block->nodes()) {
-        for (Block* sub_block : n->blocks()) {
+        for (Block *sub_block : n->blocks()) {
           blocks.push(sub_block);
         }
 
@@ -381,12 +381,12 @@ class AttributePropagator {
     // FIXME: Current Alias analysis fails to track subvalues.
     // This is not a common scenario, for freezing, detect and error out.
     IValue::HashAliasedIValues seen;
-    for (auto& val : usedAttrs_) {
+    for (auto &val : usedAttrs_) {
       IValue::HashAliasedIValues subValues;
       val.getSubValues(subValues);
       TORCH_CHECK(
           std::all_of(subValues.begin(), subValues.end(),
-                      [&seen](const IValue& v) { return seen.count(v) == 0; }),
+                      [&seen](const IValue &v) { return seen.count(v) == 0; }),
           "module contains attributes values that overlaps ", val);
       seen.insert(subValues.begin(), subValues.end());
     }
@@ -394,7 +394,7 @@ class AttributePropagator {
 
   IValue overrideGradient(IValue attr) {
     if (attr.isTensor()) {
-      auto& t = attr.toTensor();
+      auto &t = attr.toTensor();
       if (t.requires_grad()) {
         auto detached = t.detach();
         detached.set_requires_grad(false);
@@ -402,7 +402,7 @@ class AttributePropagator {
       }
     } else if (attr.isTuple()) {
       auto tuple = std::move(attr).toTuple();
-      const auto& elems = tuple->elements();
+      const auto &elems = tuple->elements();
       for (const auto idx : c10::irange(elems.size())) {
         tuple->unsafeSetElement(idx, overrideGradient(elems[idx]));
       }
@@ -415,7 +415,7 @@ class AttributePropagator {
       attr = std::move(elems);
     } else if (attr.isGenericDict()) {
       auto dict = std::move(attr).toGenericDict();
-      for (const auto& pair : dict) {
+      for (const auto &pair : dict) {
         auto val = pair.value();
         val = overrideGradient(val);
       }
@@ -424,7 +424,7 @@ class AttributePropagator {
       auto obj_type = attr.type()->expect<ClassType>();
       auto obj_value = std::move(attr).toObject();
       auto sub_attributes = obj_type->getAttributes();
-      for (const auto& sub_attr : sub_attributes) {
+      for (const auto &sub_attr : sub_attributes) {
         auto sub_attr_val = obj_value->getAttr(sub_attr.getName());
         sub_attr_val = overrideGradient(sub_attr_val);
       }
@@ -437,14 +437,14 @@ class AttributePropagator {
   // This method is invoked only when 'freezeInterfaces' parameter is on.
   // The module associated with Interface is retrieved and the invoked method
   // is inlined.
-  bool inlineInterfaceCall(Node* n, const IValue& attr) {
+  bool inlineInterfaceCall(Node *n, const IValue &attr) {
     auto class_type = attr.type()->expect<ClassType>();
     bool inlined = false;
     for (auto use : n->output()->uses()) {
       auto user_node = use.user;
       if (user_node->kind() == prim::CallMethod) {
-        const std::string& methodName = user_node->s(attr::name);
-        Function& function = class_type->getMethod(methodName);
+        const std::string &methodName = user_node->s(attr::name);
+        Function &function = class_type->getMethod(methodName);
         if (auto graphFunction = tryToGraphFunction(function)) {
           GRAPH_UPDATE("Inlining interface method '", function.name(), "' to ",
                        *user_node);
@@ -499,17 +499,17 @@ class AttributePropagator {
   //   structure
   //      and it will expect that all interface types have been removed.
   void inlineInterfaceCalls(
-      std::shared_ptr<Graph>& graph,
-      std::unordered_map<std::string, std::unordered_set<std::string>>&
-          interfacesToRetype) {
+      std::shared_ptr<Graph> &graph,
+      std::unordered_map<std::string, std::unordered_set<std::string>>
+          &interfacesToRetype) {
     auto block = graph->block();
-    std::stack<Block*> blocks({block});
+    std::stack<Block *> blocks({block});
 
     while (!blocks.empty()) {
-      Block* block = blocks.top();
+      Block *block = blocks.top();
       blocks.pop();
       for (auto n : block->nodes()) {
-        for (Block* sub_block : n->blocks()) {
+        for (Block *sub_block : n->blocks()) {
           blocks.push(sub_block);
         }
         if (n->kind() == prim::GetAttr) {
@@ -557,7 +557,7 @@ class AttributePropagator {
           TORCH_CHECK(path.has_value());
           getModuleFromPath(attrModule, path->begin(), path->end());
 
-          const auto& attrType = attrModule.type()->getAttribute(name);
+          const auto &attrType = attrModule.type()->getAttribute(name);
           TORCH_CHECK(!attrType->cast<InterfaceType>(),
                       "Freezing does not support SetAttr "
                       "on an interface type. ",
@@ -577,15 +577,15 @@ class AttributePropagator {
   // This modifies the internal structure of module types to reassign the
   // type from an interface type to its concrete type.
   void reassignInterfaceTypes(
-      const std::unordered_map<std::string, std::unordered_set<std::string>>&
-          interfacesToRetype) {
-    for (const auto& it : interfacesToRetype) {
-      const std::string& modulePath = it.first;
-      const std::vector<std::string>& splitPath = splitName(modulePath);
+      const std::unordered_map<std::string, std::unordered_set<std::string>>
+          &interfacesToRetype) {
+    for (const auto &it : interfacesToRetype) {
+      const std::string &modulePath = it.first;
+      const std::vector<std::string> &splitPath = splitName(modulePath);
       Module attrModule = module_;
       getModuleFromPath(attrModule, splitPath.begin(), splitPath.end());
 
-      for (const std::string& name : it.second) {
+      for (const std::string &name : it.second) {
         auto subvalue = attrModule.attr(name);
         auto subvalueType = subvalue.type();
         attrModule.type()->unsafeChangeAttributeType(name, subvalueType);
@@ -593,24 +593,24 @@ class AttributePropagator {
     }
   }
 
-  void propagateAttributes(std::shared_ptr<Graph>& graph) {
-    std::unordered_map<ModulePtr, std::unordered_map<std::string, Value*>>
+  void propagateAttributes(std::shared_ptr<Graph> &graph) {
+    std::unordered_map<ModulePtr, std::unordered_map<std::string, Value *>>
         attrValues;
     auto isEval = !module_.hasattr("training") || !module_.is_training();
     GRAPH_DEBUG("Freezing Module: ", module_.type()->name()->name());
     auto block = graph->block();
-    std::stack<Block*> blocks({block});
+    std::stack<Block *> blocks({block});
 
-    Node* m = *block->nodes().begin();
+    Node *m = *block->nodes().begin();
     WithInsertPoint guard(m);
     while (!blocks.empty()) {
-      Block* block = blocks.top();
+      Block *block = blocks.top();
       blocks.pop();
       for (auto it = block->nodes().begin(); it != block->nodes().end();) {
-        Node* n = *it;
-        it++;  // advance iterator bc the current node may be destroyed
+        Node *n = *it;
+        it++; // advance iterator bc the current node may be destroyed
 
-        for (Block* sub_block : n->blocks()) {
+        for (Block *sub_block : n->blocks()) {
           blocks.push(sub_block);
         }
         if (n->kind() == prim::GetAttr) {
@@ -626,11 +626,12 @@ class AttributePropagator {
             continue;
           }
           TORCH_CHECK(attrModule.hasattr(name));
-          Value* paramConst = nullptr;
+          Value *paramConst = nullptr;
           auto iter = attrValues.find(attrModule._ivalue());
           if (iter != attrValues.end()) {
             auto iter2 = iter->second.find(name);
-            if (iter2 != iter->second.end()) paramConst = iter2->second;
+            if (iter2 != iter->second.end())
+              paramConst = iter2->second;
           }
           if (!paramConst) {
             auto attr = attrModule.attr(name);
@@ -663,7 +664,7 @@ class AttributePropagator {
               continue;
             }
             std::string fullName("self.");
-            for (auto& name : names_) {
+            for (auto &name : names_) {
               fullName += name + '.';
             }
             fullName += name;
@@ -686,8 +687,8 @@ class AttributePropagator {
   }
 
   void applyToForkSubgraph(
-      Node* n, std::shared_ptr<Graph>& graph,
-      const std::function<void(std::shared_ptr<Graph>&)>& func) {
+      Node *n, std::shared_ptr<Graph> &graph,
+      const std::function<void(std::shared_ptr<Graph> &)> &func) {
     TORCH_CHECK(n->kind() == prim::fork);
     auto attrModule = module_;
     auto node = n->inputs()[0]->node();
@@ -712,8 +713,8 @@ class AttributePropagator {
     module_ = attrModule;
   }
 
-  bool moduleEscapes(Module& subModule, std::shared_ptr<Graph>& graph) {
-    for (auto& output : graph->outputs()) {
+  bool moduleEscapes(Module &subModule, std::shared_ptr<Graph> &graph) {
+    for (auto &output : graph->outputs()) {
       if (subModule.type()->isSubtypeOf(*output->type())) {
         return true;
       }
@@ -721,7 +722,7 @@ class AttributePropagator {
     return preservedSubModule_.count(subModule._ivalue());
   }
 
-  void removeExtraWaitCalls(Block* b) {
+  void removeExtraWaitCalls(Block *b) {
     auto nodes = b->nodes();
     for (auto it = nodes.begin(); it != nodes.end(); it++) {
       auto node = *it;
@@ -764,25 +765,25 @@ class AttributePropagator {
 
   // Prepraring for clean up phase. At this point, record all subModules that
   // contains mutable attributes.
-  void recordReferencedAttrs(std::shared_ptr<Graph>& graph) {
-    std::stack<Block*> blocks({graph->block()});
+  void recordReferencedAttrs(std::shared_ptr<Graph> &graph) {
+    std::stack<Block *> blocks({graph->block()});
     std::set<ModulePtr> modules({module_._ivalue()});
     while (!blocks.empty()) {
-      Block* block = blocks.top();
+      Block *block = blocks.top();
       blocks.pop();
       for (auto n : block->nodes()) {
-        for (Block* subBlock : n->blocks()) {
+        for (Block *subBlock : n->blocks()) {
           blocks.push(subBlock);
         }
         if (n->kind() == prim::GetAttr) {
-          auto& name = n->s(attr::name);
+          auto &name = n->s(attr::name);
           // For now, use all module ivalues which are the same type
           // and could be the module that this GetAttr resolves to
           // TODO: we could attempt to follow the GetAttr chain and
           // find the exact ivalue, we would have to be careful
           // that the chain does not contain any attributes which
           // get written to (setAttr calls)
-          for (auto& mptr : modules) {
+          for (auto &mptr : modules) {
             auto module = Module(mptr);
             if (module.type() == n->inputs()[0]->type()) {
               TORCH_CHECK(module.hasattr(name));
@@ -811,9 +812,9 @@ class AttributePropagator {
     // We have to process the attributes that the user wants to preserve
     // separately since it's possible that the user-preserved module is
     // never referenced in the graph.
-    for (const auto& attr_info : userPreservedAttrs_) {
-      const auto& parent_module = attr_info.first;
-      for (const auto& attr_name : attr_info.second) {
+    for (const auto &attr_info : userPreservedAttrs_) {
+      const auto &parent_module = attr_info.first;
+      for (const auto &attr_name : attr_info.second) {
         const auto value = parent_module->getAttr(attr_name);
         insertMutableAttr(attr_name, value, parent_module);
       }
@@ -826,7 +827,7 @@ class AttributePropagator {
   // Note 'attrsToKeep[type].insert(type->numAttributes())' means all
   // attribute slots of 'type' and its methods are preserved. A submodule is
   // preserved when it escapes (meaning it is returned).
-  void handleSharedClassType(Module& module, std::shared_ptr<Graph>& graph) {
+  void handleSharedClassType(Module &module, std::shared_ptr<Graph> &graph) {
     auto type = module.type();
     size_t N = type->numAttributes();
     if (moduleEscapes(module, graph)) {
@@ -854,9 +855,9 @@ class AttributePropagator {
         attrsToKeep_[type].insert(i);
         if (attr.isModule()) {
           // See [Note: Inlining interfaces strategy]
-          TORCH_CHECK(
-              !type->getAttribute(i)->cast<InterfaceType>(),
-              "Unexpected interface attribute '" + name + "' during freezing");
+          TORCH_CHECK(!type->getAttribute(i)->cast<InterfaceType>(),
+                      "Unexpected interface attribute '" + name +
+                          "' during freezing");
 
           auto attrModule = attr.toModule();
           handleSharedClassType(attrModule, graph);
@@ -870,9 +871,9 @@ class AttributePropagator {
   // attributes including its own type.
   void removeUnusedAttrs() {
     std::vector<std::string> attrsToRemove;
-    std::vector<Function*> funcsToRemove;
-    for (auto& it : attrsToKeep_) {
-      auto& type = it.first;
+    std::vector<Function *> funcsToRemove;
+    for (auto &it : attrsToKeep_) {
+      auto &type = it.first;
       size_t N = type->numAttributes();
       if (it.second.count(N)) {
         continue;
@@ -882,15 +883,15 @@ class AttributePropagator {
           attrsToRemove.push_back(type->getAttributeName(i));
         }
       }
-      for (auto& fn : type->methods()) {
+      for (auto &fn : type->methods()) {
         if (preservedMethods_.count(fn)) {
           continue;
         }
         funcsToRemove.push_back(fn);
       }
 
-      for (auto& name : attrsToRemove) {
-        for (auto& val : SharedTypeSubModules_[type]) {
+      for (auto &name : attrsToRemove) {
+        for (auto &val : SharedTypeSubModules_[type]) {
           auto mod = val.toModule();
           mod._ivalue()->unsafeRemoveAttr(name);
         }
@@ -915,7 +916,7 @@ class AttributePropagator {
       preservedScalarAttrs_;
 
   // Contains user specified methods to be preserved in frozen module.
-  std::unordered_set<Function*> preservedMethods_;
+  std::unordered_set<Function *> preservedMethods_;
 
   // Contains user specified sub module to be preserve in frozen module.
   std::unordered_set<ModulePtr> preservedSubModule_;
@@ -931,7 +932,7 @@ class AttributePropagator {
   std::unordered_map<ClassTypePtr, IValue::HashAliasedIValues>
       SharedTypeSubModules_;
 
-  Module& module_;
+  Module &module_;
 
   // Contains the attributes names (e.g. {"self", "subModule", "a"}
   std::deque<std::string> names_;
@@ -946,15 +947,17 @@ class AttributePropagator {
   std::unordered_map<ModulePtr, std::unordered_set<std::string>>
       userPreservedAttrs_;
 
-};  // class AttributePropagator
+}; // class AttributePropagator
 
-}  // namespace
+} // namespace
 
-void Freeze(Module* module) {
+void Freeze(Module *module) {
   TORCH_CHECK(module != nullptr, "module cannot be nullptr");
   AttributePropagator attrPropagator(*module);
   attrPropagator.run();
 }
 
-}  // namespace jit
-}  // namespace torch
+Module Clone(Module *module) { return module->clone(); }
+
+} // namespace jit
+} // namespace torch

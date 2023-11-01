@@ -4,28 +4,25 @@ import torch
 
 import functs._C
 
-def script(fn):
+def script(fn, backend="ts_jit"):
     """ 
-    extend torchscript script module to support functionalization
-    Note: CANNOT divide the script function from functs and jit by now
-    
-    >>> func_fn = functs.jit.script(py_fn)
-    >>> jit_fn = torch.jit.script(py_fn)
-    >>> func_fn == jit_fn
-    >>> True
-
-    >>> func_fn = functs.jit.script(NNModule())
-    >>> jit_fn = torch.jit.script(NNModule())
-    >>> func_fn == jit_fn
-    >>> True
-
-    For break the link of jit_fn and func_fn in the situation of py_fn,
-    you should correct the function object name firstly.
-
+    convert PyTorch Program to Ts Graph IR
+    backend ["ts_jit", "fait"]: 
     """
-    jit_fn = torch.jit.freeze(torch.jit.script(fn).cuda().eval())
-    g = jit_fn.graph
+    TS_JIT = "ts_jit"
+    FAIT = "fait"
+    BACKEND_LIST = [TS_JIT, FAIT]
 
+    jit_fn = torch.jit.script(fn.cuda().eval())
+
+    if backend == TS_JIT:
+        torch.jit.freeze(jit_fn)
+    elif backend == FAIT:
+        jit_fn = torch.jit.freeze(torch.jit.script(fn).cuda().eval())
+    else:
+        raise AttributeError("No backend named {}".format(backend))
+    
+    g = jit_fn.graph
     # functs pass
     torch._C._jit_pass_inline(g)
     functs._C._jit_pass_convert_to_tensorssa(g)

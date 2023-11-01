@@ -5,7 +5,8 @@
 namespace torch {
 namespace jit {
 
-void Freeze(Module* module);
+void Freeze(Module *module);
+Module Clone(Module *module);
 
-}
-}  // namespace torch
+} // namespace jit
+} // namespace torch

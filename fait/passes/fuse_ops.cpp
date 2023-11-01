@@ -16,18 +16,15 @@ namespace jit {
 static auto _tssaOps = registerTssaOps();
 
 OperatorSet fusableOps{
-    // "aten::clone(Tensor self, *, MemoryFormat? memory_format=None) ->
-    // Tensor",
+    "aten::clone(Tensor self, *, MemoryFormat? memory_format=None) -> Tensor ",
     "immut::access(Tensor src) -> Tensor",
-    // "immut::assign(Tensor self, Tensor src, bool? n=None) -> Tensor",
+    "immut::assign(Tensor self, Tensor src, bool? n=None) -> Tensor",
     "immut::select(Tensor src, int dim, int index) -> Tensor",
-    // "immut::select_rev(Tensor self, Tensor src, int dim, int index) ->
-    // Tensor",
+    "immut::select_rev(Tensor self, Tensor src, int dim, int index) -> Tensor ",
     "immut::slice(Tensor src, int dim=0, SymInt? start=None, SymInt? end=None, "
     "SymInt step=1) -> Tensor",
-    // "immut::slice_rev(Tensor self, Tensor src, int dim=0, SymInt? start=None,
-    // "
-    // "SymInt? end=None, SymInt step=1) -> Tensor",
+    "immut::slice_rev(Tensor self, Tensor src, int dim=0, SymInt? start=None, "
+    "SymInt? end=None, SymInt step=1) -> Tensor",
     "immut::squeeze(Tensor self, int dim) -> Tensor",
     "immut::unsqueeze(Tensor self, int dim) -> Tensor",
     "immut::view(Tensor self, int[] size) -> Tensor",
