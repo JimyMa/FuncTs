@@ -6,7 +6,9 @@ import functs
 
 
 class Normalize(torch.nn.Module):
-    def forward(self, src: torch.Tensor, mean: float, scale: float):
+    def forward(self, 
+                src: torch.Tensor,
+                mean: float, scale: float):
         # RGB to BGR
         dup = src.clone()
         dup[:, :, 0] = src[:, :, 2]
@@ -52,19 +54,21 @@ for i in range(10):
     o_eager = eager_fn(a, mean, scale)
     torch._C._jit_run_code(fait_code, ("", a, mean, scale))
 
+torch.cuda.profiler.start()
 begin = time.time()
-for i in range(1000):
-    o_functs = functs_fn(a, mean, scale)
+# for i in range(1000):
+#     o_functs = functs_fn(a, mean, scale)
 mid_0 = time.time()
-for i in range(1000):
-    torch._C._jit_run_code(fait_code, ("", a, mean, scale))
+# for i in range(1000):
+#     torch._C._jit_run_code(fait_code, ("", a, mean, scale))
 mid_1 = time.time()
 for i in range(1000):
     o_jit = jit_fn(a, mean, scale)
 mid_2 = time.time()
-for i in range(1000):
-    o_eager = eager_fn(a, mean, scale)
+# for i in range(1000):
+#     o_eager = eager_fn(a, mean, scale)
 end = time.time()
+torch.cuda.profiler.stop()
 
 print("functs: ", mid_0 - begin)
 print("fait: ", mid_1 - mid_0)

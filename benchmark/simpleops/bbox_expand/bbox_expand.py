@@ -12,8 +12,8 @@ class BBoxTargetExpand(torch.nn.Module):
         bbox_weights_expand = bbox_weights.clone()
         valid_label: List[int] = torch.nonzero(labels > 0).squeeze(-1).tolist()
         for i in valid_label:
-            bbox_targets_expand[i] = bbox_targets[i]
-            bbox_weights_expand[i] = bbox_weights[i]
+            bbox_targets_expand[i, 0:4] = bbox_targets[i, :]
+            bbox_weights_expand[i, 0:4] = bbox_weights[i, :]
         return bbox_targets_expand.clone(), bbox_weights_expand.clone()
 
 

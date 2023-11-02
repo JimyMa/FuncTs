@@ -16,9 +16,9 @@ def script(fn, backend="ts_jit"):
     jit_fn = torch.jit.script(fn.cuda().eval())
 
     if backend == TS_JIT:
-        torch.jit.freeze(jit_fn)
+        jit_fn = torch.jit.freeze(jit_fn)
     elif backend == FAIT:
-        jit_fn = torch.jit.freeze(torch.jit.script(fn).cuda().eval())
+        functs._C._jit_pass_freeze(torch.jit.script(fn).cuda().eval()._c)
     else:
         raise AttributeError("No backend named {}".format(backend))
     

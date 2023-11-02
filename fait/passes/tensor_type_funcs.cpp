@@ -841,6 +841,10 @@ static c10::SymbolicShape inferShapeUpsample2dOps(INFER_PARAMS) {
 }
 
 static OperatorSet sameShapeOps{
+    "aten::index_put(Tensor self, Tensor[] indices, Tensor values, bool "
+    "accumulate=False) -> Tensor",
+    "aten::index_put(Tensor self, Tensor?[] indices, Tensor values, bool "
+    "accumulate=False) -> Tensor",
     "aten::clone(Tensor self, *, MemoryFormat? memory_format=None) -> Tensor",
     "immut::assign(Tensor self, Tensor src, bool? n=None) -> Tensor",
     "immut::select_rev(Tensor self, Tensor src, int dim, int index) -> Tensor",

@@ -13,8 +13,9 @@ static void dumpGraphToFile(const std::shared_ptr<Graph> &graph,
   graph->print(ofs, false);
 }
 
-void FaitPipeline(Module module, std::vector<c10::TypePtr> type_hint) {
-  auto graph = module.get_method("forward").graph()->copy();
+void FaitPipeline(const std::shared_ptr<Graph> graph,
+                  std::vector<c10::TypePtr> type_hint) {
+  // auto graph = module.get_method("forward").graph()->copy();
   vision::cuda_version();
   std::unordered_map<Value *, TypePtr> refinedTypes;
   // ConvertProfilingInstrumentation(graph);

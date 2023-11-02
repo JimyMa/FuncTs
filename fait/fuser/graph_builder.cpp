@@ -213,9 +213,10 @@ void GraphBuilder::solveInput(Value *input_, TypePtr refined) {
   case TypeKind::TensorType: {
     BufHandle input_buf(
         set_hash_name("InputBuf"), FunctorShapeMap_[input_],
-        ToDtype(input_->type()->cast<TensorType>()->scalarType().value()));
+        ToDtype(refined->cast<TensorType>()->scalarType().value()));
     exprs_[input_] = ExprHandle(input_buf.node());
     FunctorInputArgs.emplace_back(input_buf);
+
     break;
   }
   case TypeKind::FloatType:
@@ -270,11 +271,15 @@ void GraphBuilder::compile() {
     auto graph_arg = graph_->inputs()[i];
     auto type_arg = refined_types_[i - 1];
     if (auto tensor_type_arg = type_arg->cast<TensorType>()) {
+      AT_ASSERT(tensor_type_arg->scalarType().has_value(),
+                "ScalarType must be complete");
       auto symbolic_dims = tensor_type_arg->symbolic_sizes();
       std::vector<ExprHandle> value_dims_expr;
       for (int k = 0; k < symbolic_dims.rank(); k++) {
         if (symbolic_dims[k].is_static()) {
-          value_dims_expr.push_back(LongImm::make(symbolic_dims[k].value()));
+          auto expr = LongImm::make(symbolic_dims[k].value());
+          value_dims_expr.push_back(expr);
+
         } else {
           auto dim_expr = VarHandle(set_hash_name("dim"), kLong);
           value_dims_expr.push_back(dim_expr);
@@ -289,10 +294,9 @@ void GraphBuilder::compile() {
   LONG_TAIL_LOG_INFO("Input Buffer begin");
   for (int i = 1; i < graph_->inputs().size(); i++) {
     auto input_ = graph_->inputs()[i];
-    // AT_ASSERT(input_->type()->cast<TensorType>(), "Parallel Functor Only
-    // Tensor Type are Supported by now");
-    // AT_ASSERT(input_->type()->cast<TensorType>()->scalarType().has_value(),
-    // "ScalarType must be complete");
+    // AT_ASSERT(input_->type()->cast<TensorType>(),
+    //           "Parallel Functor Only Tensor Type are Supported by now",
+    //           input_->debugName());
     solveInput(input_, refined_types_[i - 1]);
   }
   LONG_TAIL_LOG_INFO("Input Buffer end!!");
@@ -372,7 +376,6 @@ void GraphBuilder::compile() {
         if (lowering) {
           LONG_TAIL_LOG_INFO("standard lowering ...");
           get_stride_by_expr_dims(outputShape);
-
           output_tensor = lowering(
               inputs_expr, outputShape, get_stride_by_expr_dims(outputShape),
               node->output(0)->type()->cast<TensorType>()->scalarType().value(),
