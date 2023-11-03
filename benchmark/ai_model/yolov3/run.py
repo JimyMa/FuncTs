@@ -15,6 +15,9 @@ model = yolov3_bbox.YOLOV3BBox().cuda().eval()
 # torchscript
 jit_model = torch.jit.freeze(torch.jit.script(model))
 
+# torch dynamo + inductor
+tracing_model = torch.compile(model)
+
 # fait
 cls_scores: [torch.Size([1, 486, 20, 20]), torch.Size([1, 486, 10, 10]), torch.Size([1, 486, 5, 5]), torch.Size([1, 486, 3, 3]), torch.Size([1, 486, 2, 2]), torch.Size([1, 486, 1, 1])]
 bbox_preds: [torch.Size([1, 24, 20, 20]), torch.Size([1, 24, 10, 10]), torch.Size([1, 24, 5, 5]), torch.Size([1, 24, 3, 3]), torch.Size([1, 24, 2, 2]), torch.Size([1, 24, 1, 1])]
@@ -31,6 +34,8 @@ functs._C._jit_pass_fait_pipeline(fait_model.graph, type_hint)
 
 code = torch._C._jit_get_code(fait_model.graph)
 
+torch._C._jit_set_texpr_dynamic_shape_enabled(True)
+
 def eager_task(idx: int):
     model(*feats[idx % num_samples])
 
@@ -40,6 +45,9 @@ def jit_task(idx: int):
 def functs_task(idx: int):
     functs_model(*feats[idx % num_samples])
 
+def tracing_task(idx: int):
+    tracing_model(*feats[idx % num_samples])
+
 def fait_task(idx: int):
     torch._C._jit_run_code(code, ("", ) + feats[idx % num_samples])
 
@@ -47,17 +55,19 @@ for i in range(num_samples):
     eager_task(i)
     jit_task(i)
     functs_task(i)
+    tracing_task(i)
     fait_task(i)
 
-def dump_proflier(task):
+def dump_proflier(task, name):
     result = functs.utils.evaluate(task)
-    print(f'Eager Latency: {functs.utils.fmt_duration(result.mean())}')
+    print(f'{name} Latency: {functs.utils.fmt_duration(result.mean())}')
 
 torch.cuda.profiler.start()
-# dump_proflier(eager_task)
-# dump_proflier(jit_task)
-# dump_proflier(functs_task)
-dump_proflier(fait_task)
+dump_proflier(eager_task, "eager")
+dump_proflier(jit_task, "jit")
+dump_proflier(functs_task, "functs")
+dump_proflier(tracing_task, "tracing jit")
+dump_proflier(fait_task, "fait")
 torch.cuda.profiler.stop()
 
 

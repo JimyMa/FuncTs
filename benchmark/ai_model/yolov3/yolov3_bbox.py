@@ -206,7 +206,7 @@ class YOLOV3BBox(torch.nn.Module):
         for pred, stride in zip(pred_maps, featmap_strides):
             pred = pred.permute(0, 2, 3, 1).reshape(num_imgs, -1,
                                                     self.num_attrib).clone()
-            pred[..., :2].sigmoid_()
+            pred[..., :2].sigmoid_().clone()
             flatten_preds.append(pred.clone())
             flatten_strides.append(torch.tensor(
                 stride, device=pred.device).expand(pred.size(1)))
@@ -233,7 +233,7 @@ class YOLOV3BBox(torch.nn.Module):
             objectness = objectness[conf_inds]
             det_results.append(multiclass_nms(bboxes, scores, objectness))
 
-        return flatten_anchors
+        return det_results
 
 
 if __name__ == '__main__':

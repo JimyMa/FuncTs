@@ -1,6 +1,7 @@
 #include <ATen/core/interned_strings.h>
 #include <ATen/core/ivalue.h>
 #include <ATen/core/jit_type.h>
+#include <deque>
 #include <memory>
 #include <set>
 #include <unordered_map>
@@ -129,6 +130,7 @@ TensorSSAGetBufferForest(std::shared_ptr<Graph> graph) { // AliasDb
 static void
 TensorSSAAliasRemoval(Block *b, std::shared_ptr<BufferForest> bufferForest,
                       std::shared_ptr<TensorSSAMutateInfo> mutateInfo) {
+  bufferForest->dump();
   auto nodes = b->nodes();
   for (auto node = nodes.front(); node != nodes.back();) {
     auto blocks = node->blocks();
@@ -141,6 +143,7 @@ TensorSSAAliasRemoval(Block *b, std::shared_ptr<BufferForest> bufferForest,
     if (bufferForest->isBufferMutation(node)) {
       // TODO: only tensor values are considered...
       // Step 1. Pass Up
+      auto interupt = node->next();
       const Value *points_to;
       Value *leaf_value = node->output(0);
       Value *pass_up_value = node->input(0);
@@ -180,79 +183,95 @@ TensorSSAAliasRemoval(Block *b, std::shared_ptr<BufferForest> bufferForest,
       } while (points_to);
 
       // Step 2. pass down
-      // reconstruct elementMap_
-      Value *pass_down_value = pass_up_value;
-      Node *pass_down_node = pass_down_value->node();
+      // Pass down non recursive implementation
+      struct VisitNode {
+        VisitNode(Value *root, Value *pass_down, Node *update)
+            : root_value(root), pass_down_node(pass_down),
+              update_node(update){};
+        bool visted{false};
+        Value *root_value;
+        Value *pass_down_node;
+        Node *update_node;
+      };
+
       Value *root_value = leaf_value;
-      node_insert = pass_down_value->node();
+      Value *pass_down_value = pass_up_value;
 
-      // generate a strong update to beacon mutation
       auto update_node = b->owningGraph()->create(
-          tensorssa::Update, {pass_down_node->output(), root_value}, 0);
+          tensorssa::Update, {pass_down_value->node()->output(), root_value},
+          0);
       update_node->insertAfter(node_insert);
-      node_insert = update_node;
-
       mutateInfo->addMutNodes(update_node);
 
-      std::function<void()> pass_down;
+      auto rootVisitNode =
+          std::make_shared<VisitNode>(root_value, pass_down_value, update_node);
 
-      pass_down = [&]() -> void {
-        // auto elementMap = buffer_forest->elementMapMutable();
-        auto pass_down_buffer_node =
-            bufferForest->getBufferNodeOrNone(root_value);
-        for (auto point_from_buffer_node : pass_down_buffer_node->pointedFrom) {
-          // auto from_elem = buffer_forest->fromIndex(pointedFromIndex);
+      std::deque<std::shared_ptr<VisitNode>> stack;
+      stack.push_back(rootVisitNode);
 
-          // auto from_value = const_cast<Value *>(*from_elem->values.begin());
-          auto from_value = point_from_buffer_node->bufferNode_->var;
-          auto from_node = from_value->node();
+      while (!stack.empty()) {
+        auto visitingNode = stack.back();
+        stack.pop_back();
+        if (visitingNode->visted) {
+          // ACCESS Buffer Forest
+          auto pass_down_buffer_node =
+              bufferForest->getBufferNodeOrNone(visitingNode->root_value);
+          for (auto point_from_buffer_node :
+               pass_down_buffer_node->pointedFrom) {
+            auto from_value = point_from_buffer_node->bufferNode_->var;
+            auto from_node = from_value->node();
 
-          // node is dominated by from_node is nesessary!!!
-          // def func(a, b):
-          // // if cond:
-          // // // c = a[0]
-          // // else:
-          // // // pass
-          // // c.copy_(b)
-          // this pattern is unsupport
-          // a tensor which is not dominated by value try to mutate the value
-          // NOTE: this feature is unsupported in TorchScript either.
-          if (from_node->isBefore(node) && node->isDominatedBy(from_node)) {
-            if (immutable::reverseVersion.count(from_node->kind())) {
-              pass_down_node = b->owningGraph()->create(
-                  from_node->kind(), const_cast<Node *>(from_node)->inputs(),
-                  1);
-              if (immutable::Assign != from_node->kind())
-                pass_down_node->replaceInput(0, pass_down_value);
-              else {
-                pass_down_node->replaceInput(0, pass_down_value);
-                pass_down_node->replaceInput(1, pass_down_value);
+            // node is dominated by from_node is nesessary!!!
+            // def func(a, b):
+            // // if cond:
+            // // // c = a[0]
+            // // else:
+            // // // pass
+            // // c.copy_(b)
+            // this pattern is unsupport
+            // a tensor which is not dominated by value try to mutate the value
+            // NOTE: this feature is unsupported in TorchScript either.
+            if (from_node->isBefore(node) && node->isDominatedBy(from_node)) {
+              Node *pass_down_node;
+              if (immutable::reverseVersion.count(from_node->kind())) {
+                pass_down_node = b->owningGraph()->create(
+                    from_node->kind(), const_cast<Node *>(from_node)->inputs(),
+                    1);
+                if (immutable::Assign != from_node->kind())
+                  pass_down_node->replaceInput(0, pass_down_value);
+                else {
+                  pass_down_node->replaceInput(0, pass_down_value);
+                  pass_down_node->replaceInput(1, pass_down_value);
+                }
+              } else {
+                AT_ASSERT(false, "Unknown alias operator when pass down",
+                          from_node->kind().toQualString());
               }
-            } else {
-              AT_ASSERT(false, "Unknown alias operator when pass down",
-                        from_node->kind().toQualString());
+              // b->owningGraph()->insertNode(pass_down_node);
+              pass_down_node->insertAfter(visitingNode->pass_down_node->node());
+
+              pass_down_value = pass_down_node->output(0);
+              pass_down_value->copyMetadata(from_node->output(0));
+
+              // generate a strong update to beacon mutation
+              auto update_node = b->owningGraph()->create(
+                  tensorssa::Update, {pass_down_node->output(), from_value}, 0);
+              update_node->insertAfter(visitingNode->update_node);
+
+              mutateInfo->addMutNodes(update_node);
+
+              root_value = from_node->output(0);
+              auto leafVisitingNode = std::make_shared<VisitNode>(
+                  root_value, pass_down_value, update_node);
+              stack.push_back(leafVisitingNode);
             }
-
-            // b->owningGraph()->insertNode(pass_down_node);
-            pass_down_node->insertAfter(node_insert);
-            pass_down_value = pass_down_node->output(0);
-            pass_down_value->copyMetadata(from_node->output(0));
-
-            // generate a strong update to beacon mutation
-            auto update_node = b->owningGraph()->create(
-                tensorssa::Update, {pass_down_node->output(), from_value}, 0);
-            update_node->insertAfter(pass_down_node);
-            node_insert = update_node;
-
-            mutateInfo->addMutNodes(update_node);
-
-            root_value = from_node->output(0);
-            pass_down();
           }
+        } else {
+          visitingNode->visted = true;
+          stack.push_back(visitingNode);
         }
-      };
-      pass_down();
-      node = node_insert->next();
+      }
+      node = interupt;
     } else {
       node = node->next();
     }

@@ -25,6 +25,13 @@ ExprHandle constant(const ArgValue &v) {
   }
 }
 
+ExprHandle scalarOrConstant(const ArgValue &v) {
+  if (auto vh = c10::get_if<VarHandle>(&v)) {
+    return *vh;
+  }
+  return constant(v);
+}
+
 Tensor computeClone(const std::vector<ArgValue> &inputValues,
                     const std::vector<ExprHandle> &outputShape,
                     c10::optional<std::vector<ExprHandle>> outputStrides) {
@@ -58,13 +65,13 @@ Tensor computeImmutSlice(const std::vector<ArgValue> &inputValues,
                      dim += rank;
                    auto dimSize = src.dims().at(dim);
                    // Start
-                   ExprHandle start = constant(inputValues[2]);
+                   ExprHandle start = scalarOrConstant(inputValues[2]);
                    // IfThenElse::make(start >= int64_t(0), Min::make(start,
                    // dimSize, true),
                    //                  start + dimSize);
 
                    // Step
-                   auto step = constant(inputValues[4]);
+                   auto step = scalarOrConstant(inputValues[4]);
                    // Source indices
                    std::vector<ExprHandle> output_idx(axes.begin(), axes.end());
                    output_idx[dim] = start + step * output_idx[dim];
@@ -93,7 +100,7 @@ computeImmutSliceRev(const std::vector<ArgValue> &inputValues,
         if (c10::get_if<ArgNone>(&inputValues[3]))
           start = int64_t(0);
         else
-          start = constant(inputValues[3]);
+          start = scalarOrConstant(inputValues[3]);
         start =
             IfThenElse::make(start >= int64_t(0),
                              Min::make(start, dimSize, true), start + dimSize);
@@ -103,7 +110,7 @@ computeImmutSliceRev(const std::vector<ArgValue> &inputValues,
         if (c10::get_if<ArgNone>(&inputValues[4]))
           end = dimSize;
         else
-          end = constant(inputValues[4]);
+          end = scalarOrConstant(inputValues[4]);
         end = IfThenElse::make(end >= int64_t(0), Min::make(end, dimSize, true),
                                end + dimSize);
 
@@ -139,7 +146,7 @@ computeImmutSelect(const std::vector<ArgValue> &inputValues,
     if (dim < 0)
       dim += rank;
 
-    auto idx = constant(inputValues[2]);
+    auto idx = scalarOrConstant(inputValues[2]);
 
     std::vector<ExprHandle> output_idx(axes.begin(), axes.end());
     output_idx.insert(output_idx.begin() + dim, idx);

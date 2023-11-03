@@ -43,19 +43,17 @@ def fmt_duration(dur: float):
 
 
 def evaluate(task: Callable[[int], None]):
-    # for i in range(warmup_runs):
-    #     task(i)
+    for i in range(warmup_runs):
+        task(i)
 
-    # # enable_profiling()
-    # torch.cuda.synchronize()
-    # count = 0
+    # enable_profiling()
+    torch.cuda.synchronize()
+    count = 0
     begin = perf_counter()
-    count = 1
-    task(1)
-    # while perf_counter() - begin < run_duration:
-    #     task(count)
-    #     torch.cuda.synchronize()
-    #     count += 1
+    while perf_counter() - begin < run_duration:
+        task(count)
+        torch.cuda.synchronize()
+        count += 1
     # disable_profiling()
 
     return EvalRecord(total=perf_counter() - begin, count=count)

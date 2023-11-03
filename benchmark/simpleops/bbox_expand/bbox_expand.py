@@ -7,14 +7,15 @@ import functs
 
 
 class BBoxTargetExpand(torch.nn.Module):
-    def forward(self, bbox_targets, bbox_weights, labels):
+    def forward(self, bbox_targets, bbox_weights, labels: List[int]):
         bbox_targets_expand = bbox_targets.clone()
         bbox_weights_expand = bbox_weights.clone()
-        valid_label: List[int] = torch.nonzero(labels > 0).squeeze(-1).tolist()
+        valid_label: List[int] = labels
         for i in valid_label:
-            bbox_targets_expand[i, 0:4] = bbox_targets[i, :]
-            bbox_weights_expand[i, 0:4] = bbox_weights[i, :]
-        return bbox_targets_expand.clone(), bbox_weights_expand.clone()
+            # start, end = i * 4, (i + 1) * 4
+            bbox_targets_expand[i, :] = bbox_targets[i, :]
+            bbox_weights_expand[i, :] = bbox_weights[i, :]
+        return bbox_targets_expand.clone()
 
 
 eager_fn = BBoxTargetExpand()
@@ -26,7 +27,7 @@ N = 4
 
 bbox_targets = torch.rand(M, N).float().cuda()
 bbox_weights = torch.rand(M, N).float().cuda()
-labels = torch.ones(M, ).long().cuda()
+labels = [1, 2, 5, 6, 7, 9, 16, 87]
 
 
 o_functs = functs_fn(bbox_targets, bbox_weights, labels)
@@ -36,7 +37,7 @@ o_eager = eager_fn(bbox_targets, bbox_weights, labels)
 print(torch.allclose(o_functs[0], o_eager[0], atol=1e-3))
 print(torch.allclose(o_functs[1], o_eager[1], atol=1e-3))
 
-print(functs_fn.graph_for(bbox_targets, bbox_weights, labels))
+print(functs_fn.code)
 
 # warm up 0
 for i in range(10):

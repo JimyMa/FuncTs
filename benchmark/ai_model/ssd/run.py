@@ -24,8 +24,6 @@ type_hint = [torch.TupleType([torch.TensorType.get().with_dtype(torch.float32).w
                               torch.TensorType.get().with_dtype(torch.float32).with_sizes([1, 24, 1, 1]).with_device(torch.device("cuda"))])]
 
 # data load
-input = torch.load("ssd_feat.pt")[0]
-
 model = ssd_bbox.SSDBBox().cuda().eval()
 
 # torchscript
@@ -34,47 +32,49 @@ jit_model = torch.jit.freeze(torch.jit.script(model))
 # functs
 functs_model = functs.jit.script(torch.jit.freeze(torch.jit.script(model)))
 
+# torch dynamo + inductor
+tracing_model = torch.compile(model)
+
 # fait
 fait_model = functs.jit.script(model, backend="fait")
 functs._C._jit_pass_fait_pipeline(fait_model.graph, type_hint)
 code = torch._C._jit_get_code(fait_model.graph)
 
+feats = torch.load("ssd_feat.pt")
+num_samples = len(feats)
 
+code = torch._C._jit_get_code(fait_model.graph)
 
+def eager_task(idx: int):
+    model(*feats[idx % num_samples])
 
-for i in range(10):
-    functs_model(*input)
-    torch._C._jit_run_code(code, ("", ) + input)
-    jit_model(*input)
-    model(*input)
+def jit_task(idx: int):
+    jit_model(*feats[idx % num_samples])
 
-for i in range(10):
-    functs_model(*input)
-    torch._C._jit_run_code(code, ("", ) + input)
-    jit_model(*input)
-    model(*input)
+def functs_task(idx: int):
+    functs_model(*feats[idx % num_samples])
+
+def tracing_task(idx: int):
+    tracing_model(*feats[idx % num_samples])
+
+def fait_task(idx: int):
+    torch._C._jit_run_code(code, ("", ) + feats[idx % num_samples])
+
+for i in range(num_samples):
+    eager_task(i)
+    jit_task(i)
+    functs_task(i)
+    tracing_task(i)
+    fait_task(i)
+
+def dump_proflier(task, name):
+    result = functs.utils.evaluate(task)
+    print(f'{name} Latency: {functs.utils.fmt_duration(result.mean())}')
 
 torch.cuda.profiler.start()
-begin = time.time()
-for i in range(100):
-    o_functs = functs_model(*input)
-# torch.cuda.synchronize()
-mid_0 = time.time()
-for i in range(100):
-    torch._C._jit_run_code(code, ("", ) + input)
-# torch.cuda.synchronize()
-mid_1 = time.time()
-for i in range(100):
-    jit_model(*input)
-# torch.cuda.synchronize()
-mid_2 = time.time()
-for i in range(100):
-    model(*input)
-# torch.cuda.synchronize()
-end = time.time()
+dump_proflier(eager_task, "eager")
+dump_proflier(jit_task, "jit")
+dump_proflier(functs_task, "functs")
+dump_proflier(tracing_task, "tracing jit")
+dump_proflier(fait_task, "fait")
 torch.cuda.profiler.stop()
-
-print("functs: ", mid_0 - begin)
-print("fait: ", mid_1 - mid_0)
-print("torchscript: ", mid_2 - mid_1)
-print("eager: ", end - mid_2)

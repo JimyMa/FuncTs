@@ -11,8 +11,8 @@ class Normalize(torch.nn.Module):
                 mean: float, scale: float):
         # RGB to BGR
         dup = src.clone()
-        dup[:, :, 0] = src[:, :, 2]
-        dup[:, :, 2] = src[:, :, 0]
+        dup[..., 0] = src[..., 2]
+        dup[..., 2] = src[..., 0]
         return (dup - mean) * scale
 
 
@@ -24,6 +24,7 @@ fait_fn = functs.jit.script(Normalize())
 tensor_type = torch.TensorType.get().with_device(torch.device("cuda")).with_sizes([800, 1333, 3]).with_dtype(torch.float32)
 functs._C._jit_pass_fait_pipeline(fait_fn.graph, [tensor_type, torch.FloatType.get(), torch.FloatType.get()])
 fait_code = torch._C._jit_get_code(fait_fn.graph)
+print(jit_fn.graph)
 print(fait_fn.graph)
 
 a = torch.randn(800, 1333, 3).float().cuda()
