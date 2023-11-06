@@ -39,6 +39,7 @@ tracing_model = torch.compile(model)
 fait_model = functs.jit.script(model, backend="fait")
 functs._C._jit_pass_fait_pipeline(fait_model.graph, type_hint)
 code = torch._C._jit_get_code(fait_model.graph)
+print("done")
 
 feats = torch.load("ssd_feat.pt")
 num_samples = len(feats)

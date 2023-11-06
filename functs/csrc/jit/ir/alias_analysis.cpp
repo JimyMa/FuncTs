@@ -338,8 +338,6 @@ void AliasDbCopy::getWritesImpl(Node *n, MemoryLocations &ret) const {
 
 // Does `n` write to an alias of one of the values in `vs`?
 bool AliasDbCopy::writesToAlias(Node *n, const ValueSet &vs) const {
-  std::cout << ">>" << std::endl;
-  n->dump();
   const auto writtenTo = getWrites(n);
   if (writtenTo.empty()) {
     return false;

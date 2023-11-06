@@ -130,7 +130,6 @@ TensorSSAGetBufferForest(std::shared_ptr<Graph> graph) { // AliasDb
 static void
 TensorSSAAliasRemoval(Block *b, std::shared_ptr<BufferForest> bufferForest,
                       std::shared_ptr<TensorSSAMutateInfo> mutateInfo) {
-  bufferForest->dump();
   auto nodes = b->nodes();
   for (auto node = nodes.front(); node != nodes.back();) {
     auto blocks = node->blocks();
@@ -186,11 +185,11 @@ TensorSSAAliasRemoval(Block *b, std::shared_ptr<BufferForest> bufferForest,
       // Pass down non recursive implementation
       struct VisitNode {
         VisitNode(Value *root, Value *pass_down, Node *update)
-            : root_value(root), pass_down_node(pass_down),
+            : root_value(root), pass_down_value(pass_down),
               update_node(update){};
         bool visted{false};
         Value *root_value;
-        Value *pass_down_node;
+        Value *pass_down_value;
         Node *update_node;
       };
 
@@ -231,24 +230,33 @@ TensorSSAAliasRemoval(Block *b, std::shared_ptr<BufferForest> bufferForest,
             // this pattern is unsupport
             // a tensor which is not dominated by value try to mutate the value
             // NOTE: this feature is unsupported in TorchScript either.
-            if (from_node->isBefore(node) && node->isDominatedBy(from_node)) {
+
+            // For easily comperahension, If from node is node, generate a new
+            // immut::assign (this cond can be remove)*/
+
+            if ((from_node->isBefore(node) && node->isDominatedBy(from_node)) ||
+                from_node == node) {
               Node *pass_down_node;
               if (immutable::reverseVersion.count(from_node->kind())) {
                 pass_down_node = b->owningGraph()->create(
                     from_node->kind(), const_cast<Node *>(from_node)->inputs(),
                     1);
                 if (immutable::Assign != from_node->kind())
-                  pass_down_node->replaceInput(0, pass_down_value);
+                  pass_down_node->replaceInput(0,
+                                               visitingNode->pass_down_value);
                 else {
-                  pass_down_node->replaceInput(0, pass_down_value);
-                  pass_down_node->replaceInput(1, pass_down_value);
+                  pass_down_node->replaceInput(0,
+                                               visitingNode->pass_down_value);
+                  pass_down_node->replaceInput(1,
+                                               visitingNode->pass_down_value);
                 }
               } else {
                 AT_ASSERT(false, "Unknown alias operator when pass down",
                           from_node->kind().toQualString());
               }
               // b->owningGraph()->insertNode(pass_down_node);
-              pass_down_node->insertAfter(visitingNode->pass_down_node->node());
+              pass_down_node->insertAfter(
+                  visitingNode->pass_down_value->node());
 
               pass_down_value = pass_down_node->output(0);
               pass_down_value->copyMetadata(from_node->output(0));

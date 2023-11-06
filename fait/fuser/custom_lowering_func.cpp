@@ -4,6 +4,7 @@
 
 #include <utility>
 
+#include "functs/csrc/jit/ir/symbol_ext.h"
 #include "fuser/nnc_func.h"
 #include "lowering_utils.h"
 #include "tssa_set_ops.h"
@@ -435,8 +436,9 @@ static Tensor computeSliceSet(CUSTOM_LOWERING_PARAMS) {
       start = int64_t(0);
     else
       start = getScalarExpr<int64_t>(startVal, valueToExpr);
-    start = IfThenElse::make(start >= int64_t(0),
-                             Min::make(start, dimSize, true), start + dimSize);
+    // start = IfThenElse::make(start >= int64_t(0),
+    //                          Min::make(start, dimSize, true), start +
+    //                          dimSize);
 
     // End
     auto endVal = node->input(4);
@@ -445,8 +447,8 @@ static Tensor computeSliceSet(CUSTOM_LOWERING_PARAMS) {
       end = dimSize;
     else
       end = getScalarExpr<int64_t>(endVal, valueToExpr);
-    end = IfThenElse::make(end >= int64_t(0), Min::make(end, dimSize, true),
-                           end + dimSize);
+    // end = IfThenElse::make(end >= int64_t(0), Min::make(end, dimSize, true),
+    //                        end + dimSize);
 
     // Step
     int64_t step = GET_INT_CONST_AT(5);
@@ -458,8 +460,9 @@ static Tensor computeSliceSet(CUSTOM_LOWERING_PARAMS) {
 
     // See if we can create an elementwise pipeline for source values
     auto srcElem = src.load(srcAxes);
-    auto ewiseFuncs = findEwiseFuncsForSetSrc(node->input(0), node->input(1),
-                                              aten::slice, valueToExpr);
+    auto ewiseFuncs = findEwiseFuncsForSetSrc(
+        node->input(0), node->input(1), c10::immutable::Slice, valueToExpr);
+
     if (!ewiseFuncs.empty()) {
       srcElem = self.load(axes);
       for (auto &func : ewiseFuncs)

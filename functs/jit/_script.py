@@ -33,5 +33,5 @@ def script(fn, backend="ts_jit", remove_update=True, enable_dce_cse=True):
     if enable_dce_cse:
         torch._C._jit_pass_dce(g)
         torch._C._jit_pass_cse(g)
-
+        torch._C._jit_pass_constant_propagation(g)
     return jit_fn

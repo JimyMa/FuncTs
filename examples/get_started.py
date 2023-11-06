@@ -8,23 +8,23 @@ import functs._C
 def func(a: torch.Tensor, b: torch.Tensor, n: int):
   a = a.clone()
   b = b.clone()
+  b_list = []
   for i in range(n):
     b[i] = b[i] + 1
-  return b
+    b[i].copy_(b[i] + 1)
+    b_list.append(b[i])
+  return b_list
 
 jit_func = torch.jit.script(func)
 c = jit_func.code
 g = jit_func.graph
-print(c)
-print(g)
 g.alias_db().dump()
 
 # to torchscript
-jit_func = functs.jit.script(func, remove_update=False, enable_dce_cse=False)
+jit_func = functs.jit.script(func)
 c = jit_func.code
 g = jit_func.graph
 print(c)
-print(g)
 g.alias_db().dump()
 
 # check equal
