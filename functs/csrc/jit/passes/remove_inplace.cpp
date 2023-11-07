@@ -27,35 +27,40 @@ void RemoveInplaceImpl(Block *b, std::shared_ptr<AliasDbCopy> aliasDb) {
 
     // preprocess: convert `aten::compute_` buffer ==> `aten::compute` and
     // `aten::copy`
-    if (isMutating(node) && aten::copy_ != node->kind() &&
-        aliasDb->elementMap().count(node->input(0)) &&
+    if (isMutating(node) && aliasDb->elementMap().count(node->input(0)) &&
         node->input(0)->type()->kind() != TypeKind::ListType &&
         node->input(0)->type()->kind() != TypeKind::DictType &&
         node->input(0)->type()->kind() != TypeKind::ClassType) {
-      WithInsertPoint guard(b->param_node()->next());
-      auto constant_false = b->owningGraph()->insertConstant(false);
+      if (aten::copy_ != node->kind()) {
+        WithInsertPoint guard(b->param_node()->next());
+        auto constant_false = b->owningGraph()->insertConstant(false);
 
-      auto mutSym = node->kind();
-      std::string immutOpName(mutSym.toUnqualString());
-      immutOpName.pop_back();
+        auto mutSym = node->kind();
+        std::string immutOpName(mutSym.toUnqualString());
+        immutOpName.pop_back();
 
-      auto immutSym = Symbol::fromQualString(
-          std::string(mutSym.ns().toUnqualString()) + "::" + immutOpName);
-      auto immutNode = b->owningGraph()
-                           ->create(immutSym, node->inputs())
-                           ->copyMetadata(node);
+        auto immutSym = Symbol::fromQualString(
+            std::string(mutSym.ns().toUnqualString()) + "::" + immutOpName);
+        auto immutNode = b->owningGraph()
+                             ->create(immutSym, node->inputs())
+                             ->copyMetadata(node);
 
-      immutNode->insertBefore(node);
+        immutNode->insertBefore(node);
 
-      auto copyNode =
-          b->owningGraph()->create(aten::copy_, 1)->copyMetadata(node);
+        auto copyNode =
+            b->owningGraph()->create(aten::copy_, 1)->copyMetadata(node);
 
-      copyNode->addInput(node->input(0));
-      copyNode->addInput(immutNode->output());
-      copyNode->addInput(constant_false);
-      copyNode->insertBefore(node);
-      ++it;
-      node->destroy();
+        copyNode->addInput(node->input(0));
+        copyNode->addInput(immutNode->output());
+        copyNode->addInput(constant_false);
+        copyNode->insertBefore(node);
+        node->output()->replaceAllUsesWith(node->input(0));
+        ++it;
+        node->destroy();
+      } else {
+        node->output()->replaceAllUsesWith(node->input(0));
+        ++it;
+      }
     } else {
       ++it;
     }

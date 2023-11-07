@@ -25,6 +25,7 @@ def script(fn, backend="ts_jit", remove_update=True, enable_dce_cse=True):
             raise AttributeError("No backend named {}".format(backend))
     
     g = jit_fn.graph
+    functs._C._jit_pass_dump_remove_inter_precedure_mutation(g)
     # functs pass
     torch._C._jit_pass_inline(g)
     functs._C._jit_pass_convert_to_tensorssa(g)

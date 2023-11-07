@@ -29,6 +29,6 @@ namespace torch {
 namespace jit {
 
 void FaitPipeline(std::shared_ptr<Graph>, std::vector<c10::TypePtr>);
-
+void FaitGetRefineType(std::shared_ptr<Graph>, std::vector<c10::TypePtr>);
 } // namespace jit
 } // namespace torch

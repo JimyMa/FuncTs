@@ -13,6 +13,17 @@ static void dumpGraphToFile(const std::shared_ptr<Graph> &graph,
   graph->print(ofs, false);
 }
 
+void FaitGetRefineType(const std::shared_ptr<Graph> graph,
+                       std::vector<c10::TypePtr> type_hint) {
+  vision::cuda_version();
+  std::unordered_map<Value *, TypePtr> refinedTypes;
+  // ConvertProfilingInstrumentation(graph);
+  RefineInputTypes(graph, type_hint, refinedTypes);
+  CanonicalizeOps(graph);
+  InferDtypeAndDevice(graph, refinedTypes);
+  InferShape(graph, refinedTypes);
+}
+
 void FaitPipeline(const std::shared_ptr<Graph> graph,
                   std::vector<c10::TypePtr> type_hint) {
   // auto graph = module.get_method("forward").graph()->copy();
