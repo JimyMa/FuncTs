@@ -118,10 +118,10 @@ for _ in range(10):
 
 begin = time.time()
 for _ in range(100):
-    nasrnn_jit_fn(a)
+    _ = nasrnn_jit_fn(a)
 mid = time.time()
 for _ in range(100):
-    nasrnn_functs_fn(a)
+    _ = nasrnn_functs_fn(a)
 end = time.time()
 
 print("functs: ", end - mid)
