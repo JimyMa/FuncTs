@@ -16,6 +16,7 @@ model = yolov3_bbox.YOLOV3BBox().cuda().eval()
 jit_model = torch.jit.freeze(torch.jit.script(model))
 
 # torch dynamo + inductor
+torch._dynamo.reset()
 tracing_model = torch.compile(model)
 
 # fait
@@ -59,8 +60,7 @@ for i in range(num_samples):
     fait_task(i)
 
 def dump_proflier(task, name):
-    result = functs.utils.evaluate(task)
-    print(f'{name} Latency: {functs.utils.fmt_duration(result.mean())}')
+    functs.utils.evaluate_task(task, name=name)
 
 torch.cuda.profiler.start()
 dump_proflier(eager_task, "eager")

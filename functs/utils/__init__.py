@@ -1,2 +1,1 @@
-from .evaluate import evaluate, fmt_duration
-from .timer import Timer
+from .evaluate import Timer, evaluate_task, evaluate_func, fmt_duration

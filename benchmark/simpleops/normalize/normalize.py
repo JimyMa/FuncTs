@@ -70,38 +70,6 @@ print(torch.allclose(o_functs, o_eager, atol=1e-3))
 print(torch.allclose(stack, o_eager, atol=1e-3))
 
 
-# warm up 0
-for i in range(10):
-    o_functs = functs_fn(a, mean, scale)
-    o_jit = jit_fn(a, mean, scale)
-    o_eager = eager_fn(a, mean, scale)
-    torch._C._jit_run_code(fait_code, ("", a, mean, scale))
-
-# warm up 1
-for i in range(10):
-    o_functs = functs_fn(a, mean, scale)
-    o_jit = jit_fn(a, mean, scale)
-    o_eager = eager_fn(a, mean, scale)
-    torch._C._jit_run_code(fait_code, ("", a, mean, scale))
-
-torch.cuda.profiler.start()
-begin = time.time()
-for i in range(1000):
-    o_functs = functs_fn(a, mean, scale)
-mid_0 = time.time()
-for i in range(1000):
-    torch._C._jit_run_code(fait_code, ("", a, mean, scale))
-mid_1 = time.time()
-for i in range(1000):
-    o_jit = jit_fn(a, mean, scale)
-mid_2 = time.time()
-for i in range(1000):
-    o_eager = eager_fn(a, mean, scale)
-end = time.time()
-torch.cuda.profiler.stop()
-
-print("functs: ", mid_0 - begin)
-print("fait: ", mid_1 - mid_0)
-print("torchscript: ", mid_2 - mid_1)
-print("eager: ", end - mid_2)
-
+functs.utils.evaluate_func(eager_fn, (a, mean, scale), "normalize eager", run_duration=2.0)
+functs.utils.evaluate_func(jit_fn, (a, mean, scale), "normalize jit", run_duration=2.0)
+functs.utils.evaluate_func(functs_fn, (a, mean, scale), "normalize functs", run_duration=2.0)

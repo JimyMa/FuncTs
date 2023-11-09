@@ -54,38 +54,9 @@ k[:, :, :START_LEN, :] = torch.randn(batch_size, NUM_HEAD, START_LEN, SIZE_PER_H
 v = torch.zeros(batch_size, NUM_HEAD, SEQ_LEN, SIZE_PER_HEAD, dtype=torch.float32, device='cuda')
 v[:, :, :START_LEN, :] = torch.randn(batch_size, NUM_HEAD, START_LEN, SIZE_PER_HEAD, dtype=torch.float32, device='cuda')
 
-
-
-import time
-for i in range(10):
-    model(x, k, v)
-    jit_model(x, k, v)
-    functs_model(x, k, v)
-
-import time
-# warm up
-for _ in range(10):
-    model(x, k, v)
-    jit_model(x, k, v)
-    functs_model(x, k, v)
-
-# warm up
-for _ in range(10):
-    model(x, k, v)
-    jit_model(x, k, v)
-    functs_model(x, k, v)
-
-begin = time.time()
-for _ in range(100):
-    _ = jit_model(x, k, v)
-mid = time.time()
-for _ in range(100):
-    _ = functs_model(x, k, v)
-end = time.time()
-
-print("functs: ", end - mid)
-print("jit: ", mid - begin)
-
+functs.utils.evaluate_func(model, [x, k, v], "eager", run_duration=2.)
+functs.utils.evaluate_func(jit_model, [x, k, v], "jit model", run_duration=2.)
+functs.utils.evaluate_func(functs_model, [x, k, v], "functs model", run_duration=2.)
 
 
 

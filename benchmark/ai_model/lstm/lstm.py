@@ -22,7 +22,7 @@ platform = arguments.platform
 
 import sys
 sys.path.append('../../ast_analyzer/utils')
-from functs.utils.timer import Timer
+from functs.utils.evaluate import Timer, evaluate_func
 # from nvprof import profile_start, profile_stop, enable_profile
 # enable_profile(platform)
 
@@ -179,8 +179,8 @@ def test_model(enable_torch, batch_size, impl, *params):
         torch.cuda.synchronize()
         print("Time {} ms".format((time() - t0) * 1000))
 
-    if enable_torch == "functs":
-        print(model.graph_for(inp))
+    # if enable_torch == "functs":
+    #     print(model.graph_for(inp))
 
     timer = Timer()
     torch.cuda.profiler.start()
@@ -189,7 +189,7 @@ def test_model(enable_torch, batch_size, impl, *params):
         timer.start()
         _ = model(inp)
         torch.cuda.synchronize()
-        timer.log()
+        timer.observe()
     torch.cuda.profiler.stop()
     timer.report()
 
@@ -238,33 +238,26 @@ def export_model(batch_size, input_size, hidden_size, num_layers, seq_len):
 
 
 if __name__ == '__main__':
+    batch_size = 1
     input_size = 256
     hidden_size = 256
     num_layers = 10
     seq_len = 64
 
+    model = LSTM(input_size, hidden_size, num_layers).cuda().eval()
+    jit_model = torch.jit.script(model)
+    functs_model = functs.jit.script(model)
+
+    inp = torch.randn([seq_len, batch_size, input_size], device=cuda_device)
 
     with torch.no_grad():
-        # export_model(1, input_size, hidden_size, output_size, seq_len)
-        # export_model(64, input_size, hidden_size, output_size, seq_len)
-        # if not arguments.overhead_test:
-        #     test_model(True, arguments.bs, 'cudnn', input_size, hidden_size, num_layers, seq_len)
-        # else:
-        #     if arguments.unroll:
-        #         test_model(True, 1, 'unroll', input_size, hidden_size, num_layers, seq_len)
-        #     else:
+        evaluate_func(model, [inp], "lstm eager", run_duration=3.)
+        evaluate_func(jit_model, [inp], "lstm jit", run_duration=3.)
+        evaluate_func(functs_model, [inp], "lstm functs", run_duration=3.)
+        # test_model("jit", 1, 'loop', input_size, hidden_size, num_layers, seq_len)
+        # test_model(False, 1, 'loop', input_size, hidden_size, num_layers, seq_len)
+        # test_model("functs", 1, 'loop', input_size, hidden_size, num_layers, seq_len)
 
-        test_model("jit", 1, 'loop', input_size, hidden_size, num_layers, seq_len)
-        test_model(False, 1, 'loop', input_size, hidden_size, num_layers, seq_len)
-        test_model("functs", 1, 'loop', input_size, hidden_size, num_layers, seq_len)
-
-        # test_model(False, 1, 'cudnn', input_size, hidden_size, num_layers, seq_len)
-        # test_model(True, 1, 'cudnn', input_size, hidden_size, num_layers, seq_len)
-        # test_model(False, 64, 'cudnn', input_size, hidden_size, num_layers, seq_len)
-        # test_model(True, 64, 'cudnn', input_size, hidden_size, num_layers, seq_len)
-
-        # test_model(True, 1, 'loop', input_size, hidden_size, num_layers, seq_len)
-        # test_model(True, 1, 'unroll', input_size, hidden_size, num_layers, seq_len)
 
 
 

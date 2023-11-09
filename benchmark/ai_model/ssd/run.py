@@ -69,8 +69,7 @@ for i in range(num_samples):
     fait_task(i)
 
 def dump_proflier(task, name):
-    result = functs.utils.evaluate(task)
-    print(f'{name} Latency: {functs.utils.fmt_duration(result.mean())}')
+    functs.utils.evaluate_task(task, name=name)
 
 torch.cuda.profiler.start()
 dump_proflier(eager_task, "eager")

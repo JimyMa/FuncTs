@@ -58,33 +58,8 @@ o_eager = eager_fn(a, b)
 
 print(torch.allclose(o_functs, o_eager, atol=1e-3))
 
-# warm up 0
-for i in range(10):
-    o_functs = functs_fn(a, b)
-    o_jit = jit_fn(a, b)
-    o_eager = eager_fn(a, b)
-
-# warm up 1
-for i in range(10):
-    o_functs = functs_fn(a, b)
-    o_jit = jit_fn(a, b)
-    o_eager = eager_fn(a, b)
-
-
-import time
-begin = time.time()
-for i in range(10000):
-    o_functs = functs_fn(a, b)
-mid_0 = time.time()
-for i in range(10000):
-    o_functs = jit_fn(a, b)
-mid_1 = time.time()
-for i in range(10000):
-    o_functs = eager_fn(a, b)
-end = time.time()
-
-print("functs: ", mid_0 - begin)
-print("torchscript: ", mid_1 - mid_0)
-print("eager: ", end - mid_1)
+functs.utils.evaluate_func(eager_fn, (a, b), "eager", run_duration=2.)
+functs.utils.evaluate_func(jit_fn, (a, b), "jit", run_duration=2.)
+functs.utils.evaluate_func(functs_fn, (a, b), "functs", run_duration=2.)
 
 

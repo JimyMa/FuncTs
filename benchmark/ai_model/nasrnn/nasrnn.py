@@ -96,36 +96,18 @@ SEQ_LEN = 1000
 
 nasrnn = NasRNN(1, INPUT_SIZE, HIDDEN_SIZE).cuda().eval()
 nasrnn_jit_fn = torch.jit.script(nasrnn)
-print(nasrnn_jit_fn.graph)
+# print(nasrnn_jit_fn.graph)
 
 import functs
 nasrnn_functs_fn = functs.jit.script(nasrnn)
-print(nasrnn_functs_fn.graph)
+# print(nasrnn_functs_fn.graph)
 
 
-a = torch.rand([SEQ_LEN, 1, INPUT_SIZE]).cuda().float()
+inp = torch.rand([SEQ_LEN, 1, INPUT_SIZE]).cuda().float()
 
-import time
-# warm up
-for _ in range(10):
-    nasrnn_jit_fn(a)
-    nasrnn_functs_fn(a)
-
-# warm up
-for _ in range(10):
-    nasrnn_jit_fn(a)
-    nasrnn_functs_fn(a)
-
-begin = time.time()
-for _ in range(100):
-    _ = nasrnn_jit_fn(a)
-mid = time.time()
-for _ in range(100):
-    _ = nasrnn_functs_fn(a)
-end = time.time()
-
-print("functs: ", end - mid)
-print("jit: ", mid - begin)
+functs.utils.evaluate.evaluate_func(nasrnn, [inp], "nasrnn eager")
+functs.utils.evaluate.evaluate_func(nasrnn_jit_fn, [inp], "nasrnn jit")
+functs.utils.evaluate.evaluate_func(nasrnn_functs_fn, [inp], "nasrnn functs")
 
 
 
