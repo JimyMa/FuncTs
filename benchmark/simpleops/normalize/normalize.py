@@ -40,18 +40,18 @@ tensorexpr_str = """
 graph(%src.1 : Float(800, 1333, 3, strides=[3999, 3, 1], device=cuda:0),
       %mean.1 : float,
       %scale.1 : float):
-  %9 : int = prim::Constant[value=0]() # /home/jimyma/project/TensorSSA/FuncTs/benchmark/simpleops/normalize/normalize.py:14:17
-  %8 : int = prim::Constant[value=2]() # /home/jimyma/project/TensorSSA/FuncTs/benchmark/simpleops/normalize/normalize.py:14:31
+  %9 : int = prim::Constant[value=0]()
+  %8 : int = prim::Constant[value=2]()
   %7 : NoneType = prim::Constant()
-  %6 : int = prim::Constant[value=-1]() # /home/jimyma/project/TensorSSA/FuncTs/benchmark/simpleops/normalize/normalize.py:14:22
+  %6 : int = prim::Constant[value=-1]()
   %4 : int = prim::Constant[value=1]()
-  %dup.1 : Float(800, 1333, 3, strides=[3999, 3, 1], device=cuda:0) = aten::clone(%src.1, %7) # /home/jimyma/project/TensorSSA/FuncTs/benchmark/simpleops/normalize/normalize.py:13:14
-  %11 : Float(800, 1333, strides=[1333, 1], device=cuda:0) = immut::select(%src.1, %6, %8) # /home/jimyma/project/TensorSSA/FuncTs/benchmark/simpleops/normalize/normalize.py:14:22
+  %dup.1 : Float(800, 1333, 3, strides=[3999, 3, 1], device=cuda:0) = aten::clone(%src.1, %7)
+  %11 : Float(800, 1333, strides=[1333, 1], device=cuda:0) = immut::select(%src.1, %6, %8)
   %24 : Float(800, 1333, 3, strides=[3999, 3, 1], device=cuda:0) = immut::select_rev(%dup.1, %11, %6, %9)
-  %14 : Float(800, 1333, strides=[1333, 1], device=cuda:0) = immut::select(%src.1, %6, %9) # /home/jimyma/project/TensorSSA/FuncTs/benchmark/simpleops/normalize/normalize.py:15:22
+  %14 : Float(800, 1333, strides=[1333, 1], device=cuda:0) = immut::select(%src.1, %6, %9)
   %28 : Float(800, 1333, 3, strides=[3999, 3, 1], device=cuda:0) = immut::select_rev(%24, %14, %6, %8)
-  %17 : Float(800, 1333, 3, strides=[3999, 3, 1], device=cuda:0) = aten::sub(%28, %mean.1, %4) # /home/jimyma/project/TensorSSA/FuncTs/benchmark/simpleops/normalize/normalize.py:16:16
-  %18 : Float(800, 1333, 3, strides=[3999, 3, 1], device=cuda:0) = aten::mul(%17, %scale.1) # /home/jimyma/project/TensorSSA/FuncTs/benchmark/simpleops/normalize/normalize.py:16:16
+  %17 : Float(800, 1333, 3, strides=[3999, 3, 1], device=cuda:0) = aten::sub(%28, %mean.1, %4)
+  %18 : Float(800, 1333, 3, strides=[3999, 3, 1], device=cuda:0) = aten::mul(%17, %scale.1)
   return (%18)
 """
 
