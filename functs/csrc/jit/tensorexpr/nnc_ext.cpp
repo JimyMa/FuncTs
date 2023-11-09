@@ -211,7 +211,6 @@ Tensor computeImmutView(const std::vector<ArgValue> &inputValues,
   return Compute(
       "aten_reshape", outputShape, [&](const std::vector<VarHandle> &axes) {
         std::vector<VarHandle> new_axes;
-        std::cout << "??" << std::endl;
         assert(outputShape.size() == axes.size());
         /*
         Example for the index transformation. Assume we have a tensor A and
