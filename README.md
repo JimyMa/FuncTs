@@ -15,6 +15,7 @@ python setup.py develop --user
 you can directly run python file `python example/get_started.py`. You can also define a script as follow in a  `python` file and run it.
 
 ```python
+
 import torch
 import functs._C
 
@@ -46,3 +47,7 @@ b: torch.Tensor = torch.randn([1024, 1024])
 print(torch.allclose(jit_func(a, b), func(a, b)))
 
 ```
+
+## Latency benchmark
+
+![latency](./docs/imgs/latency.jpg)

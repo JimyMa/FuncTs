@@ -24,3 +24,10 @@ compile_commands.json
 .benchmarks/
 
 *.nvvp
+
+# figure
+*.pdf
+figure/*.jpg
+
+
+
