@@ -1,6 +1,5 @@
-import time
-
 import torch
+from torch.profiler import profile, ProfilerActivity
 
 import functs
 
@@ -73,3 +72,8 @@ print(torch.allclose(stack, o_eager, atol=1e-3))
 functs.utils.evaluate_func(eager_fn, (a, mean, scale), "normalize eager", run_duration=2.0)
 functs.utils.evaluate_func(jit_fn, (a, mean, scale), "normalize jit", run_duration=2.0)
 functs.utils.evaluate_func(functs_fn, (a, mean, scale), "normalize functs", run_duration=2.0)
+
+print(functs.utils.proifler_func(eager_fn, (a, mean, scale), "normalize eager", run_duration=2.0).key_metrics)
+print(functs.utils.proifler_func(jit_fn, (a, mean, scale), "normalize jit", run_duration=2.0).key_metrics)
+print(functs.utils.proifler_func(functs_fn, (a, mean, scale), "normalize functs", run_duration=2.0).key_metrics)
+

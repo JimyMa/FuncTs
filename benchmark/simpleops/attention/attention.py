@@ -1,5 +1,6 @@
 import torch
 from torch import nn
+from torch.profiler import profile, ProfilerActivity
 
 
 START_LEN = 32
@@ -54,9 +55,16 @@ k[:, :, :START_LEN, :] = torch.randn(batch_size, NUM_HEAD, START_LEN, SIZE_PER_H
 v = torch.zeros(batch_size, NUM_HEAD, SEQ_LEN, SIZE_PER_HEAD, dtype=torch.float32, device='cuda')
 v[:, :, :START_LEN, :] = torch.randn(batch_size, NUM_HEAD, START_LEN, SIZE_PER_HEAD, dtype=torch.float32, device='cuda')
 
-functs.utils.evaluate_func(model, [x, k, v], "eager", run_duration=2.)
-functs.utils.evaluate_func(jit_model, [x, k, v], "jit model", run_duration=2.)
-functs.utils.evaluate_func(functs_model, [x, k, v], "functs model", run_duration=2.)
+print(torch.allclose(model(x, k, v)[0], functs_model(x, k, v)[0]))
+print(torch.allclose(model(x, k, v)[1], functs_model(x, k, v)[1]))
+print(torch.allclose(model(x, k, v)[2], functs_model(x, k, v)[2]))
 
+timer_eager = functs.utils.evaluate_func(model, [x, k, v], "eager", run_duration=2.)
+timer_jit = functs.utils.evaluate_func(jit_model, [x, k, v], "jit", run_duration=2.)
+timer_functs = functs.utils.evaluate_func(functs_model, [x, k, v], "functs", run_duration=2.)
+
+print(functs.utils.proifler_func(model, (x, k, v), "normalize eager", run_duration=2.0).key_metrics)
+print(functs.utils.proifler_func(jit_model, (x, k, v), "normalize jit", run_duration=2.0).key_metrics)
+print(functs.utils.proifler_func(functs_model, (x, k, v), "normalize functs", run_duration=2.0).key_metrics)
 
 

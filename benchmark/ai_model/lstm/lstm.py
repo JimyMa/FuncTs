@@ -5,6 +5,7 @@ from typing import Tuple
 import functs
 import torch
 import torch.nn as nn
+from torch.profiler import profile, ProfilerActivity
 from time import time
 import os
 import numpy as np
@@ -22,7 +23,7 @@ platform = arguments.platform
 
 import sys
 sys.path.append('../../ast_analyzer/utils')
-from functs.utils.evaluate import Timer, evaluate_func
+from functs.utils.evaluate import Timer, evaluate_func, proifler_func
 # from nvprof import profile_start, profile_stop, enable_profile
 # enable_profile(platform)
 
@@ -254,6 +255,12 @@ if __name__ == '__main__':
         evaluate_func(model, [inp], "lstm eager", run_duration=3.)
         evaluate_func(jit_model, [inp], "lstm jit", run_duration=3.)
         evaluate_func(functs_model, [inp], "lstm functs", run_duration=3.)
+
+        print(proifler_func(model, [inp], "lstm eager", run_duration=3.).key_metrics)
+        print(proifler_func(jit_model, [inp], "lstm jit", run_duration=3.).key_metrics)
+        print(proifler_func(functs_model, [inp], "lstm functs", run_duration=3.).key_metrics)
+
+
         # test_model("jit", 1, 'loop', input_size, hidden_size, num_layers, seq_len)
         # test_model(False, 1, 'loop', input_size, hidden_size, num_layers, seq_len)
         # test_model("functs", 1, 'loop', input_size, hidden_size, num_layers, seq_len)

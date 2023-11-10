@@ -7,6 +7,7 @@ import logging
 
 import torch
 import torch.nn as nn
+from torch.profiler import profile, ProfilerActivity
 
 from collections import OrderedDict, defaultdict
 
@@ -105,10 +106,10 @@ nasrnn_functs_fn = functs.jit.script(nasrnn)
 
 inp = torch.rand([SEQ_LEN, 1, INPUT_SIZE]).cuda().float()
 
-functs.utils.evaluate.evaluate_func(nasrnn, [inp], "nasrnn eager")
-functs.utils.evaluate.evaluate_func(nasrnn_jit_fn, [inp], "nasrnn jit")
-functs.utils.evaluate.evaluate_func(nasrnn_functs_fn, [inp], "nasrnn functs")
+functs.utils.evaluate.evaluate_func(nasrnn, [inp], "nasrnn eager", run_duration=2.0)
+functs.utils.evaluate.evaluate_func(nasrnn_jit_fn, [inp], "nasrnn jit", run_duration=2.0)
+functs.utils.evaluate.evaluate_func(nasrnn_functs_fn, [inp], "nasrnn functs", run_duration=2.0)
 
-
-
-
+print(functs.utils.proifler_func(nasrnn, [inp], "nasrnn eager", run_duration=2.0).key_metrics)
+print(functs.utils.proifler_func(nasrnn_jit_fn, [inp], "nasrnn jit", run_duration=2.0).key_metrics)
+print(functs.utils.proifler_func(nasrnn_functs_fn, [inp], "nasrnn functs", run_duration=2.0).key_metrics)

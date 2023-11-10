@@ -68,13 +68,11 @@ for i in range(num_samples):
     tracing_task(i)
     fait_task(i)
 
-def dump_proflier(task, name):
-    functs.utils.evaluate_task(task, name=name)
+functs.utils.evaluate_task(eager_task, "eager", run_duration=2.)
+functs.utils.evaluate_task(jit_task, "jit", run_duration=2.)
+functs.utils.evaluate_task(fait_task, "fait", run_duration=2.)
 
-torch.cuda.profiler.start()
-dump_proflier(eager_task, "eager")
-dump_proflier(jit_task, "jit")
-dump_proflier(functs_task, "functs")
-dump_proflier(tracing_task, "tracing jit")
-dump_proflier(fait_task, "fait")
-torch.cuda.profiler.stop()
+print(functs.utils.profiler_task(eager_task, "eager", run_duration=2.).key_metrics)
+print(functs.utils.profiler_task(jit_task, "jit", run_duration=2.).key_metrics)
+print(functs.utils.profiler_task(fait_task, "fait", run_duration=2.).key_metrics)
+

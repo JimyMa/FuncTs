@@ -1,6 +1,7 @@
 import time
 
 import torch
+from torch.profiler import profile, ProfilerActivity
 import functs
 
 import yolov3_bbox
@@ -62,13 +63,21 @@ for i in range(num_samples):
 def dump_proflier(task, name):
     functs.utils.evaluate_task(task, name=name)
 
-torch.cuda.profiler.start()
-dump_proflier(eager_task, "eager")
-dump_proflier(jit_task, "jit")
-dump_proflier(functs_task, "functs")
-dump_proflier(tracing_task, "tracing jit")
-dump_proflier(fait_task, "fait")
-torch.cuda.profiler.stop()
+# torch.cuda.profiler.start()
+# dump_proflier(eager_task, "eager")
+# dump_proflier(jit_task, "jit")
+# dump_proflier(functs_task, "functs")
+# dump_proflier(tracing_task, "tracing jit")
+# dump_proflier(fait_task, "fait")
+# torch.cuda.profiler.stop()
+
+functs.utils.evaluate_task(eager_task, "eager", run_duration=2.)
+functs.utils.evaluate_task(jit_task, "jit", run_duration=2.)
+functs.utils.evaluate_task(fait_task, "fait", run_duration=2.)
+
+print(functs.utils.profiler_task(eager_task, "eager", run_duration=2.).key_metrics)
+print(functs.utils.profiler_task(jit_task, "jit", run_duration=2.).key_metrics)
+print(functs.utils.profiler_task(fait_task, "fait", run_duration=2.).key_metrics)
 
 
 

@@ -1,4 +1,5 @@
 import torch
+from torch.profiler import profile, ProfilerActivity
 import functs
 
 import torch.nn as nn
@@ -166,5 +167,6 @@ functs.utils.evaluate_func(model, (encoder_output, mask, h, c), "eager", run_dur
 functs.utils.evaluate_func(jit_model, (encoder_output, mask, h, c), "jit", run_duration=2.)
 functs.utils.evaluate_func(functs_model, (encoder_output, mask, h, c), "functs", run_duration=2.)
 
-
-
+print(functs.utils.proifler_func(model, (encoder_output, mask, h, c), "eager", run_duration=2.).key_metrics)
+print(functs.utils.proifler_func(jit_model, (encoder_output, mask, h, c), "jit", run_duration=2.).key_metrics)
+print(functs.utils.proifler_func(functs_model, (encoder_output, mask, h, c), "functs", run_duration=2.).key_metrics)

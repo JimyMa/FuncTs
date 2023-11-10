@@ -1,8 +1,17 @@
+import os
+import functools
+import tempfile
+import shutil
+import json
 from dataclasses import dataclass
 from time import perf_counter
 from typing import Callable
+from collections import OrderedDict
+
 
 import torch
+from torch.profiler import ProfilerActivity
+from torch.autograd import DeviceType
 
 # from prof import (all_passes_submitted, begin_profiler_pass, disable_profiling,
 #                   enable_profiling, end_profiler_pass, finalize_metrics,
@@ -126,24 +135,93 @@ def evaluate_task(task: Callable[[int], None],
 
 def evaluate_func(func, 
                   args,
-                  name="", 
+                  name="",
                   warmup_runs=WARMUP_RUNS_DEFAULT,
                   run_duration=RUN_DURATION_DEFAULT,
                   device="cuda") -> Timer:
-    for i in range(warmup_runs):
+    for _ in range(warmup_runs):
         func(*args)
-    if (device == "cuda"):
-        torch.cuda.synchronize()
+    torch.cuda.synchronize() 
     timer = Timer(name)
     begin = timer.start()
     while timer.time() - begin < run_duration:
         func(*args)
-        if (device == "cuda"):
-            torch.cuda.synchronize()
         timer.observe()
     timer.report(clear=False)
     return timer
 
+def profiler_task(task: Callable[[int], None],
+                  name="",
+                  warmup_runs=WARMUP_RUNS_DEFAULT,
+                  run_duration=RUN_DURATION_DEFAULT,
+                  device="cuda") -> "ProfilerOberservation":
+    for i in range(warmup_runs):
+        task(i)
+    profiler = torch.profiler.profile(activities=[ProfilerActivity.CUDA])
+    torch.cuda.synchronize()
+    timer = Timer(name)
+    profiler.start()
+    begin = timer.start()
+    count = 0
+    while timer.time() - begin < run_duration:
+        task(count)
+        if (device == "cuda"):
+            torch.cuda.synchronize()
+        count += 1
+        timer.observe()
+    timer.report(clear=False)
+
+    profiler.stop()
+    json_path = tempfile.mktemp()
+    profiler.export_chrome_trace(json_path)
+    with open(json_path, "r") as f:
+        profiler_json = json.load(f)
+    os.remove(json_path)
+    return ProfilerOberservation(timer, profiler_json)
+
+def proifler_func(func, 
+                  args,
+                  name="",
+                  warmup_runs=WARMUP_RUNS_DEFAULT,
+                  run_duration=RUN_DURATION_DEFAULT,
+                  device="cuda") -> "ProfilerOberservation":
+    for _ in range(warmup_runs):
+        func(*args)
+    profiler = torch.profiler.profile(activities=[ProfilerActivity.CUDA])
+    torch.cuda.synchronize()
+    timer = Timer(name)
+    profiler.start()
+    begin = timer.start()
+    while timer.time() - begin < run_duration:
+        func(*args)
+        timer.observe()
+    timer.report(clear=False)
+
+    profiler.stop()
+    json_path = tempfile.mktemp()
+    profiler.export_chrome_trace(json_path)
+    with open(json_path, "r") as f:
+        profiler_json = json.load(f)
+    os.remove(json_path)
+    return ProfilerOberservation(timer, profiler_json)
+
+
+
+class ProfilerOberservation(object):
+    def __init__(self, timer: Timer,
+                 prof: torch.autograd.profiler_util.EventList,
+                 **kwargs) -> None:
+        self.timer = timer
+        self.name = self.timer.name
+        self.prof = prof
+
+    @property
+    def total_kernel_calls(self) -> None:
+        return functools.reduce(lambda x, y: x + y, [1 for event in self.prof["traceEvents"] if event.get("cat") == "kernel"]) / self.timer.cnt
+
+    @property
+    def key_metrics(self) -> dict:
+        return OrderedDict([ ["name", self.name], ["kenel counts", self.total_kernel_calls] ])
 
 # def eval_metrics(task: Callable[[int], None], num_samples: int):
 #     initialize_metrics()

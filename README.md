@@ -10,6 +10,8 @@ python -c "import torch"; echo $?
 python setup.py develop --user
 ```
 
+- PyTorch version: `18989890bfc`
+
 ## Use FuncTs to perform functionalization
 
 you can directly run python file `python example/get_started.py`. You can also define a script as follow in a  `python` file and run it.
@@ -51,3 +53,7 @@ print(torch.allclose(jit_func(a, b), func(a, b)))
 ## Latency benchmark
 
 ![latency](./docs/imgs/latency.jpg)
+
+## Kernel launch counts
+
+![kernel launch](./docs/imgs/kernel_launch.jpg)
