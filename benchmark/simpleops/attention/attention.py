@@ -59,12 +59,19 @@ print(torch.allclose(model(x, k, v)[0], functs_model(x, k, v)[0]))
 print(torch.allclose(model(x, k, v)[1], functs_model(x, k, v)[1]))
 print(torch.allclose(model(x, k, v)[2], functs_model(x, k, v)[2]))
 
-timer_eager = functs.utils.evaluate_func(model, [x, k, v], "eager", run_duration=2.)
-timer_jit = functs.utils.evaluate_func(jit_model, [x, k, v], "jit", run_duration=2.)
-timer_functs = functs.utils.evaluate_func(functs_model, [x, k, v], "functs", run_duration=2.)
+# timer_eager = functs.utils.evaluate_func(model, [x, k, v], "eager", run_duration=2.)
+# timer_jit = functs.utils.evaluate_func(jit_model, [x, k, v], "jit", run_duration=2.)
+# timer_functs = functs.utils.evaluate_func(functs_model, [x, k, v], "functs", run_duration=2.)
 
-print(functs.utils.proifler_func(model, (x, k, v), "normalize eager", run_duration=2.0).key_metrics)
-print(functs.utils.proifler_func(jit_model, (x, k, v), "normalize jit", run_duration=2.0).key_metrics)
-print(functs.utils.proifler_func(functs_model, (x, k, v), "normalize functs", run_duration=2.0).key_metrics)
+print("profiler latency cuda graph")
+for i in range(1, 5 + 1):
+    print("iter per capture: {}".format(i + 10))
+    functs.utils.evaluate.evaluate_func(model, [x, k, v], "attention eager", run_duration=2., enable_cudagraph=True, iter_per_capture=i + 10)
+    functs.utils.evaluate.evaluate_func(jit_model, [x, k, v], "attention jit", run_duration=2., enable_cudagraph=True, iter_per_capture=i + 10)
+    functs.utils.evaluate.evaluate_func(functs_model, [x, k, v], "attention functs", run_duration=2., enable_cudagraph=True, iter_per_capture=i + 10)
+
+print(functs.utils.proifler_func(model, (x, k, v), "attention eager", run_duration=2.0).key_metrics)
+print(functs.utils.proifler_func(jit_model, (x, k, v), "attention jit", run_duration=2.0).key_metrics)
+print(functs.utils.proifler_func(functs_model, (x, k, v), "attention functs", run_duration=2.0).key_metrics)
 
 

@@ -93,7 +93,7 @@ class NasRNN(nn.Module):
 
 INPUT_SIZE = 256
 HIDDEN_SIZE = 256
-SEQ_LEN = 1000
+SEQ_LEN = 200
 
 nasrnn = NasRNN(1, INPUT_SIZE, HIDDEN_SIZE).cuda().eval()
 nasrnn_jit_fn = torch.jit.script(nasrnn)
@@ -109,6 +109,13 @@ inp = torch.rand([SEQ_LEN, 1, INPUT_SIZE]).cuda().float()
 functs.utils.evaluate.evaluate_func(nasrnn, [inp], "nasrnn eager", run_duration=2.0)
 functs.utils.evaluate.evaluate_func(nasrnn_jit_fn, [inp], "nasrnn jit", run_duration=2.0)
 functs.utils.evaluate.evaluate_func(nasrnn_functs_fn, [inp], "nasrnn functs", run_duration=2.0)
+
+print("profiler latency cuda graph")
+for i in range(1, 5 + 1):
+    print("iter per capture: {}".format(i))
+    functs.utils.evaluate.evaluate_func(nasrnn, [inp], "nasrnn eager", run_duration=2., enable_cudagraph=True, iter_per_capture=i)
+    functs.utils.evaluate.evaluate_func(nasrnn_jit_fn, [inp], "nasrnn jit", run_duration=2., enable_cudagraph=True, iter_per_capture=i)
+    functs.utils.evaluate.evaluate_func(nasrnn_functs_fn, [inp], "nasrnn functs", run_duration=2., enable_cudagraph=True, iter_per_capture=i)
 
 print(functs.utils.proifler_func(nasrnn, [inp], "nasrnn eager", run_duration=2.0).key_metrics)
 print(functs.utils.proifler_func(nasrnn_jit_fn, [inp], "nasrnn jit", run_duration=2.0).key_metrics)

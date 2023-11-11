@@ -105,7 +105,10 @@ class Timer:
 
 
 WARMUP_RUNS_DEFAULT = 16
+ITER_PER_CAPTURE_DEFAULT = 5
 RUN_DURATION_DEFAULT = 10.
+CUDA_GRAPH_CAPTURE_POOL_NUM_DEFAULT = 1
+
 
 def evaluate_task(task: Callable[[int], None],
                   name="",
@@ -138,17 +141,34 @@ def evaluate_func(func,
                   name="",
                   warmup_runs=WARMUP_RUNS_DEFAULT,
                   run_duration=RUN_DURATION_DEFAULT,
+                  enable_cudagraph=False,
+                  iter_per_capture=ITER_PER_CAPTURE_DEFAULT,
+                  cuda_graph_caputure_pool_num=CUDA_GRAPH_CAPTURE_POOL_NUM_DEFAULT,
                   device="cuda") -> Timer:
     for _ in range(warmup_runs):
         func(*args)
     torch.cuda.synchronize() 
     timer = Timer(name)
     begin = timer.start()
+    if enable_cudagraph:
+        # torch_cuda_graph_pool = [torch.cuda.CUDAGraph() for _ in range(cuda_graph_caputure_pool_num)]
+        graph_cnt = 0
     while timer.time() - begin < run_duration:
-        func(*args)
-        timer.observe()
+        if not enable_cudagraph:
+            func(*args)
+            timer.observe()
+        else:
+            # g = torch_cuda_graph_pool[graph_cnt] if graph_cnt < cuda_graph_caputure_pool_num else torch.cuda.CUDAGraph()
+            g = torch.cuda.CUDAGraph()
+            with torch.cuda.graph(g):
+                for _ in range(iter_per_capture):
+                    func(*args)
+                    timer.observe()
+            torch.cuda.synchronize() 
+            graph_cnt += 1
     timer.report(clear=False)
     return timer
+
 
 def profiler_task(task: Callable[[int], None],
                   name="",

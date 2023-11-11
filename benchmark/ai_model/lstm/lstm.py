@@ -243,7 +243,7 @@ if __name__ == '__main__':
     input_size = 256
     hidden_size = 256
     num_layers = 10
-    seq_len = 64
+    seq_len = 32
 
     model = LSTM(input_size, hidden_size, num_layers).cuda().eval()
     jit_model = torch.jit.script(model)
@@ -252,13 +252,22 @@ if __name__ == '__main__':
     inp = torch.randn([seq_len, batch_size, input_size], device=cuda_device)
 
     with torch.no_grad():
-        evaluate_func(model, [inp], "lstm eager", run_duration=3.)
-        evaluate_func(jit_model, [inp], "lstm jit", run_duration=3.)
-        evaluate_func(functs_model, [inp], "lstm functs", run_duration=3.)
+        print("profiler latency")
+        evaluate_func(model, [inp], "lstm eager", run_duration=2.)
+        evaluate_func(jit_model, [inp], "lstm jit", run_duration=2.)
+        evaluate_func(functs_model, [inp], "lstm functs", run_duration=2.)
 
-        print(proifler_func(model, [inp], "lstm eager", run_duration=3.).key_metrics)
-        print(proifler_func(jit_model, [inp], "lstm jit", run_duration=3.).key_metrics)
-        print(proifler_func(functs_model, [inp], "lstm functs", run_duration=3.).key_metrics)
+        print("profiler latency cuda graph")
+        for i in range(1, 5 + 1):
+            print("iter per capture: {}".format(i))
+            evaluate_func(model, [inp], "lstm eager", run_duration=2., enable_cudagraph=True, iter_per_capture=i)
+            evaluate_func(jit_model, [inp], "lstm jit", run_duration=2., enable_cudagraph=True, iter_per_capture=i)
+            evaluate_func(functs_model, [inp], "lstm functs", run_duration=2., enable_cudagraph=True, iter_per_capture=i)
+
+        # print("profiler key metrics")
+        # print(proifler_func(model, [inp], "lstm eager", run_duration=3.).key_metrics)
+        # print(proifler_func(jit_model, [inp], "lstm jit", run_duration=3.).key_metrics)
+        # print(proifler_func(functs_model, [inp], "lstm functs", run_duration=3.).key_metrics)
 
 
         # test_model("jit", 1, 'loop', input_size, hidden_size, num_layers, seq_len)
