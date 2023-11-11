@@ -82,7 +82,11 @@ static void beginCuptiTrace() {
   cuptiActivityRegisterCallbacks(bufferRequested, bufferCompleted);
 }
 
-static void endCuptiTrace() { cuptiActivityFlushAll(1); }
+static void endCuptiTrace() { 
+  cuptiActivityDisable(CUPTI_ACTIVITY_KIND_MEMORY2);
+  cuptiActivityDisable(CUPTI_ACTIVITY_KIND_CONCURRENT_KERNEL);
+  cuptiActivityFlushAll(1); 
+}
 
 static bool enabled = false;
 

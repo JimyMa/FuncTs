@@ -243,7 +243,7 @@ if __name__ == '__main__':
     input_size = 256
     hidden_size = 256
     num_layers = 10
-    seq_len = 32
+    seq_len = 64
 
     model = LSTM(input_size, hidden_size, num_layers).cuda().eval()
     jit_model = torch.jit.script(model)
@@ -257,12 +257,12 @@ if __name__ == '__main__':
         evaluate_func(jit_model, [inp], "lstm jit", run_duration=2.)
         evaluate_func(functs_model, [inp], "lstm functs", run_duration=2.)
 
-        print("profiler latency cuda graph")
-        for i in range(1, 5 + 1):
-            print("iter per capture: {}".format(i))
-            evaluate_func(model, [inp], "lstm eager", run_duration=2., enable_cudagraph=True, iter_per_capture=i)
-            evaluate_func(jit_model, [inp], "lstm jit", run_duration=2., enable_cudagraph=True, iter_per_capture=i)
-            evaluate_func(functs_model, [inp], "lstm functs", run_duration=2., enable_cudagraph=True, iter_per_capture=i)
+        # print("profiler latency cuda graph")
+        # for i in range(1, 5 + 1):
+        #     print("iter per capture: {}".format(i))
+        #     evaluate_func(model, [inp], "lstm eager", run_duration=2., enable_cudagraph=True, iter_per_capture=i)
+        #     evaluate_func(jit_model, [inp], "lstm jit", run_duration=2., enable_cudagraph=True, iter_per_capture=i)
+        #     evaluate_func(functs_model, [inp], "lstm functs", run_duration=2., enable_cudagraph=True, iter_per_capture=i)
 
         # print("profiler key metrics")
         # print(proifler_func(model, [inp], "lstm eager", run_duration=3.).key_metrics)

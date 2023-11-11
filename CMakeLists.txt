@@ -67,6 +67,9 @@ file(GLOB CUPTI_EXT_SOURCES
 add_library(cupti_ext SHARED ${CUPTI_EXT_SOURCES})
 target_link_libraries(cupti_ext CUDA::cupti CUDA::nvperf_host CUDA::nvperf_target)
 
+add_library(ltprof SHARED ${PROJECT_SOURCE_DIR}/fait/util/profile.cpp ${PROJECT_SOURCE_DIR}/fait/util/metrics.cpp ${CUPTI_EXT_SOURCES})
+target_link_libraries(ltprof ${TORCH_LIBRARIES} cupti_ext)
+
 set(FUNCTS_LINK_LIBS 
   ${FUNCTS_LINK_LIBS}
   TorchVision::TorchVision
@@ -77,6 +80,9 @@ set(FUNCTS_LINK_LIBS
 
 add_library(functs_python SHARED ${SOURCES})
 target_link_libraries(functs_python ${FUNCTS_LINK_LIBS})
+
+
+
 
 install(TARGETS functs_python
   DESTINATION lib

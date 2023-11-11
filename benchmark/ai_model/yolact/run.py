@@ -75,10 +75,10 @@ for i in range(num_samples):
     fait_task(i)
 
 
-functs.utils.evaluate_task(eager_task, "eager", run_duration=2.)
-functs.utils.evaluate_task(jit_task, "jit", run_duration=2.)
+# functs.utils.evaluate_task(eager_task, "eager", run_duration=2.)
+# functs.utils.evaluate_task(jit_task, "jit", run_duration=2.)
 functs.utils.evaluate_task(fait_task, "fait", run_duration=2.)
 
-print(functs.utils.profiler_task(eager_task, "eager", run_duration=2.).key_metrics)
-print(functs.utils.profiler_task(jit_task, "jit", run_duration=2.).key_metrics)
-print(functs.utils.profiler_task(fait_task, "fait", run_duration=2.).key_metrics)
+# print(functs.utils.profiler_task(eager_task, "eager", run_duration=2.).key_metrics)
+# print(functs.utils.profiler_task(jit_task, "jit", run_duration=2.).key_metrics)
+# print(functs.utils.profiler_task(fait_task, "fait", run_duration=2.).key_metrics)

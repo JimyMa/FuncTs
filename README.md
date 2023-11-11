@@ -58,11 +58,17 @@ print(torch.allclose(jit_func(a, b), func(a, b)))
 
 ![kernel launch](./docs/imgs/kernel_launch.jpg)
 
+## Memory Allocation
+
+![kernel launch](./docs/imgs/memcpy.jpg)
+
 ## Latency with CUDA Graph
 
 ![kernel launch](./docs/imgs/latency_cudagraph.jpg)
 
 - Because CUDA Graph fixes memory addresses, CUDA Graphs do not have a great way of handling live tensors from a previous invocation. [Limitations](https://dev-discuss.pytorch.org/t/cudagraphs-in-pytorch-2-0/1428)
+
+
 
 
 

@@ -73,7 +73,12 @@ functs.utils.evaluate_func(eager_fn, (a, mean, scale), "normalize eager", run_du
 functs.utils.evaluate_func(jit_fn, (a, mean, scale), "normalize jit", run_duration=2.0)
 functs.utils.evaluate_func(functs_fn, (a, mean, scale), "normalize functs", run_duration=2.0)
 
-print(functs.utils.proifler_func(eager_fn, (a, mean, scale), "normalize eager", run_duration=2.0).key_metrics)
-print(functs.utils.proifler_func(jit_fn, (a, mean, scale), "normalize jit", run_duration=2.0).key_metrics)
-print(functs.utils.proifler_func(functs_fn, (a, mean, scale), "normalize functs", run_duration=2.0).key_metrics)
+
+# functs.utils.eval_metrics_func(eager_fn, (a, mean, scale), "normalize eager", run_duration=2.0)
+# functs.utils.eval_metrics_func(jit_fn, (a, mean, scale), "normalize jit", run_duration=2.0)
+# functs.utils.eval_metrics_func(functs_fn, (a, mean, scale), "normalize functs", run_duration=2.0)
+
+# print(functs.utils.proifler_func(eager_fn, (a, mean, scale), "normalize eager", run_duration=2.0).key_metrics)
+# print(functs.utils.proifler_func(jit_fn, (a, mean, scale), "normalize jit", run_duration=2.0).key_metrics)
+# print(functs.utils.proifler_func(functs_fn, (a, mean, scale), "normalize functs", run_duration=2.0).key_metrics)
 

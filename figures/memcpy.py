@@ -4,10 +4,10 @@ import matplotlib.pyplot as plt
 tools = ["PyTorch", "TorchScript", "FuncTs"]
 
 models = ["yolov3_postprocess", "ssd_postprocess", "yolact_postprocess", "nasrnn", "lstm", "seq2seq", "attention", "normalize"]
-latency_eager = np.array([])
-latency_jit = np.array([])
+latency_eager = np.array([13.65, 2.829, 188.1, 808.7, 20.01, 29.57, 203.9, 36.52])
+latency_jit = np.array([11.35, 2.821, 83.68, 805.8, 11.27, 19.45, 203.6, 24.16])
 # latency_tracing_jit = [1.101, 2.858]
-latency_functs = np.array([])
+latency_functs = np.array([4.50, 2.634, 21.92, 405.3, 18.63, 11.16, 299, 12.15])
 
 latency_eager_normal = latency_eager / latency_eager
 latency_jit_normal = latency_jit / latency_eager
@@ -31,13 +31,13 @@ for b, (c, h) in enumerate(zip(colors, data)):
         h,
         width=bar_width,
         color=c,
-        # edgecolor="black",
+        edgecolor="black",
         label="Normalized Performance"
     )
 plt.xticks(range(len(models)), models, rotation=10)
 plt.ylabel("Normalized Performance")
 fig.legend(labels=tools, ncol=np.ceil(len(tools)), loc="outside upper center")
 
-plt.savefig('kernel_launch.pdf')
-plt.savefig('kernel_launch.jpg')
+plt.savefig('memcpy.pdf')
+plt.savefig('memcpy.jpg')
 plt.show()
