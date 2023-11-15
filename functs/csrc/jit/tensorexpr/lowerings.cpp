@@ -100,16 +100,19 @@ void init_nnc_ext() {
   };
   registerNNCImmutLoweringFunction(immutUnsqueezeSchema, immut_unsqueeze_fn);
 
-  const char *immutViewSchema =
-      "immut::view(Tensor self, int[] size) -> Tensor";
-  auto immut_view_fn = [](const std::vector<ArgValue> &inputs,
-                          const std::vector<ExprHandle> &outputShape,
-                          const std::vector<ExprHandle> &outputStrides,
-                          const c10::optional<ScalarType> &outputType,
-                          at::Device device) {
-    return computeImmutView(inputs, outputShape);
-  };
-  registerNNCImmutLoweringFunction(immutViewSchema, immut_view_fn);
+  // const char *immutViewSchema =
+  //     "immut::view(Tensor self, int[] size) -> Tensor";
+  // const char *immutReshapeSchema =
+  //     "immut::reshape(Tensor self, int[] size) -> Tensor";
+  // auto immut_view_fn = [](const std::vector<ArgValue> &inputs,
+  //                         const std::vector<ExprHandle> &outputShape,
+  //                         const std::vector<ExprHandle> &outputStrides,
+  //                         const c10::optional<ScalarType> &outputType,
+  //                         at::Device device) {
+  //   return computeImmutView(inputs, outputShape);
+  // };
+  // registerNNCImmutLoweringFunction(immutViewSchema, immut_view_fn);
+  // registerNNCImmutLoweringFunction(immutReshapeSchema, immut_view_fn);
 
   // const char *immutRepeatSchema =
   //     "aten::repeat(Tensor self, int[] repeats) -> Tensor";

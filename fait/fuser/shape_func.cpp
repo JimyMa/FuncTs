@@ -309,6 +309,7 @@ OperatorMap<NNCShapeFunction> shapeFuncs{
      computeSliceShape},
     {"aten::unsqueeze(Tensor(a) self, int dim) -> Tensor(a)",
      computeUnsqueezeShape},
+    {"immut::unsqueeze(Tensor self, int dim) -> Tensor", computeUnsqueezeShape},
     {"aten::transpose.int(Tensor(a) self, int dim0, int dim1) -> Tensor(a)",
      computeTransposeShape},
     {"aten::permute(Tensor(a) self, int[] dims) -> Tensor(a)",

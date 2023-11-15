@@ -26,25 +26,29 @@ type_hint = [torch.TupleType([torch.TensorType.get().with_dtype(torch.float32).w
 # data load
 model = ssd_bbox.SSDBBox().cuda().eval()
 
-# torchscript
+# torchscript nvfuser
 jit_model = torch.jit.freeze(torch.jit.script(model))
+
+# torchscript nnc
+nvfuser_model = torch.jit.freeze(torch.jit.script(model))
 
 # functs
 functs_model = functs.jit.script(torch.jit.freeze(torch.jit.script(model)))
 
+
 # torch dynamo + inductor
-tracing_model = torch.compile(model)
+tracing_model = torch.compile(model, dynamic=True)
 
 # fait
-fait_model = functs.jit.script(model, backend="fait")
-functs._C._jit_pass_fait_pipeline(fait_model.graph, type_hint)
-code = torch._C._jit_get_code(fait_model.graph)
+# fait_model = functs.jit.script(model, backend="fait")
+# functs._C._jit_pass_fait_pipeline(fait_model.graph, type_hint)
+# code = torch._C._jit_get_code(fait_model.graph)
 print("done")
 
 feats = torch.load("ssd_feat.pt")
 num_samples = len(feats)
 
-code = torch._C._jit_get_code(fait_model.graph)
+# code = torch._C._jit_get_code(fait_model.graph)
 
 def eager_task(idx: int):
     model(*feats[idx % num_samples])
@@ -58,19 +62,22 @@ def functs_task(idx: int):
 def tracing_task(idx: int):
     tracing_model(*feats[idx % num_samples])
 
+def nvfuser_task(idx: int):
+    nvfuser_model(*feats[idx % num_samples])
+
 def fait_task(idx: int):
     torch._C._jit_run_code(code, ("", ) + feats[idx % num_samples])
 
-for i in range(num_samples):
-    eager_task(i)
-    jit_task(i)
-    functs_task(i)
-    tracing_task(i)
-    fait_task(i)
-
 functs.utils.evaluate_task(eager_task, "eager", run_duration=2.)
 functs.utils.evaluate_task(jit_task, "jit", run_duration=2.)
+functs.utils.evaluate_task(functs_task, "functs", run_duration=2.)
+functs.utils.evaluate_task(tracing_task, "dynamo", run_duration=2.)
 functs.utils.evaluate_task(fait_task, "fait", run_duration=2.)
+
+# # nvfuser
+torch._C._jit_set_nvfuser_enabled(True)
+functs.utils.evaluate_task(nvfuser_task, "nvfuser", run_duration=2.)
+torch._C._jit_set_nvfuser_enabled(False)
 
 # print(functs.utils.profiler_task(eager_task, "eager", run_duration=2.).key_metrics)
 # print(functs.utils.profiler_task(jit_task, "jit", run_duration=2.).key_metrics)

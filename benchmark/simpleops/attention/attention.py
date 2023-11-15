@@ -42,12 +42,16 @@ class Attention(nn.Module):
             gen_id = gen_id + 1
         return k.clone(), v.clone(), x.clone()
     
-batch_size = 8
+batch_size = 1
 
 model = Attention(NUM_HEAD, SIZE_PER_HEAD).cuda().eval()
 jit_model = torch.jit.script(model)
+dynamo_model = torch.compile(model, dynamic=True)
+nvfuser_model = torch.jit.freeze(torch.jit.script(model))
+
 import functs
 functs_model = functs.jit.script(model)
+# torch._C._jit_pass_loop_unrolling(functs_model.graph)
 
 x = torch.randn(batch_size, NUM_HEAD, 1, SIZE_PER_HEAD).cuda()
 k = torch.zeros(batch_size, NUM_HEAD, SEQ_LEN, SIZE_PER_HEAD, dtype=torch.float32, device='cuda')
@@ -60,22 +64,34 @@ print(torch.allclose(model(x, k, v)[1], functs_model(x, k, v)[1]))
 print(torch.allclose(model(x, k, v)[2], functs_model(x, k, v)[2]))
 
 with torch.no_grad():
-    timer_eager = functs.utils.evaluate_func(model, [x, k, v], "eager", run_duration=2.)
-    timer_jit = functs.utils.evaluate_func(jit_model, [x, k, v], "jit", run_duration=2.)
-    timer_functs = functs.utils.evaluate_func(functs_model, [x, k, v], "functs", run_duration=2.)
+    # timer_eager = functs.utils.evaluate_func(model, [x, k, v], "eager", run_duration=2.)
+    # timer_jit = functs.utils.evaluate_func(jit_model, [x, k, v], "jit", run_duration=2.)
+    # timer_functs = functs.utils.evaluate_func(functs_model, [x, k, v], "functs", run_duration=2.)
+    # timer_dynamo = functs.utils.evaluate_func(dynamo_model, [x, k, v], "dynamo", run_duration=2.)
 
+    # torch.cuda.profiler.start()
+    # torch._C._jit_set_nvfuser_enabled(True)
+    # timer_nvfuser = functs.utils.evaluate_func(nvfuser_model, [x, k, v], "nvfuser", run_duration=2.)
+    # torch._C._jit_set_nvfuser_enabled(False)
+    # torch.cuda.profiler.stop()
     # print(jit_model.graph_for(x, k, v))
     # print(functs_model.graph_for(x, k, v))
 
-# print("profiler latency cuda graph")
-# for i in range(1, 5 + 1):
-#     print("iter per capture: {}".format(i + 10))
-#     functs.utils.evaluate.evaluate_func(model, [x, k, v], "attention eager", run_duration=2., enable_cudagraph=True, iter_per_capture=i + 10)
-#     functs.utils.evaluate.evaluate_func(jit_model, [x, k, v], "attention jit", run_duration=2., enable_cudagraph=True, iter_per_capture=i + 10)
-#     functs.utils.evaluate.evaluate_func(functs_model, [x, k, v], "attention functs", run_duration=2., enable_cudagraph=True, iter_per_capture=i + 10)
+    # print("profiler latency cuda graph")
+    # for i in range(2, 5 + 2):
+    #     print("iter per capture: {}".format(i + 10))
+    #     functs.utils.evaluate.evaluate_func(model, [x, k, v], "attention eager", run_duration=2., enable_cudagraph=True, iter_per_capture=i + 10)
+        # functs.utils.evaluate.evaluate_func(dynamo_model, [x, k, v], "attention dynamo", run_duration=2., enable_cudagraph=True, iter_per_capture=i + 10)
+        # functs.utils.evaluate.evaluate_func(jit_model, [x, k, v], "attention jit", run_duration=2., enable_cudagraph=True, iter_per_capture=i + 10)
+        # functs.utils.evaluate.evaluate_func(functs_model, [x, k, v], "attention functs", run_duration=2., enable_cudagraph=True, iter_per_capture=i + 10)
 
-# print(functs.utils.proifler_func(model, (x, k, v), "attention eager", run_duration=2.0).key_metrics)
-# print(functs.utils.proifler_func(jit_model, (x, k, v), "attention jit", run_duration=2.0).key_metrics)
-# print(functs.utils.proifler_func(functs_model, (x, k, v), "attention functs", run_duration=2.0).key_metrics)
+    print("profiler latency cuda graph")
+    for i in range(1, 5 + 1):
+        torch._C._jit_set_nvfuser_enabled(True)
+        functs.utils.evaluate.evaluate_func(nvfuser_model, [x, k, v], "attention nvfuser", run_duration=2., enable_cudagraph=True, iter_per_capture=i + 10)
+        torch._C._jit_set_nvfuser_enabled(False)
+    # print(functs.utils.proifler_func(model, (x, k, v), "attention eager", run_duration=2.0).key_metrics)
+    # print(functs.utils.proifler_func(jit_model, (x, k, v), "attention jit", run_duration=2.0).key_metrics)
+    # print(functs.utils.proifler_func(functs_model, (x, k, v), "attention functs", run_duration=2.0).key_metrics)
 
 

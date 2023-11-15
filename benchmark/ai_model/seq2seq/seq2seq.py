@@ -15,7 +15,7 @@ n_run = 100
 from functs.utils.evaluate import Timer
 
 MAX_LENGTH = 50
-OUTPUT_SIZE = 3797
+OUTPUT_SIZE = 500
 HIDDEN_SIZE = 256
 
 class LSTMCell(nn.Module):
@@ -160,12 +160,22 @@ mask = gen_mask_from_sequence(std)
 encoder_output = torch.randn(MAX_LENGTH, batch_size, HIDDEN_SIZE, device=device)
 
 jit_model = torch.jit.script(model)
+dynamo_model = torch.compile(model)
+nvfuser_model = torch.jit.freeze(torch.jit.script(model))
+
 functs_model = functs.jit.script(model)
 
 
 functs.utils.evaluate_func(model, (encoder_output, mask, h, c), "eager", run_duration=2.)
 functs.utils.evaluate_func(jit_model, (encoder_output, mask, h, c), "jit", run_duration=2.)
+functs.utils.evaluate_func(dynamo_model, (encoder_output, mask, h, c), "dynamo", run_duration=2.)
 functs.utils.evaluate_func(functs_model, (encoder_output, mask, h, c), "functs", run_duration=2.)
+
+
+
+torch._C._jit_set_nvfuser_enabled(True)
+functs.utils.evaluate_func(nvfuser_model, (encoder_output, mask, h, c), "lstm nvfuser", run_duration=2.)
+torch._C._jit_set_nvfuser_enabled(False)
 
 # print(functs.utils.proifler_func(model, (encoder_output, mask, h, c), "eager", run_duration=2.).key_metrics)
 # print(functs.utils.proifler_func(jit_model, (encoder_output, mask, h, c), "jit", run_duration=2.).key_metrics)

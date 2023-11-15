@@ -37,7 +37,7 @@ class NasRNN(nn.Module):
         inputs_bcast = inputs.unsqueeze(1)
         ihs = torch.matmul(inputs_bcast, self.weight_ih)
         for i in range(inputs.size()[0]): # change to 1000 for fully unrolled exp
-            inp = inputs[i]
+            # inp = inputs[i]
             state_m = torch.reshape(state_m, (self.batch_size, self.hidden_size))
 
             ih = ihs[i]
@@ -93,31 +93,52 @@ class NasRNN(nn.Module):
 
 INPUT_SIZE = 256
 HIDDEN_SIZE = 256
-SEQ_LEN = 200
+SEQ_LEN = 50
 
 nasrnn = NasRNN(1, INPUT_SIZE, HIDDEN_SIZE).cuda().eval()
 nasrnn_jit_fn = torch.jit.script(nasrnn)
 # print(nasrnn_jit_fn.graph)
 
+nasrnn_nvfuser_fn = torch.jit.freeze(torch.jit.script(nasrnn))
+nasrnn_dynamo_fn = torch.compile(nasrnn, dynamic=True)
+import torch._dynamo
+torch._dynamo.config.suppress_errors = True
+
 import functs
 nasrnn_functs_fn = functs.jit.script(nasrnn)
 # print(nasrnn_functs_fn.graph)
 
+with torch.no_grad():
+    inp = torch.rand([SEQ_LEN, 1, INPUT_SIZE]).cuda().float()
 
-inp = torch.rand([SEQ_LEN, 1, INPUT_SIZE]).cuda().float()
+    functs.utils.evaluate.evaluate_func(nasrnn, [inp], "nasrnn eager", run_duration=2.0)
+    functs.utils.evaluate.evaluate_func(nasrnn_jit_fn, [inp], "nasrnn jit", run_duration=2.0)
+    functs.utils.evaluate.evaluate_func(nasrnn_dynamo_fn, [inp], "nasrnn dynamo", run_duration=2.0)
+    functs.utils.evaluate.evaluate_func(nasrnn_functs_fn, [inp], "nasrnn functs", run_duration=2.0)
 
-functs.utils.evaluate.evaluate_func(nasrnn, [inp], "nasrnn eager", run_duration=2.0)
-functs.utils.evaluate.evaluate_func(nasrnn_jit_fn, [inp], "nasrnn jit", run_duration=2.0)
-functs.utils.evaluate.evaluate_func(nasrnn_functs_fn, [inp], "nasrnn functs", run_duration=2.0)
+    # torch._C._jit_set_nvfuser_enabled(True)
+    # functs.utils.evaluate_func(nasrnn_nvfuser_fn, [inp], "nvfuser", run_duration=2.)
+    # torch._C._jit_set_nvfuser_enabled(False)
 
-# print(functs.utils.proifler_func(nasrnn, [inp], "nasrnn eager", run_duration=2.0).key_metrics)
-# print(functs.utils.proifler_func(nasrnn_jit_fn, [inp], "nasrnn jit", run_duration=2.0).key_metrics)
-# print(functs.utils.proifler_func(nasrnn_functs_fn, [inp], "nasrnn functs", run_duration=2.0).key_metrics)
+    # print(functs.utils.proifler_func(nasrnn, [inp], "nasrnn eager", run_duration=2.0).key_metrics)
+    # print(functs.utils.proifler_func(nasrnn_jit_fn, [inp], "nasrnn jit", run_duration=2.0).key_metrics)
+    # print(functs.utils.evaluate.proifler_func(nasrnn_dynamo_fn, [inp], "nasrnn dynamo", run_duration=2.0).key_metrics)
+    # print(functs.utils.proifler_func(nasrnn_functs_fn, [inp], "nasrnn functs", run_duration=2.0).key_metrics)
 
+    # torch._C._jit_set_nvfuser_enabled(True)
+    # print(functs.utils.evaluate.proifler_func(nasrnn_nvfuser_fn, [inp], "nasrnn nvfuser", run_duration=2.0).key_metrics)
+    # torch._C._jit_set_nvfuser_enabled(False)
 
-# print("profiler latency cuda graph")
-# for i in range(1, 5 + 1):
-#     print("iter per capture: {}".format(i))
-#     functs.utils.evaluate.evaluate_func(nasrnn, [inp], "nasrnn eager", run_duration=2., enable_cudagraph=True, iter_per_capture=i)
-#     functs.utils.evaluate.evaluate_func(nasrnn_jit_fn, [inp], "nasrnn jit", run_duration=2., enable_cudagraph=True, iter_per_capture=i)
-#     functs.utils.evaluate.evaluate_func(nasrnn_functs_fn, [inp], "nasrnn functs", run_duration=2., enable_cudagraph=True, iter_per_capture=i)
+    # print("profiler latency cuda graph")
+    # for i in range(2, 5 + 2):
+    #     print("iter per capture: {}".format(i))
+        # functs.utils.evaluate.evaluate_func(nasrnn, [inp], "nasrnn eager", run_duration=2., enable_cudagraph=True, iter_per_capture=i)
+        # functs.utils.evaluate.evaluate_func(nasrnn_jit_fn, [inp], "nasrnn jit", run_duration=2., enable_cudagraph=True, iter_per_capture=i)
+        # functs.utils.evaluate.evaluate_func(nasrnn_dynamo_fn, [inp], "nasrnn dynamo", run_duration=2., enable_cudagraph=True, iter_per_capture=i)
+        # functs.utils.evaluate.evaluate_func(nasrnn_functs_fn, [inp], "nasrnn functs", run_duration=2., enable_cudagraph=True, iter_per_capture=i)
+
+    # print("profiler latency cuda graph")
+    # for i in range(2, 5 + 2):
+    #     torch._C._jit_set_nvfuser_enabled(True)
+    #     functs.utils.evaluate.evaluate_func(nasrnn_nvfuser_fn, [inp], "nasrnn nvfuser", run_duration=2., enable_cudagraph=True, iter_per_capture=i)
+    #     torch._C._jit_set_nvfuser_enabled(False)

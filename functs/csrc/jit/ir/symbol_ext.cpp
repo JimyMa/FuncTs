@@ -48,6 +48,10 @@ at::Tensor ImmutView(at::Tensor src, at::IntArrayRef dims) {
   return src.view(dims);
 }
 
+at::Tensor ImmutReshape(at::Tensor src, at::IntArrayRef dims) {
+  return src.reshape(dims);
+}
+
 static auto _registry =
     RegisterOperators()
         .op("immut::access(Tensor src) -> Tensor", Access,
@@ -83,6 +87,9 @@ static auto _registry =
             RegisterOperators::options().aliasAnalysis(
                 c10::AliasAnalysisKind::PURE_FUNCTION))
         .op("immut::view(Tensor self, int[] size) -> Tensor", ImmutView,
+            RegisterOperators::options().aliasAnalysis(
+                c10::AliasAnalysisKind::PURE_FUNCTION))
+        .op("immut::reshape(Tensor self, int[] size) -> Tensor", ImmutReshape,
             RegisterOperators::options().aliasAnalysis(
                 c10::AliasAnalysisKind::PURE_FUNCTION));
 ;

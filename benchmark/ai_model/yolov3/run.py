@@ -16,6 +16,9 @@ model = yolov3_bbox.YOLOV3BBox().cuda().eval()
 # torchscript
 jit_model = torch.jit.freeze(torch.jit.script(model))
 
+# nvfuser
+nvfuser_model = torch.jit.freeze(torch.jit.script(model))
+
 # torch dynamo + inductor
 torch._dynamo.reset()
 tracing_model = torch.compile(model)
@@ -50,6 +53,9 @@ def functs_task(idx: int):
 def tracing_task(idx: int):
     tracing_model(*feats[idx % num_samples])
 
+def nvfuser_task(idx: int):
+    nvfuser_model(*feats[idx % num_samples])
+
 def fait_task(idx: int):
     torch._C._jit_run_code(code, ("", ) + feats[idx % num_samples])
 
@@ -73,7 +79,14 @@ def dump_proflier(task, name):
 
 functs.utils.evaluate_task(eager_task, "eager", run_duration=2.)
 functs.utils.evaluate_task(jit_task, "jit", run_duration=2.)
+functs.utils.evaluate_task(functs_task, "functs", run_duration=2.)
+functs.utils.evaluate_task(tracing_task, "dynamo+inductor", run_duration=2.)
 functs.utils.evaluate_task(fait_task, "fait", run_duration=2.)
+
+# nvfuser
+torch._C._jit_set_nvfuser_enabled(True)
+functs.utils.evaluate_task(nvfuser_task, "nvfuser", run_duration=2.)
+torch._C._jit_set_nvfuser_enabled(False)
 
 # print(functs.utils.profiler_task(eager_task, "eager", run_duration=2.).key_metrics)
 # print(functs.utils.profiler_task(jit_task, "jit", run_duration=2.).key_metrics)

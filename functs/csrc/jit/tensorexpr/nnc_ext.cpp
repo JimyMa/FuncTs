@@ -129,7 +129,6 @@ computeImmutSliceRev(const std::vector<ArgValue> &inputValues,
         auto notSet = (dimAxis < start) || (dimAxis >= end) ||
                       ((dimAxis - start) % step != int64_t(0));
         auto result = IfThenElse::make(notSet, self.load(axes), srcElem);
-
         return result;
       });
 }
@@ -175,7 +174,6 @@ computeImmutSelectRev(const std::vector<ArgValue> &inputValues,
     auto cond =
         CompareSelect::make(axes[dim], idx, src.load(srcAxes), self.load(axes),
                             CompareSelectOperation::kEQ);
-
     return cond;
   });
 }

@@ -48,7 +48,6 @@ def fmt_duration(dur: float):
         idx += 1
     return '{:.4}{}'.format(dur, units[idx])
 
-
 class Timer:
     def __init__(self, name="", color=True):
         self.name = name
@@ -76,6 +75,10 @@ class Timer:
     
     def time(self):
         return perf_counter()
+
+    def unobserve(self):
+        new_observation = self.time()
+        self.observation = new_observation
 
     def observe(self):
         new_observation = self.time()
@@ -133,6 +136,7 @@ def evaluate_task(task: Callable[[int], None],
     while timer.time() - begin < run_duration:
         task(count)
         count += 1
+        observation = timer.observation
         timer.observe()
     disable_profiling()
     timer.report(clear=False)
@@ -164,9 +168,13 @@ def evaluate_func(func,
             # g = torch_cuda_graph_pool[graph_cnt] if graph_cnt < cuda_graph_caputure_pool_num else torch.cuda.CUDAGraph()
             g = torch.cuda.CUDAGraph()
             with torch.cuda.graph(g):
-                for _ in range(iter_per_capture):
+                for i in range(iter_per_capture):
                     func(*args)
-                    timer.observe()
+                    observation = timer.observation
+                    if i == 0:
+                        timer.unobserve()
+                    else:
+                        timer.observe()
             torch.cuda.synchronize() 
     timer.report(clear=False)
     disable_profiling()
@@ -178,10 +186,11 @@ def profiler_task(task: Callable[[int], None],
                   name="",
                   warmup_runs=WARMUP_RUNS_DEFAULT,
                   run_duration=RUN_DURATION_DEFAULT,
-                  device="cuda") -> "ProfilerOberservation":
+                  device="cuda",
+                  export_json=None) -> "ProfilerOberservation":
     for i in range(warmup_runs):
         task(i)
-    profiler = torch.profiler.profile(activities=[ProfilerActivity.CUDA])
+    profiler = torch.profiler.profile(activities=[ProfilerActivity.CUDA, ProfilerActivity.CPU])
     torch.cuda.synchronize()
     timer = Timer(name)
     profiler.start()
@@ -196,6 +205,8 @@ def profiler_task(task: Callable[[int], None],
     timer.report(clear=False)
 
     profiler.stop()
+    if export_json:
+        profiler.export_chrome_trace("nvfuser.json")
     return ProfilerOberservation(timer, profiler)
 
 def proifler_func(func, 
@@ -203,19 +214,23 @@ def proifler_func(func,
                   name="",
                   warmup_runs=WARMUP_RUNS_DEFAULT,
                   run_duration=RUN_DURATION_DEFAULT,
-                  device="cuda") -> "ProfilerOberservation":
+                  device="cuda",
+                  export_json=None) -> "ProfilerOberservation":
     for _ in range(warmup_runs):
         func(*args)
-    profiler = torch.profiler.profile(activities=[ProfilerActivity.CUDA], use_cuda=True)
+    profiler = torch.profiler.profile(activities=[ProfilerActivity.CUDA, ProfilerActivity.CPU], use_cuda=True)
     torch.cuda.synchronize()
     timer = Timer(name)
     profiler.start()
     begin = timer.start()
     while timer.time() - begin < run_duration:
         func(*args)
+        torch.cuda.synchronize()
         timer.observe()
     timer.report(clear=False)
     profiler.stop()
+    if export_json:
+        profiler.export_chrome_trace(export_json)
     return ProfilerOberservation(timer, profiler)
 
 
@@ -272,12 +287,17 @@ class ProfilerOberservation(object):
     @property
     def total_kernel_calls(self) -> None:
         return functools.reduce(lambda x, y: x + y, [1 for event in self.prof_json["traceEvents"] if event.get("cat") == "kernel"]) / self.timer.cnt
+    
+    @property
+    def total_kernel_durations(self) -> None:
+        return functools.reduce(lambda x, y: x + y, [event.get("dur") for event in self.prof_json["traceEvents"] if event.get("cat") == "kernel"]) / self.timer.cnt
 
     @property
     def key_metrics(self) -> dict:
         return OrderedDict([ ["name", self.name], 
                              ["kenel counts", self.total_kernel_calls],
-                             ["cuda memory allocation", self.total_cuda_memory_allocation] ])
+                             ["kernel dur", self.total_kernel_durations],
+                             ["cuda memory allocation", self.total_cuda_memory_allocation],])
 
 # def eval_metrics(task: Callable[[int], None], num_samples: int):
 #     initialize_metrics()

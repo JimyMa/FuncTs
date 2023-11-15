@@ -91,7 +91,7 @@ class YOLOAnchorGenerator(torch.nn.Module):
         shift_xx, shift_yy = self._meshgrid(shift_x, shift_y)
         shifts = torch.stack([shift_xx, shift_yy, shift_xx, shift_yy], dim=-1)
         all_anchors = base_anchors[None, :, :] + shifts[:, None, :]
-        all_anchors = all_anchors.reshape(-1, 4)
+        all_anchors = all_anchors.clone().reshape(-1, 4)
 
         return all_anchors
 
@@ -194,8 +194,9 @@ class YOLOV3BBox(torch.nn.Module):
         # pred_maps = [torch.Size([1, 255, 10, 10]), torch.Size([1, 255, 20, 20]), torch.Size([1, 255, 40, 40])]
         featmap_strides = [32, 16, 8]
         num_imgs = pred_maps[0].size(0)
-        featmap_sizes = [(pred_map.size(-2), pred_map.size(-1))
-                         for pred_map in pred_maps]
+        # featmap_sizes = [(pred_map.size(-2), pred_map.size(-1))
+        #                  for pred_map in pred_maps]
+        featmap_sizes = ((10, 10), (20, 20), (40, 40))
 
         mlvl_anchors = self.prior_generator(
             featmap_sizes, dtype=pred_maps[0].dtype, device=pred_maps[0].device)

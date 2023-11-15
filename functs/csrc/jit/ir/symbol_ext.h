@@ -38,8 +38,8 @@ static std::unordered_map<Symbol, Symbol> immutableVersion{
     {aten::copy_, c10::immutable::Assign},
     {aten::select, c10::immutable::Select},
     {aten::slice, c10::immutable::Slice},
-    // {aten::squeeze, c10::immutable::Squeeze},
-    // {aten::unsqueeze, c10::immutable::Unsqueeze},
+    {aten::squeeze, c10::immutable::Squeeze},
+    {aten::unsqueeze, c10::immutable::Unsqueeze},
     // {aten::view, c10::immutable::View},
     // {aten::reshape, c10::immutable::Reshape},
 };
@@ -48,11 +48,10 @@ static std::unordered_map<Symbol, Symbol> reverseVersion{
     {c10::immutable::Assign, c10::immutable::Assign},
     {c10::immutable::Select, c10::immutable::SelectReverse},
     {c10::immutable::Slice, c10::immutable::SliceReverse},
-    // {c10::immutable::Squeeze, c10::immutable::Unsqueeze},
-    // {c10::immutable::Unsqueeze, c10::immutable::Squeeze},
-    // {c10::immutable::View, c10::immutable::Unsqueeze},
-    // {c10::immutable::Reshape, c10::immutable::Squeeze}
-};
+    {c10::immutable::Squeeze, c10::immutable::Unsqueeze},
+    {c10::immutable::Unsqueeze, c10::immutable::Squeeze},
+    {c10::immutable::View, c10::immutable::View},
+    {c10::immutable::Reshape, c10::immutable::View}};
 
 } // namespace immutable
 } // namespace c10

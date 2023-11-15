@@ -247,23 +247,45 @@ if __name__ == '__main__':
 
     model = LSTM(input_size, hidden_size, num_layers).cuda().eval()
     jit_model = torch.jit.script(model)
+    dynamo_model = torch.compile(model)
+    nvfuser_model = torch.jit.freeze(torch.jit.script(model))
     functs_model = functs.jit.script(model)
 
     inp = torch.randn([seq_len, batch_size, input_size], device=cuda_device)
 
+    torch._dynamo.config.suppress_errors = True
     with torch.no_grad():
         print("profiler latency")
         evaluate_func(model, [inp], "lstm eager", run_duration=2.)
         evaluate_func(jit_model, [inp], "lstm jit", run_duration=2.)
         evaluate_func(functs_model, [inp], "lstm functs", run_duration=2.)
 
-        # print("profiler latency cuda graph")
-        # for i in range(1, 5 + 1):
-        #     print("iter per capture: {}".format(i))
-        #     evaluate_func(model, [inp], "lstm eager", run_duration=2., enable_cudagraph=True, iter_per_capture=i)
-        #     evaluate_func(jit_model, [inp], "lstm jit", run_duration=2., enable_cudagraph=True, iter_per_capture=i)
-        #     evaluate_func(functs_model, [inp], "lstm functs", run_duration=2., enable_cudagraph=True, iter_per_capture=i)
+        import torch._dynamo
+        torch._dynamo.config.suppress_errors = True
+        torch._dynamo.reset()
+        evaluate_func(dynamo_model, [inp], "lstm dynamo", run_duration=2.)
 
+
+        torch._C._jit_set_nvfuser_enabled(True)
+        evaluate_func(nvfuser_model, [inp], "lstm nvfuser", run_duration=2.)
+        torch._C._jit_set_nvfuser_enabled(False)
+        
+        # print("profiler latency cuda graph")
+        # for i in range(2, 5 + 2):
+            # print("iter per capture: {}".format(i))
+            # evaluate_func(model, [inp], "lstm eager", run_duration=2., enable_cudagraph=True, iter_per_capture=i)
+            # evaluate_func(jit_model, [inp], "lstm jit", run_duration=2., enable_cudagraph=True, iter_per_capture=i)
+            # evaluate_func(dynamo_model, [inp], "lstm dynamo", run_duration=2., enable_cudagraph=True, iter_per_capture=i)
+            # evaluate_func(functs_model, [inp], "lstm functs", run_duration=2., enable_cudagraph=True, iter_per_capture=i)
+
+        # print("profiler latency cuda graph")
+        # for i in range(2, 5 + 2):
+        #     print("iter per capture: {}".format(i))
+        #     torch._C._jit_set_nvfuser_enabled(True)
+        #     evaluate_func(nvfuser_model, [inp], "lstm nvfuser", run_duration=2., enable_cudagraph=True, iter_per_capture=i)
+        #     torch._C._jit_set_nvfuser_enabled(False)
+        
+        # evaluate_func(functs_model, [inp], "lstm functs", run_duration=2., enable_cudagraph=True, iter_per_capture=i)
         # print("profiler key metrics")
         # print(proifler_func(model, [inp], "lstm eager", run_duration=3.).key_metrics)
         # print(proifler_func(jit_model, [inp], "lstm jit", run_duration=3.).key_metrics)
