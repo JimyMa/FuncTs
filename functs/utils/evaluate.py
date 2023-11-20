@@ -125,21 +125,18 @@ def evaluate_task(task: Callable[[int], None],
                   device="cuda") -> Timer:
     for i in range(warmup_runs):
         task(i)
-
-    # enable_profiling()
-    if device == "cuda":
-        torch.cuda.synchronize()
-    count = 0
+    torch.cuda.synchronize() 
     timer = Timer(name)
-    enable_profiling()
     begin = timer.start()
+    enable_profiling()
+    cnt = 0
     while timer.time() - begin < run_duration:
-        task(count)
-        count += 1
-        observation = timer.observation
+        task(cnt)
+        cnt += 1
         timer.observe()
-    disable_profiling()
+        torch.cuda.synchronize() 
     timer.report(clear=False)
+    disable_profiling()
     print_profiling_results(timer.cnt)
 
     return timer
@@ -229,9 +226,7 @@ def proifler_func(func,
         timer.observe()
     timer.report(clear=False)
     profiler.stop()
-    if export_json:
-        profiler.export_chrome_trace(export_json)
-    return ProfilerOberservation(timer, profiler)
+    return ProfilerOberservation(timer, profiler, export_json=export_json)
 
 
 # def eval_metrics_func(func, 
@@ -267,17 +262,18 @@ def proifler_func(func,
 class ProfilerOberservation(object):
     def __init__(self, timer: Timer,
                  prof: torch.profiler.profile,
+                 export_json=None,
                  **kwargs) -> None:
         self.timer = timer
         self.name = self.timer.name
         self.prof = prof
 
-        json_path = tempfile.mktemp()
+        json_path = export_json or tempfile.mktemp()
         self.prof.export_chrome_trace(json_path)
         with open(json_path, "r") as f:
             profiler_json = json.load(f)
         self.prof_json = profiler_json
-        os.remove(json_path)
+        # os.remove(json_path)
 
     @property
     def total_cuda_memory_allocation(self) -> None:

@@ -7,7 +7,7 @@ from typing import Dict, Optional
 
 import torch
 
-ltprof_path = os.path.join(os.path.dirname(__file__), "../../build/libltprof.so")
+ltprof_path = os.path.join(os.path.dirname(__file__), "../lib/libltprof.so")
 _lib = ctypes.cdll.LoadLibrary(ltprof_path)
 
 _enabled = False

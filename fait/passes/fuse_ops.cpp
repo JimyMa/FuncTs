@@ -3,6 +3,7 @@
 #include <torch/csrc/jit/ir/ir_views.h>
 #include <torch/csrc/jit/tensorexpr/operators/operators.h>
 
+#include "functs/csrc/jit/ir/symbol_ext.h"
 #include "parallelize_loops.h"
 #include "tensor_ssa.h"
 #include "type_utils.h"
@@ -118,7 +119,10 @@ static std::unordered_set<Symbol> workingSymbols{
     aten::max, aten::softmax,
     // Copy
     aten::repeat, aten::cat, aten::stack, aten::index,
-    // TensorSSA
+    // // TensorSSA
+    // c10::immutable::Assign,
+    // c10::immutable::Select, c10::immutable::SelectReverse,
+    // c10::immutable::Slice, c10::immutable::SliceReverse
 };
 
 static std::unordered_map<Symbol, bool (*)(Node *node)> fusabilityCheckers{

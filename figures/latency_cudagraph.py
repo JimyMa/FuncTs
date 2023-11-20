@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-tools = ["PyTorch", "TorchDynamo", "nvfuser", "TorchScript", "FuncTs"]
+tools = ["PyTorch", "TorchDynamo + Inductor", "TorchScript + nvfuser", "TorchScript + NNC", "TorchScript + TensorSSA + NNC"]
 models = ["NASRNN", "Attention", "LSTM"]
 
 # LSTM
@@ -59,7 +59,7 @@ data = {
 
 
 # illustrate bar figure
-colors = ["#003366", "#E31B23", "#005CAB", "#784c22", "#FFC325",]
+colors = ["#cbcbcbff", "#e695bfff", "#82c8e1ff", "#8ee4a1ff", "#ffa13ab4",]
 markers = ["o", "s", "D", "*", "8"]
 bar_width = 1 / (len(tools) + 2)
 begin_pos = -(len(tools) - 1) * bar_width / 2
@@ -98,7 +98,7 @@ for model, ax in zip(models, axes):
 
 
 # plt.xticks(range(len(iters)), iters, rotation=10)
-fig.legend(labels=tools, ncol=np.ceil(len(tools)), loc="outside upper center")
+fig.legend(labels=tools, ncol=3, loc="outside upper center")
 fig.supylabel("Latency (ms)", weight='bold')
 
 plt.savefig('latency_cudagraph.pdf')

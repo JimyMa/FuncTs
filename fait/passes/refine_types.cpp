@@ -1,5 +1,7 @@
 #include "refine_types.h"
 
+#include <iostream>
+
 #include <torch/csrc/jit/ir/ir_views.h>
 
 #include <nlohmann/json.hpp>
@@ -67,19 +69,15 @@ void setRefinedType(Value *value, const TypePtr &newType,
     matched = convertToMatch(newType, value->type());
     value->setType(matched);
   }
-  if (*matched != *newType)
-    refinedTypes[value] = newType;
+  if (*matched != *newType) refinedTypes[value] = newType;
 }
 
 static void markLiveValues(Block *block,
                            std::unordered_set<Value *> &deadValues) {
-  for (auto param : block->inputs())
-    deadValues.erase(param);
+  for (auto param : block->inputs()) deadValues.erase(param);
   for (auto node : block->nodes()) {
-    for (auto subBlock : node->blocks())
-      markLiveValues(subBlock, deadValues);
-    for (auto output : node->outputs())
-      deadValues.erase(output);
+    for (auto subBlock : node->blocks()) markLiveValues(subBlock, deadValues);
+    for (auto output : node->outputs()) deadValues.erase(output);
   }
 }
 
@@ -104,11 +102,9 @@ void transferRefinedTypesOf(Node *src, Node *dst, ValueTypeMap &refinedTypes) {
 
 void removeDeadRefinedTypes(ValueTypeMap &refinedTypes, Graph *graph) {
   std::unordered_set<Value *> deadValues;
-  for (auto &pair : refinedTypes)
-    deadValues.insert(pair.first);
+  for (auto &pair : refinedTypes) deadValues.insert(pair.first);
   markLiveValues(graph->block(), deadValues);
-  for (auto dead : deadValues)
-    refinedTypes.erase(dead);
+  for (auto dead : deadValues) refinedTypes.erase(dead);
 }
 
 #define STR_TO_TYPE(type) {#type, TypeKind::type},
@@ -119,38 +115,37 @@ static std::unordered_map<std::string, TypeKind> strToTypeKind{
 static TypePtr parseType(const json &jsonType) {
   auto kind = strToTypeKind.at(jsonType.at("kind"));
   switch (kind) {
-  case TypeKind::BoolType:
-    return BoolType::get();
+    case TypeKind::BoolType:
+      return BoolType::get();
 
-  case TypeKind::IntType:
-    return IntType::get();
+    case TypeKind::IntType:
+      return IntType::get();
 
-  case TypeKind::FloatType:
-    return FloatType::get();
+    case TypeKind::FloatType:
+      return FloatType::get();
 
-  case TypeKind::TensorType: {
-    auto shape = jsonType.at("shape").get<std::vector<int64_t>>();
-    auto dtype = strToDtype.at(jsonType.at("dtype").get<std::string>());
-    return TensorType::createContiguous(dtype, c10::kCUDA, shape);
-  }
+    case TypeKind::TensorType: {
+      auto shape = jsonType.at("shape").get<std::vector<int64_t>>();
+      auto dtype = strToDtype.at(jsonType.at("dtype").get<std::string>());
+      return TensorType::createContiguous(dtype, c10::kCUDA, shape);
+    }
 
-  case TypeKind::TupleType: {
-    auto elements = jsonType.at("elements").get<std::vector<json>>();
-    std::vector<TypePtr> elemTypes;
-    for (auto &elem : elements)
-      elemTypes.push_back(parseType(elem));
-    return TupleType::create(elemTypes);
-  }
+    case TypeKind::TupleType: {
+      auto elements = jsonType.at("elements").get<std::vector<json>>();
+      std::vector<TypePtr> elemTypes;
+      for (auto &elem : elements) elemTypes.push_back(parseType(elem));
+      return TupleType::create(elemTypes);
+    }
 
-  case TypeKind::ListType: {
-    auto element = parseType(jsonType.at("element"));
-    return ListType::create(element);
-  }
+    case TypeKind::ListType: {
+      auto element = parseType(jsonType.at("element"));
+      return ListType::create(element);
+    }
 
-  default: {
-    TORCH_CHECK(false, "Cannot parse type ", jsonType);
-    return nullptr;
-  }
+    default: {
+      TORCH_CHECK(false, "Cannot parse type ", jsonType);
+      return nullptr;
+    }
   }
 }
 
@@ -159,8 +154,7 @@ std::vector<TypePtr> parseInputTypes(const std::string &path) {
   TORCH_CHECK(ifs, "Cannot open file ", path);
   auto jsonTypes = json::parse(ifs).get<std::vector<json>>();
   std::vector<TypePtr> inputTypes;
-  for (auto &json : jsonTypes)
-    inputTypes.push_back(parseType(json));
+  for (auto &json : jsonTypes) inputTypes.push_back(parseType(json));
   return inputTypes;
 }
 
@@ -191,7 +185,7 @@ void dumpRefinedTypes(const ValueTypeMap &refinedTypes) {
 
 using BlockPropagator = std::function<void(Block *, ValueTypeMap &)>;
 
-#define TYPE_PROP_PARAMS                                                       \
+#define TYPE_PROP_PARAMS \
   Node *node, ValueTypeMap &refinedTypes, const BlockPropagator &propFunc
 
 static void propagateConstant(TYPE_PROP_PARAMS) {
@@ -199,17 +193,26 @@ static void propagateConstant(TYPE_PROP_PARAMS) {
   if (ty->kind() == TypeKind::ListType) {
     auto listVal = node->ival(attr::value).toListRef();
     std::vector<TypePtr> elemTypes;
-    for (auto elem : listVal)
-      elemTypes.push_back(elem.type());
+    for (auto elem : listVal) elemTypes.push_back(elem.type());
     ty = TupleType::create(elemTypes);
   }
   setRefinedType(node->output(0), ty, refinedTypes);
+  if (ty->kind() == TypeKind::TensorType) {
+    auto val = toIValue(node->output(0)).value();
+    auto tensor_val = val.toTensor();
+    ShapeVec tensorShape;
+    auto constShape = tensor_val.sizes().vec();
+    for (auto dim : constShape) {
+      tensorShape.push_back(dim);
+    }
+    setShape(node->output(0), tensorShape);
+    setDtype(node->output(0), tensor_val.dtype().toScalarType());
+  }
 }
 
 static void propagateTupleConstruct(TYPE_PROP_PARAMS) {
   std::vector<TypePtr> elemTypes;
-  for (auto input : node->inputs())
-    elemTypes.push_back(input->type());
+  for (auto input : node->inputs()) elemTypes.push_back(input->type());
   node->output(0)->setType(TupleType::create(elemTypes));
 }
 
@@ -228,15 +231,13 @@ static void propagateListUnpack(TYPE_PROP_PARAMS) {
       node->output(i)->setType(elemTypes[i]);
   } else {
     auto elemTy = list->type()->cast<ListType>()->getElementType();
-    for (auto output : node->outputs())
-      output->setType(elemTy);
+    for (auto output : node->outputs()) output->setType(elemTy);
   }
 }
 
 static void propagateListConstruct(TYPE_PROP_PARAMS) {
   std::vector<TypePtr> elemTypes;
-  for (auto input : node->inputs())
-    elemTypes.push_back(input->type());
+  for (auto input : node->inputs()) elemTypes.push_back(input->type());
   setRefinedType(node->output(0), TupleType::create(elemTypes), refinedTypes);
 }
 
@@ -247,6 +248,9 @@ static void propagateGetItem(TYPE_PROP_PARAMS) {
       index->node()->kind() == prim::Constant) {
     auto elems = refinedTypes[list]->cast<TupleType>()->elements();
     auto idxCnst = index->node()->i(attr::value);
+    if (idxCnst == -1) {
+      idxCnst += elems.size();
+    }
     node->output(0)->setType(elems.at(idxCnst));
   } else {
     auto elemTy = list->type()->cast<ListType>()->getElementType();
@@ -278,7 +282,6 @@ static void propagateLoop(TYPE_PROP_PARAMS) {
     auto input = view.carriedInputs()[i], param = view.bodyCarriedInputs()[i];
     param->setType(input->type());
   }
-
   // Propagate carried values until a fixed point
   while (true) {
     propFunc(view.bodyBlock(), refinedTypes);
@@ -291,8 +294,7 @@ static void propagateLoop(TYPE_PROP_PARAMS) {
         changed = true;
       }
     }
-    if (!changed)
-      break;
+    if (!changed) break;
   }
 
   // Propagate returns to outputs
@@ -341,8 +343,7 @@ static void propagateFusionGroup(TYPE_PROP_PARAMS) {
   // Move constants outside of body
   auto graph = node->owningGraph();
   rewrite(block, [&](Node *cnstNode) -> Node * {
-    if (cnstNode->kind() != prim::Constant)
-      return nullptr;
+    if (cnstNode->kind() != prim::Constant) return nullptr;
     auto cnst = cnstNode->output(0);
     auto newCnstNode = graph->createClone(cnstNode, [](Value *v) { return v; })
                            ->insertBefore(node);
@@ -383,55 +384,52 @@ static void inferDtypeIn(Block *block, ValueTypeMap &refinedTypes) {
     // Handle special symbols
     auto kind = node->kind();
     switch (node->kind()) {
-    case prim::dtype: {
-      auto dtype = node->input(0)->type()->cast<TensorType>()->scalarType();
-      if (dtype) {
-        graph->setInsertPoint(node->next());
-        auto cnstVal = graph->insertConstant(int64_t(dtype.value()));
-        node->output(0)->replaceAllUsesWith(cnstVal);
-        node = remove(node);
-      }
-    } break;
+      case prim::dtype: {
+        auto dtype = node->input(0)->type()->cast<TensorType>()->scalarType();
+        if (dtype) {
+          graph->setInsertPoint(node->next());
+          auto cnstVal = graph->insertConstant(int64_t(dtype.value()));
+          node->output(0)->replaceAllUsesWith(cnstVal);
+          node = remove(node);
+        }
+      } break;
 
-    default: {
-      if (symbolPropagators.count(kind)) {
-        symbolPropagators[kind](node, refinedTypes, inferDtypeIn);
-        continue;
-      }
+      default: {
+        if (symbolPropagators.count(kind)) {
+          symbolPropagators[kind](node, refinedTypes, inferDtypeIn);
+          continue;
+        }
 
-      // Skip if there is no tensor in the output
-      auto outputs = node->outputs();
-      if (std::none_of(outputs.begin(), outputs.end(), isTensor))
-        continue;
+        // Skip if there is no tensor in the output
+        auto outputs = node->outputs();
+        if (std::none_of(outputs.begin(), outputs.end(), isTensor)) continue;
 
-      // Use per-operator dtype function to infer dtype
-      auto dtype = c10::kFloat;
-      auto op = node->maybeOperator();
-      if (op && specialDtypeHandlers.contains(*op)) {
-        (*specialDtypeHandlers.find(*op))(node, refinedTypes);
-        continue;
-      } else if (op && dtypeFuncs.contains(*op)) {
-        dtype = (*dtypeFuncs.find(*op))(node, refinedTypes);
-      } else {
-        for (auto input : node->inputs()) {
-          if (!isTensor(input))
-            continue;
-          auto inDtype = input->type()->cast<TensorType>()->scalarType();
-          if (inDtype) {
-            dtype = *inDtype;
-            break;
+        // Use per-operator dtype function to infer dtype
+        auto dtype = c10::kFloat;
+        auto op = node->maybeOperator();
+        if (op && specialDtypeHandlers.contains(*op)) {
+          (*specialDtypeHandlers.find(*op))(node, refinedTypes);
+          continue;
+        } else if (op && dtypeFuncs.contains(*op)) {
+          dtype = (*dtypeFuncs.find(*op))(node, refinedTypes);
+        } else {
+          for (auto input : node->inputs()) {
+            if (!isTensor(input)) continue;
+            auto inDtype = input->type()->cast<TensorType>()->scalarType();
+            if (inDtype) {
+              dtype = *inDtype;
+              break;
+            }
           }
         }
-      }
 
-      // Propagate device to outputs
-      for (auto output : outputs) {
-        if (!isTensor(output))
-          continue;
-        output->setType(
-            output->type()->cast<TensorType>()->withScalarType(dtype));
-      }
-    } break;
+        // Propagate device to outputs
+        for (auto output : outputs) {
+          if (!isTensor(output)) continue;
+          output->setType(
+              output->type()->cast<TensorType>()->withScalarType(dtype));
+        }
+      } break;
     }
   }
 }
@@ -442,52 +440,50 @@ static void inferDeviceIn(Block *block, ValueTypeMap &refinedTypes) {
        node = node->next()) {
     auto kind = node->kind();
     switch (node->kind()) {
-    case prim::device: {
-      auto device = node->input(0)->type()->cast<TensorType>()->device();
-      if (device) {
-        graph->setInsertPoint(node->next());
-        auto cnstVal = graph->insertConstant(device.value());
-        node->output(0)->replaceAllUsesWith(cnstVal);
-        node = remove(node);
-      }
-    } break;
+      case prim::device: {
+        auto device = node->input(0)->type()->cast<TensorType>()->device();
+        if (device) {
+          graph->setInsertPoint(node->next());
+          auto cnstVal = graph->insertConstant(device.value());
+          node->output(0)->replaceAllUsesWith(cnstVal);
+          node = remove(node);
+        }
+      } break;
 
-    default: {
-      // Propagate types for special symbols
-      if (symbolPropagators.count(kind)) {
-        symbolPropagators[kind](node, refinedTypes, inferDeviceIn);
-        continue;
-      }
+      default: {
+        // Propagate types for special symbols
+        if (symbolPropagators.count(kind)) {
+          symbolPropagators[kind](node, refinedTypes, inferDeviceIn);
+          continue;
+        }
 
-      // Skip if there is no tensor in the output
-      auto outputs = node->outputs();
-      if (std::none_of(outputs.begin(), outputs.end(), isTensor))
-        continue;
+        // Skip if there is no tensor in the output
+        auto outputs = node->outputs();
+        if (std::none_of(outputs.begin(), outputs.end(), isTensor)) continue;
 
-      // Use per-operator device function to infer device
-      c10::Device device(c10::kCUDA);
-      auto op = node->maybeOperator();
-      if (op && deviceFuncs.contains(*op))
-        device = (*deviceFuncs.find(*op))(node, refinedTypes);
-      else {
-        for (auto input : node->inputs()) {
-          if (!isTensor(input))
-            continue;
-          auto inputDev = input->type()->cast<TensorType>()->device();
-          if (inputDev) {
-            device = *inputDev;
-            break;
+        // Use per-operator device function to infer device
+        c10::Device device(c10::kCUDA);
+        auto op = node->maybeOperator();
+        if (op && deviceFuncs.contains(*op))
+          device = (*deviceFuncs.find(*op))(node, refinedTypes);
+        else {
+          for (auto input : node->inputs()) {
+            if (!isTensor(input)) continue;
+            auto inputDev = input->type()->cast<TensorType>()->device();
+            if (inputDev) {
+              device = *inputDev;
+              break;
+            }
           }
         }
-      }
 
-      // Propagate device to outputs
-      for (auto output : outputs) {
-        if (!isTensor(output))
-          continue;
-        output->setType(output->type()->cast<TensorType>()->withDevice(device));
+        // Propagate device to outputs
+        for (auto output : outputs) {
+          if (!isTensor(output)) continue;
+          output->setType(
+              output->type()->cast<TensorType>()->withDevice(device));
+        }
       }
-    }
     }
   }
 }
@@ -499,6 +495,14 @@ void InferDtypeAndDevice(const std::shared_ptr<Graph> &graph,
   inferDtypeIn(graph->block(), refinedTypes);
 }
 
+static OperatorSet unsupported{};
+
+void collectUnsupported() {
+  for (auto &op : unsupported.getOps()) {
+    std::cout << op->schema() << std::endl;
+  }
+}
+
 static void inferShapeIn(Block *block, ValueTypeMap &refinedTypes) {
   auto graph = block->owningGraph();
   for (auto node = block->nodes().front(); node != block->nodes().back();
@@ -506,96 +510,90 @@ static void inferShapeIn(Block *block, ValueTypeMap &refinedTypes) {
     // Handle special symbols
     auto kind = node->kind();
     switch (node->kind()) {
-    case aten::dim: {
-      auto tensorTy = node->input(0)->type()->cast<TensorType>();
-      auto dim = tensorTy->dim();
-      if (dim) {
-        auto constDim = graph->insertConstant(int64_t(*dim));
-        node->output(0)->replaceAllUsesWith(constDim);
-        node = remove(node);
-      }
-    } break;
+      case aten::dim: {
+        auto tensorTy = node->input(0)->type()->cast<TensorType>();
+        auto dim = tensorTy->dim();
+        if (dim) {
+          auto constDim = graph->insertConstant(int64_t(*dim));
+          node->output(0)->replaceAllUsesWith(constDim);
+          node = remove(node);
+        }
+      } break;
 
-    case aten::size: {
-      auto tensorTy = node->input(0)->type()->cast<TensorType>();
-      auto shape = tensorTy->sizes();
-      graph->setInsertPoint(node->next());
-      Value *cnstVal = nullptr;
-      if (node->inputs().size() == 1 && shape.isComplete()) {
-        cnstVal = graph->insertConstant(*shape.concrete_sizes());
-      } else if (node->inputs().size() == 2 && shape.size()) {
-        auto index = constant_as<int64_t>(node->input(1));
-        if (!index)
-          continue;
-        if (*index < 0)
-          *index += *shape.size();
-        if (!shape[*index])
-          continue;
-        cnstVal = graph->insertConstant(shape[*index].value());
-      }
-      if (cnstVal) {
-        node->output(0)->replaceAllUsesWith(cnstVal);
-        node = remove(node);
-      }
-    } break;
-
-    case aten::len: {
-      auto input = node->input(0);
-      auto inTy = input->type();
-      c10::optional<int64_t> len;
-      if (inTy->kind() == TypeKind::TensorType) {
-        auto sizes = inTy->cast<TensorType>()->sizes();
-        if (sizes.size())
-          len = sizes[0];
-      } else if (inTy->kind() == TypeKind::ListType &&
-                 refinedTypes.count(input) &&
-                 refinedTypes[input]->kind() == TypeKind::TupleType) {
-        len = refinedTypes[input]->cast<TupleType>()->elements().size();
-      }
-      if (len) {
+      case aten::size: {
+        auto tensorTy = node->input(0)->type()->cast<TensorType>();
+        auto shape = tensorTy->sizes();
         graph->setInsertPoint(node->next());
-        auto cnstVal = graph->insertConstant(*len);
-        node->output(0)->replaceAllUsesWith(cnstVal);
-        node = remove(node);
-      }
-    } break;
+        Value *cnstVal = nullptr;
+        if (node->inputs().size() == 1 && shape.isComplete()) {
+          cnstVal = graph->insertConstant(*shape.concrete_sizes());
+        } else if (node->inputs().size() == 2 && shape.size()) {
+          auto index = constant_as<int64_t>(node->input(1));
+          if (!index) continue;
+          if (*index < 0) *index += *shape.size();
+          if (!shape[*index]) continue;
+          cnstVal = graph->insertConstant(shape[*index].value());
+        }
+        if (cnstVal) {
+          node->output(0)->replaceAllUsesWith(cnstVal);
+          node = remove(node);
+        }
+      } break;
 
-    default: {
-      // Propagate types
-      if (symbolPropagators.count(kind)) {
-        symbolPropagators[kind](node, refinedTypes, inferShapeIn);
-        continue;
-      }
+      case aten::len: {
+        auto input = node->input(0);
+        auto inTy = input->type();
+        c10::optional<int64_t> len;
+        if (inTy->kind() == TypeKind::TensorType) {
+          auto sizes = inTy->cast<TensorType>()->sizes();
+          if (sizes.size()) len = sizes[0];
+        } else if (inTy->kind() == TypeKind::ListType &&
+                   refinedTypes.count(input) &&
+                   refinedTypes[input]->kind() == TypeKind::TupleType) {
+          len = refinedTypes[input]->cast<TupleType>()->elements().size();
+        }
+        if (len) {
+          graph->setInsertPoint(node->next());
+          auto cnstVal = graph->insertConstant(*len);
+          node->output(0)->replaceAllUsesWith(cnstVal);
+          node = remove(node);
+        }
+      } break;
 
-      // Skip if there is no tensor in the output
-      auto outputs = node->outputs();
-      if (std::none_of(outputs.begin(), outputs.end(), isTensor))
-        continue;
-
-      // Use special shape handlers
-      auto op = node->maybeOperator();
-      if (!op)
-        continue;
-      if (specialShapeHandlers.contains(*op)) {
-        (*specialShapeHandlers.find(*op))(node, refinedTypes);
-        continue;
-      }
-
-      // Use per-operator shape function to infer shape
-      if (!shapeFuncs.contains(*op)) {
-        std::cout << op->schema() << std::endl;
-        continue;
-      }
-      auto shape = (*shapeFuncs.find(*op))(node, refinedTypes);
-      for (auto output : outputs) {
-        if (!isTensor(output))
+      default: {
+        // Propagate types
+        if (symbolPropagators.count(kind)) {
+          symbolPropagators[kind](node, refinedTypes, inferShapeIn);
           continue;
-        if (!shape.rank().has_value())
+        }
+
+        // Skip if there is no tensor in the output
+        auto outputs = node->outputs();
+        if (std::none_of(outputs.begin(), outputs.end(), isTensor)) continue;
+
+        // Use special shape handlers
+        auto op = node->maybeOperator();
+        if (!op) continue;
+        if (specialShapeHandlers.contains(*op)) {
+          (*specialShapeHandlers.find(*op))(node, refinedTypes);
           continue;
-        output->setType(
-            output->type()->cast<TensorType>()->withSymbolicShapes(shape));
-      }
-    } break;
+        }
+
+        // Use per-operator shape function to infer shape
+        
+        if (!shapeFuncs.contains(*op)) {
+          if (!node->isMemberOf(unsupported)) unsupported.insert({toString((node->schema())).c_str()});
+          continue;
+        }
+
+        auto shape = (*shapeFuncs.find(*op))(node, refinedTypes);
+        for (auto output : outputs) {
+          if (!isTensor(output)) continue;
+          if (!shape.rank().has_value()) continue;
+          output->setType(
+              output->type()->cast<TensorType>()->withSymbolicShapes(shape));
+        }
+      } break;
     }
   }
 }
@@ -605,8 +603,7 @@ void InferShape(const std::shared_ptr<Graph> &graph,
   initTensorTypeFuncs();
   while (true) {
     inferShapeIn(graph->block(), refinedTypes);
-    if (!FoldConstantsTSSA(graph))
-      break;
+    if (!FoldConstantsTSSA(graph)) break;
     EliminateDeadCodeTSSA(graph);
     removeDeadRefinedTypes(refinedTypes, graph.get());
   }
@@ -615,5 +612,5 @@ void InferShape(const std::shared_ptr<Graph> &graph,
   removeDeadRefinedTypes(refinedTypes, graph.get());
 }
 
-} // namespace jit
-} // namespace torch
+}  // namespace jit
+}  // namespace torch

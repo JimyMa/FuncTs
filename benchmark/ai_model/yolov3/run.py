@@ -4,9 +4,28 @@ import torch
 from torch.profiler import profile, ProfilerActivity
 import functs
 
+import argparse
+
 import yolov3_bbox
 
 torch.cuda.init()
+
+parser = argparse.ArgumentParser()
+parser.add_argument("--bs", default=1, type=int)
+arguments = parser.parse_args()
+
+def process_feat(feat):
+    new_feat = []
+    for data_tuple in feat:
+        new_data_tuple =[data.repeat(arguments.bs, 1, 1, 1) for data in data_tuple]
+        new_feat.append(new_data_tuple)
+    return tuple(new_feat)
+
+def process_feat_batch(feats):
+    new_feats = []
+    for feat in feats:
+        new_feats.append(process_feat(feat))
+    return new_feats
 
 # pred_maps = [torch.Size([1, 255, 10, 10]), torch.Size([1, 255, 20, 20]), torch.Size([1, 255, 40, 40])]
 
@@ -26,11 +45,14 @@ tracing_model = torch.compile(model)
 # fait
 cls_scores: [torch.Size([1, 486, 20, 20]), torch.Size([1, 486, 10, 10]), torch.Size([1, 486, 5, 5]), torch.Size([1, 486, 3, 3]), torch.Size([1, 486, 2, 2]), torch.Size([1, 486, 1, 1])]
 bbox_preds: [torch.Size([1, 24, 20, 20]), torch.Size([1, 24, 10, 10]), torch.Size([1, 24, 5, 5]), torch.Size([1, 24, 3, 3]), torch.Size([1, 24, 2, 2]), torch.Size([1, 24, 1, 1])]
-type_hint = [torch.TupleType([torch.TensorType.get().with_dtype(torch.float32).with_sizes([1, 255, 10, 10]).with_device(torch.device("cuda")),
-                              torch.TensorType.get().with_dtype(torch.float32).with_sizes([1, 255, 20, 20]).with_device(torch.device("cuda")),
-                              torch.TensorType.get().with_dtype(torch.float32).with_sizes([1, 255, 40, 40]).with_device(torch.device("cuda"))],)]
+type_hint = [torch.TupleType([torch.TensorType.get().with_dtype(torch.float32).with_sizes([arguments.bs, 255, 10, 10]).with_device(torch.device("cuda")),
+                              torch.TensorType.get().with_dtype(torch.float32).with_sizes([arguments.bs, 255, 20, 20]).with_device(torch.device("cuda")),
+                              torch.TensorType.get().with_dtype(torch.float32).with_sizes([arguments.bs, 255, 40, 40]).with_device(torch.device("cuda"))],)]
 
 feats = torch.load("yolov3_feat.pt")
+feats = process_feat_batch(feats)
+num_samples = len(feats)
+
 num_samples = len(feats)
 
 functs_model = functs.jit.script(torch.jit.freeze(torch.jit.script(model)))
@@ -63,7 +85,7 @@ for i in range(num_samples):
     eager_task(i)
     jit_task(i)
     functs_task(i)
-    tracing_task(i)
+    # tracing_task(i)
     fait_task(i)
 
 def dump_proflier(task, name):

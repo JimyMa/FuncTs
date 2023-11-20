@@ -7,6 +7,15 @@ START_LEN = 32
 SEQ_LEN = 64
 NUM_HEAD = 12
 SIZE_PER_HEAD = 64
+batch_size = 1
+
+import argparse
+parser = argparse.ArgumentParser()
+parser.add_argument('--bs', type=int, default=1)
+parser.add_argument('--maxlength', type=int, default=50)
+parser.add_argument('--tool', type=str, default="all")
+arguments = parser.parse_args()
+
 
 class Attention(nn.Module):
     def __init__(self, num_head, size_per_head):
@@ -34,7 +43,12 @@ class Attention(nn.Module):
             q = torch.matmul(x, self.weight_q)
             k[:, :, gen_id, :] = torch.reshape(torch.matmul(x, self.weight_k), (batch_size, self.num_head, self.size_per_head))
             v[:, :, gen_id, :] = torch.reshape(torch.matmul(x, self.weight_v), (batch_size, self.num_head, self.size_per_head))
-            attn = torch.matmul(k, q.transpose(2, 3)).transpose(2, 3)
+
+            k_reshape = k.reshape(-1, k.shape[-2], k.shape[-1])
+            q_reshape = q.reshape(-1, q.shape[-2], q.shape[-1])
+            attn = torch.bmm(k_reshape, q_reshape.transpose(-2, -1)).transpose(-2, -1)
+            attn = attn.reshape(batch_size, -1, attn.shape[-2], attn.shape[-1])
+            
             attn = attn * 0.125
             attn = torch.softmax(attn, dim=3)
             x = torch.matmul(attn, v)
@@ -42,7 +56,7 @@ class Attention(nn.Module):
             gen_id = gen_id + 1
         return k.clone(), v.clone(), x.clone()
     
-batch_size = 1
+
 
 model = Attention(NUM_HEAD, SIZE_PER_HEAD).cuda().eval()
 jit_model = torch.jit.script(model)
@@ -62,11 +76,21 @@ v[:, :, :START_LEN, :] = torch.randn(batch_size, NUM_HEAD, START_LEN, SIZE_PER_H
 print(torch.allclose(model(x, k, v)[0], functs_model(x, k, v)[0]))
 print(torch.allclose(model(x, k, v)[1], functs_model(x, k, v)[1]))
 print(torch.allclose(model(x, k, v)[2], functs_model(x, k, v)[2]))
-
 with torch.no_grad():
+    # fait_model = functs.jit.script(torch.jit.freeze(torch.jit.script(model)))
+    # type_hint = [torch.TensorType.get().with_dtype(torch.float32).with_sizes([ batch_size, NUM_HEAD, 1, SIZE_PER_HEAD ]).with_device(torch.device("cuda")),
+    #              torch.TensorType.get().with_dtype(torch.float32).with_sizes([ batch_size, NUM_HEAD, SEQ_LEN, SIZE_PER_HEAD ]).with_device(torch.device("cuda")),
+    #              torch.TensorType.get().with_dtype(torch.float32).with_sizes([ batch_size, NUM_HEAD, SEQ_LEN, SIZE_PER_HEAD ]).with_device(torch.device("cuda"))]
+    # # functs._C._jit_pass_fait_pipeline(fait_model.graph, type_hint)
+    # # print(fait_model.graph) 
+
+    # # code = torch._C._jit_get_code(fait_model.graph)
+    # # print(torch.allclose(torch._C._jit_run_code(code, ("", x, k, v))[2], functs_model(x, k, v)[2]))
+
     # timer_eager = functs.utils.evaluate_func(model, [x, k, v], "eager", run_duration=2.)
     # timer_jit = functs.utils.evaluate_func(jit_model, [x, k, v], "jit", run_duration=2.)
     # timer_functs = functs.utils.evaluate_func(functs_model, [x, k, v], "functs", run_duration=2.)
+    # # timer_fait = functs.utils.evaluate_func(torch._C._jit_run_code, [code, ("", x, k, v)], "fait", run_duration=2.)
     # timer_dynamo = functs.utils.evaluate_func(dynamo_model, [x, k, v], "dynamo", run_duration=2.)
 
     # torch.cuda.profiler.start()
@@ -77,6 +101,8 @@ with torch.no_grad():
     # print(jit_model.graph_for(x, k, v))
     # print(functs_model.graph_for(x, k, v))
 
+
+
     # print("profiler latency cuda graph")
     # for i in range(2, 5 + 2):
     #     print("iter per capture: {}".format(i + 10))
@@ -85,13 +111,29 @@ with torch.no_grad():
         # functs.utils.evaluate.evaluate_func(jit_model, [x, k, v], "attention jit", run_duration=2., enable_cudagraph=True, iter_per_capture=i + 10)
         # functs.utils.evaluate.evaluate_func(functs_model, [x, k, v], "attention functs", run_duration=2., enable_cudagraph=True, iter_per_capture=i + 10)
 
-    print("profiler latency cuda graph")
-    for i in range(1, 5 + 1):
-        torch._C._jit_set_nvfuser_enabled(True)
-        functs.utils.evaluate.evaluate_func(nvfuser_model, [x, k, v], "attention nvfuser", run_duration=2., enable_cudagraph=True, iter_per_capture=i + 10)
-        torch._C._jit_set_nvfuser_enabled(False)
+    # print("profiler latency cuda graph")
+    # for i in range(1, 5 + 1):
+    #     torch._C._jit_set_nvfuser_enabled(True)
+    #     functs.utils.evaluate.evaluate_func(nvfuser_model, [x, k, v], "attention nvfuser", run_duration=2., enable_cudagraph=True, iter_per_capture=i + 10)
+    #     torch._C._jit_set_nvfuser_enabled(False)
     # print(functs.utils.proifler_func(model, (x, k, v), "attention eager", run_duration=2.0).key_metrics)
     # print(functs.utils.proifler_func(jit_model, (x, k, v), "attention jit", run_duration=2.0).key_metrics)
     # print(functs.utils.proifler_func(functs_model, (x, k, v), "attention functs", run_duration=2.0).key_metrics)
+    # timer_fait = functs.utils.proifler_func(torch._C._jit_run_code, [code, ("", x, k, v)], "fait", run_duration=2., export_json="fait.json")
 
+
+    if arguments.tool in ["all", "eager"]:
+        print(functs.utils.proifler_func(model, [x, k, v], "eager", run_duration=1.0, export_json="eager").key_metrics)
+
+    if arguments.tool in ["all", "jit"]:    
+        print(functs.utils.proifler_func(jit_model, [x, k, v], "jit", run_duration=1.0, export_json="jit").key_metrics)
+    if arguments.tool in ["all", "dynamo"]:
+        print(functs.utils.proifler_func(dynamo_model, [x, k, v], "dynamo", run_duration=1.0, export_json="dynamo").key_metrics)
+    if arguments.tool in ["all", "functs"]:
+        print(functs.utils.proifler_func(functs_model, [x, k, v], "functs", run_duration=1.0, export_json="functs").key_metrics)
+
+    if arguments.tool in ["all", "nvfuser"]:
+        torch._C._jit_set_nvfuser_enabled(True)
+        print(functs.utils.evaluate.proifler_func(nvfuser_model, [x, k, v], "nvfuser", run_duration=1.0, export_json="nvfuser").key_metrics)
+        torch._C._jit_set_nvfuser_enabled(False)
 

@@ -178,7 +178,9 @@ def nms_wrapper(boxes: Tensor,
     dets = torch.cat((boxes[inds], scores[inds].reshape(-1, 1)), dim=1)
     return dets, inds
 
-
+def batch_tensor_to_list(mlvl_tensors: Tensor, batch_size: int):
+    tensor_list = [mlvl_tensors[i:i+1] for i in range(batch_size)]
+    return tensor_list
 class YOLOV3BBox(torch.nn.Module):
     def __init__(self) -> None:
         super().__init__()
@@ -222,6 +224,10 @@ class YOLOV3BBox(torch.nn.Module):
 
         padding = flatten_bboxes.new_zeros(num_imgs, flatten_bboxes.size(1), 1)
         flatten_cls_scores = torch.cat([flatten_cls_scores, padding], dim=-1)
+
+        flatten_bboxes = batch_tensor_to_list(flatten_bboxes, num_imgs)
+        flatten_cls_scores = batch_tensor_to_list(flatten_cls_scores, num_imgs)
+        flatten_objectness = batch_tensor_to_list(flatten_objectness, num_imgs)
 
         det_results: List[Tuple[Tensor, Tensor]] = []
         for (bboxes, scores, objectness) in zip(flatten_bboxes,

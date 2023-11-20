@@ -91,3 +91,6 @@ torch._C._jit_set_nvfuser_enabled(False)
 # print(functs.utils.proifler_func(jit_fn, (a, mean, scale), "normalize jit", run_duration=2.0).key_metrics)
 # print(functs.utils.proifler_func(functs_fn, (a, mean, scale), "normalize functs", run_duration=2.0).key_metrics)
 
+torch.onnx.export(functs_fn, (a, mean, scale), "x.onnx")
+
+

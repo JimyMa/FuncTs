@@ -19,7 +19,7 @@ torch_cmake_prefix_path = os.path.join(torch_dir,
                                        "share",
                                        "cmake",
                                        "Torch")
-
+cmake_path = "/usr/local/bin/cmake"
 
 def build_cmake(build_type="Release", generate_command=1):
     os.makedirs(build_dir, exist_ok=True)
@@ -32,7 +32,7 @@ def build_cmake(build_type="Release", generate_command=1):
     gen_args == ["-DCMAKE_EXPORT_COMPILE_COMMANDS={}".format(generate_command)]
 
     # if fait backend is used, cmake version must be >= 3.27.0!!!
-    gen_command = ["/usr/bin/cmake"] + gen_args
+    gen_command = [cmake_path] + gen_args
     check_call(gen_command, cwd=build_dir)
 
     build_args = ["--build",
@@ -46,7 +46,7 @@ def build_cmake(build_type="Release", generate_command=1):
     if max_jobs:
         build_args += ["-j", max_jobs]
 
-    build_command = ["/usr/bin/cmake"] + build_args
+    build_command = [cmake_path] + build_args
     check_call(build_command, cwd=build_dir)
 
 

@@ -832,6 +832,7 @@ GraphBuilder::prepareRunArgs(const at::ArrayRef<IValue> &inputs,
       auto functor_out_buf = FunctorOutputBufArgs[i].node();
       auto par_out_buf = StoreBufParallelFunctorMap.at(functor_out_buf)[j];
       auto output_dims_expr = par_out_buf.dims();
+      
       for (auto output_dim_expr : output_dims_expr) {
         auto dim = dim_evaluators_.at(output_dim_expr.node()).evaluate(dim_map);
         // auto dim = EvaluateOutputShape::run(output_dim_expr.node(), dim_map,

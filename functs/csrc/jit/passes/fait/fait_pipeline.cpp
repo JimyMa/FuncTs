@@ -49,6 +49,8 @@ void FaitPipeline(const std::shared_ptr<Graph> graph,
   InferShape(graph, refinedTypes);
   FuseOps(graph, refinedTypes);
   dumpGraphToFile(graph, "after_unroll.rb");
+
+  
   SplitParallelMaps(graph, refinedTypes);
   dumpGraphToFile(graph, "after_split.rb");
   ToMutableTensors(graph);

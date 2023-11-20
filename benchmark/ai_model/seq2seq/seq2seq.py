@@ -14,6 +14,13 @@ n_run = 100
 
 from functs.utils.evaluate import Timer
 
+import argparse
+parser = argparse.ArgumentParser()
+parser.add_argument('--bs', type=int, default=1)
+parser.add_argument('--maxlength', type=int, default=50)
+parser.add_argument('--tool', type=str, default="all")
+arguments = parser.parse_args()
+
 MAX_LENGTH = 50
 OUTPUT_SIZE = 500
 HIDDEN_SIZE = 256
@@ -165,18 +172,26 @@ nvfuser_model = torch.jit.freeze(torch.jit.script(model))
 
 functs_model = functs.jit.script(model)
 
+# functs.utils.evaluate_func(model, (encoder_output, mask, h, c), "eager", run_duration=2.)
+# functs.utils.evaluate_func(jit_model, (encoder_output, mask, h, c), "jit", run_duration=2.)
+# functs.utils.evaluate_func(dynamo_model, (encoder_output, mask, h, c), "dynamo", run_duration=2.)
+# functs.utils.evaluate_func(functs_model, (encoder_output, mask, h, c), "functs", run_duration=2.)
 
-functs.utils.evaluate_func(model, (encoder_output, mask, h, c), "eager", run_duration=2.)
-functs.utils.evaluate_func(jit_model, (encoder_output, mask, h, c), "jit", run_duration=2.)
-functs.utils.evaluate_func(dynamo_model, (encoder_output, mask, h, c), "dynamo", run_duration=2.)
-functs.utils.evaluate_func(functs_model, (encoder_output, mask, h, c), "functs", run_duration=2.)
+# torch._C._jit_set_nvfuser_enabled(True)
+# functs.utils.evaluate_func(nvfuser_model, (encoder_output, mask, h, c), "lstm nvfuser", run_duration=2.)
+# torch._C._jit_set_nvfuser_enabled(False)
 
+if arguments.tool in ["all", "eager"]:
+    print(functs.utils.proifler_func(model, (encoder_output, mask, h, c), "eager", run_duration=1.0, export_json="eager").key_metrics)
 
+if arguments.tool in ["all", "jit"]:    
+    print(functs.utils.proifler_func(jit_model, (encoder_output, mask, h, c), "jit", run_duration=1.0, export_json="jit").key_metrics)
+if arguments.tool in ["all", "dynamo"]:
+    print(functs.utils.proifler_func(dynamo_model, (encoder_output, mask, h, c), "dynamo", run_duration=1.0, export_json="dynamo").key_metrics)
+if arguments.tool in ["all", "functs"]:
+    print(functs.utils.proifler_func(functs_model, (encoder_output, mask, h, c), "functs", run_duration=1.0, export_json="functs").key_metrics)
 
-torch._C._jit_set_nvfuser_enabled(True)
-functs.utils.evaluate_func(nvfuser_model, (encoder_output, mask, h, c), "lstm nvfuser", run_duration=2.)
-torch._C._jit_set_nvfuser_enabled(False)
-
-# print(functs.utils.proifler_func(model, (encoder_output, mask, h, c), "eager", run_duration=2.).key_metrics)
-# print(functs.utils.proifler_func(jit_model, (encoder_output, mask, h, c), "jit", run_duration=2.).key_metrics)
-# print(functs.utils.proifler_func(functs_model, (encoder_output, mask, h, c), "functs", run_duration=2.).key_metrics)
+if arguments.tool in ["all", "nvfuser"]:
+    torch._C._jit_set_nvfuser_enabled(True)
+    print(functs.utils.evaluate.proifler_func(nvfuser_model, (encoder_output, mask, h, c), "nvfuser", run_duration=1.0, export_json="nvfuser").key_metrics)
+    torch._C._jit_set_nvfuser_enabled(False)

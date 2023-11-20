@@ -264,8 +264,7 @@ class SSDBBox(torch.nn.Module):
         for cls_score, bbox_pred, priors in zip(cls_score_list, bbox_pred_list, mlvl_priors):
             # assert cls_score.size()[-2:] == bbox_pred.size()[-2:]
             bbox_pred = bbox_pred.permute(1, 2, 0).reshape(-1, 4)
-            cls_score = cls_score.permute(
-                1, 2, 0).reshape(-1, self.cls_out_channels)
+            cls_score = cls_score.permute(1, 2, 0).reshape(-1, self.cls_out_channels)
             scores = cls_score.softmax(-1)[:, :-1]
             scores, labels, keep_idxs = filter_scores_and_topk(
                 scores, score_thr, nms_pre)

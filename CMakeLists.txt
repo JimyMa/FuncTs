@@ -81,9 +81,17 @@ set(FUNCTS_LINK_LIBS
 add_library(functs_python SHARED ${SOURCES})
 target_link_libraries(functs_python ${FUNCTS_LINK_LIBS})
 
-
-
-
 install(TARGETS functs_python
   DESTINATION lib
 )
+
+install(TARGETS cupti_ext
+  DESTINATION lib
+)
+
+install(TARGETS ltprof
+  DESTINATION lib
+)
+
+
+

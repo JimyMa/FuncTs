@@ -17,6 +17,8 @@ parser.add_argument('--platform', type=str)
 parser.add_argument('--overhead_test', action='store_true')
 parser.add_argument('--unroll', dest='unroll', action='store_true')
 parser.add_argument('--fix', dest='unroll', action='store_false')
+parser.add_argument('--maxlength', type=int, default=50)
+parser.add_argument('--tool', type=str, default="all")
 parser.set_defaults(unroll=False)
 arguments = parser.parse_args()
 platform = arguments.platform
@@ -45,17 +47,17 @@ def load_tensor_bin(path, dtype=np.float32, device='cuda'):
 class LSTMCell(nn.Module):
     def __init__(self, hidden_size, input_size):
         super().__init__()
-        self.weight_ih_l0 = nn.Parameter(torch.randn(4 * hidden_size, input_size, dtype=torch.float32))
-        self.weight_hh_l0 = nn.Parameter(torch.randn(4 * hidden_size, input_size, dtype=torch.float32))
-        self.bias_ih_l0 = nn.Parameter(torch.randn(4 * hidden_size, dtype=torch.float32))
-        self.bias_hh_l0 = nn.Parameter(torch.randn(4 * hidden_size, dtype=torch.float32))
-        self.weight_ih_l0_t = nn.Parameter(torch.empty(4, input_size, hidden_size, dtype=torch.float32))
-        self.weight_hh_l0_t = nn.Parameter(torch.empty(4, input_size, hidden_size, dtype=torch.float32))
-        self.bias_ih_l0_t = nn.Parameter(torch.empty(4, 1, hidden_size, dtype=torch.float32))
-        self.bias_hh_l0_t = nn.Parameter(torch.empty(4, 1, hidden_size, dtype=torch.float32))
+        self.weight_ih_l0 = torch.randn(4 * hidden_size, input_size, dtype=torch.float32).cuda()
+        self.weight_hh_l0 = torch.randn(4 * hidden_size, input_size, dtype=torch.float32).cuda()
+        self.bias_ih_l0 = torch.randn(4 * hidden_size, dtype=torch.float32).cuda()
+        self.bias_hh_l0 = torch.randn(4 * hidden_size, dtype=torch.float32).cuda()
+        self.weight_ih_l0_t = torch.empty(4, input_size, hidden_size, dtype=torch.float32).cuda()
+        self.weight_hh_l0_t = torch.empty(4, input_size, hidden_size, dtype=torch.float32).cuda()
+        self.bias_ih_l0_t = torch.empty(4, 1, hidden_size, dtype=torch.float32).cuda()
+        self.bias_hh_l0_t = torch.empty(4, 1, hidden_size, dtype=torch.float32).cuda()
         self.hidden_size = hidden_size
         self.input_size = input_size
-    
+
     def update_param(self):
         self.state_dict()[f"weight_ih_l0_t"][:] = torch.transpose(self.weight_ih_l0.view(4, self.hidden_size, self.input_size), 1, 2)
         self.state_dict()[f"bias_ih_l0_t"][:] = self.bias_ih_l0.reshape((4, 1, self.hidden_size))
@@ -83,7 +85,7 @@ class LSTMCell(nn.Module):
         state_c = (forgetgate * c) + (ingate * cellgate)
         state_h = outgate * torch.tanh(state_c)
 
-        return state_h.clone(), state_h.clone(), state_c.clone()
+        return state_h, state_h, state_c
 
 
 class LSTM(nn.Module):
@@ -99,9 +101,9 @@ class LSTM(nn.Module):
     def forward(self, inputs):  # seq_len, batch, input_size
         batch_size = inputs.shape[1]
         # state_c = [torch.zeros(batch_size, self.hidden_size, device='cuda') for _ in range(10)] # hardcode for ts compile
-        state_c = torch.zeros(10,1,  batch_size, self.hidden_size, device='cuda')
+        state_c = torch.zeros(10, 1, batch_size, self.hidden_size, dtype=torch.float32, device='cuda')
         # state_h = [torch.zeros(batch_size, self.hidden_size, device='cuda') for _ in range(10)]
-        state_h = torch.zeros(10, 1, batch_size, self.hidden_size, device='cuda')
+        state_h = torch.zeros(10, 1, batch_size, self.hidden_size, dtype=torch.float32, device='cuda')
         for i in range(inputs.size()[0]):
             cur_input = inputs[i]
             for j, layer in enumerate(self.layers):
@@ -124,7 +126,7 @@ class LSTMWrapper(torch.nn.Module):
         self.hidden_size = hidden_size
         self.num_layers = num_layers
         self.cuda_device = cuda_device
-        self.load_weight()
+        # self.load_weight()
     
     def load_weight(self):
         for i in range(self.num_layers):
@@ -243,7 +245,7 @@ if __name__ == '__main__':
     input_size = 256
     hidden_size = 256
     num_layers = 10
-    seq_len = 64
+    seq_len = 50
 
     model = LSTM(input_size, hidden_size, num_layers).cuda().eval()
     jit_model = torch.jit.script(model)
@@ -255,20 +257,39 @@ if __name__ == '__main__':
 
     torch._dynamo.config.suppress_errors = True
     with torch.no_grad():
-        print("profiler latency")
-        evaluate_func(model, [inp], "lstm eager", run_duration=2.)
-        evaluate_func(jit_model, [inp], "lstm jit", run_duration=2.)
-        evaluate_func(functs_model, [inp], "lstm functs", run_duration=2.)
+        # print("profiler latency")
+        if arguments.tool in ["all", "eager"]:
+            evaluate_func(model, [inp], "lstm eager", run_duration=5.)
+        if arguments.tool in ["all", "jit"]:
+            evaluate_func(jit_model, [inp], "lstm jit", run_duration=5.)
+        if arguments.tool in ["all", "functs"]:
+            evaluate_func(functs_model, [inp], "lstm functs", run_duration=5.)
 
-        import torch._dynamo
-        torch._dynamo.config.suppress_errors = True
-        torch._dynamo.reset()
-        evaluate_func(dynamo_model, [inp], "lstm dynamo", run_duration=2.)
+        if arguments.tool in ["all", "dynamo"]:
+            import torch._dynamo
+            torch._dynamo.config.suppress_errors = True
+            torch._dynamo.reset()
+            evaluate_func(dynamo_model, [inp], "lstm dynamo", run_duration=5.)
 
+        if arguments.tool in ["all", "nvfuser"]:
+            torch._C._jit_set_nvfuser_enabled(True)
+            evaluate_func(nvfuser_model, [inp], "lstm nvfuser", run_duration=5.)
+            torch._C._jit_set_nvfuser_enabled(False)
 
-        torch._C._jit_set_nvfuser_enabled(True)
-        evaluate_func(nvfuser_model, [inp], "lstm nvfuser", run_duration=2.)
-        torch._C._jit_set_nvfuser_enabled(False)
+        # if arguments.tool in ["all", "eager"]:
+        #     print(functs.utils.proifler_func(model, [inp], "nasrnn eager", run_duration=1.0, export_json="eager").key_metrics)
+    
+        # if arguments.tool in ["all", "jit"]:    
+        #     print(functs.utils.proifler_func(jit_model, [inp], "nasrnn jit", run_duration=1.0, export_json="jit").key_metrics)
+        # if arguments.tool in ["all", "dynamo"]:
+        #     print(functs.utils.proifler_func(dynamo_model, [inp], "nasrnn dynamo", run_duration=1.0, export_json="dynamo").key_metrics)
+        # if arguments.tool in ["all", "functs"]:
+        #     print(functs.utils.proifler_func(functs_model, [inp], "nasrnn functs", run_duration=1.0, export_json="functs").key_metrics)
+
+        # if arguments.tool in ["all", "nvfuser"]:
+        #     torch._C._jit_set_nvfuser_enabled(True)
+        #     print(functs.utils.evaluate.proifler_func(nvfuser_model, [inp], "nasrnn nvfuser", run_duration=1.0, export_json="nvfuser").key_metrics)
+        #     torch._C._jit_set_nvfuser_enabled(False)
         
         # print("profiler latency cuda graph")
         # for i in range(2, 5 + 2):
@@ -284,12 +305,6 @@ if __name__ == '__main__':
         #     torch._C._jit_set_nvfuser_enabled(True)
         #     evaluate_func(nvfuser_model, [inp], "lstm nvfuser", run_duration=2., enable_cudagraph=True, iter_per_capture=i)
         #     torch._C._jit_set_nvfuser_enabled(False)
-        
-        # evaluate_func(functs_model, [inp], "lstm functs", run_duration=2., enable_cudagraph=True, iter_per_capture=i)
-        # print("profiler key metrics")
-        # print(proifler_func(model, [inp], "lstm eager", run_duration=3.).key_metrics)
-        # print(proifler_func(jit_model, [inp], "lstm jit", run_duration=3.).key_metrics)
-        # print(proifler_func(functs_model, [inp], "lstm functs", run_duration=3.).key_metrics)
 
 
         # test_model("jit", 1, 'loop', input_size, hidden_size, num_layers, seq_len)

@@ -5,15 +5,21 @@ import functs._C
 
 
 # substitute your own function here~
-def func(a: torch.Tensor, b: torch.Tensor, n: int):
-  a = a.clone()
-  b = b.clone()
-  b_list = []
-  for i in range(n):
-    b[i] = b[i] + 1
-    b[i].copy_(b[i] + 1)
-    b_list.append(b[i])
-  return b_list
+# def func(a: torch.Tensor, b: torch.Tensor, n: int):
+#   a = a.clone()
+#   b = b.clone()
+#   for i in range(n):
+#     b[i] = b[i] + 1
+#   return b
+
+def func(a: torch.Tensor, b: torch.Tensor, idx: int):
+  if idx >= 0:
+    a += 1
+    b[0] = a[0]
+  else:
+    b -= 1
+    b[0] = a[0]
+  return a + b
 
 def func_data_control_flow_dependency(a: torch.Tensor, 
                                       b: torch.Tensor, 
@@ -30,7 +36,7 @@ def func_data_control_flow_dependency(a: torch.Tensor,
     b[-idx].copy_(a[-idx])
   return a + b
 
-func = func_data_control_flow_dependency
+# func = func_data_control_flow_dependency
 
 
 jit_func = torch.jit.script(func)
@@ -52,7 +58,9 @@ a: torch.Tensor = torch.randn([1024, 1024])
 b: torch.Tensor = torch.randn([1024, 1024])
 n = 3
 
-print(torch.allclose(jit_func(a, b, 3), func(a, b, 3)))
+# print(torch.allclose(jit_func(a, b, 3), func(a, b, 3)))
+
+
 
 
 

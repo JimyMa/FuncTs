@@ -20,7 +20,6 @@ class DecodeBBoxes(torch.nn.Module):
         return decoded_bboxes.clone()
 
 
-
 class YOLOAnchorGenerator(torch.nn.Module):
     def __init__(self, stride, base_size: List[Tuple[int, int]]):
         super().__init__()
