@@ -508,9 +508,6 @@ void ConvertToTensorSSA(std::shared_ptr<Graph> graph) {
 
   // Step 4. block propogation
   // add alias block arguments
-  /////////////////////////////////
-  //  IMPLEMENTED BY ZIHAN WANG  //
-  /////////////////////////////////
   TensorSSAPropagation(graph, mutateInfo);
 
   // Step 5. rename stack
