@@ -8,6 +8,6 @@ TORCH_API extern PyTypeObject THPDtypeType;
 
 namespace torch {
 namespace jit {
-void initJITFuncTsBindings(PyObject *module);
+void initJITFuncTsModuleBindings(PyObject *module);
 }
 } // namespace torch

@@ -1,7 +1,7 @@
-#include <Python.h>
 #include <vector>
 
 #include <functs/csrc/jit/python/init.h>
+#include <functs/csrc/jit/python/script_init.h>
 #include <functs/csrc/jit/tensorexpr/lowerings.h>
 
 extern "C" PyObject *initModule();
@@ -16,7 +16,8 @@ PyObject *initModule() {
   module = PyModule_Create(&functsmodule);
 
   torch::jit::tensorexpr::init_nnc_ext();
-  torch::jit::initJITFuncBindings(module);
+  torch::jit::initJITFuncTsBindings(module);
+  torch::jit::initJITFuncTsModuleBindings(module);
 
   return module;
 }
