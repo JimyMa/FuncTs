@@ -57,7 +57,11 @@ void dumpRefinedTypes(const ValueTypeMap &refinedTypes);
 /// Lookup tables for tensor type refinement functions
 
 extern OperatorMap<c10::SymbolicShape (*)(Node *, ValueTypeMap &)> shapeFuncs;
+extern std::map<std::string, c10::SymbolicShape (*)(Node *, ValueTypeMap &)> shapeFuncSymbolString;
+
 extern OperatorMap<c10::ScalarType (*)(Node *, ValueTypeMap &)> dtypeFuncs;
+extern std::map<std::string, c10::ScalarType (*)(Node *, ValueTypeMap &)> dtypeFuncSymbolString;
+
 extern OperatorMap<c10::Device (*)(Node *, ValueTypeMap &)> deviceFuncs;
 
 extern OperatorMap<void (*)(Node *, ValueTypeMap &)> specialShapeHandlers;

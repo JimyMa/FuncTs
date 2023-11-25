@@ -25,7 +25,8 @@ set(CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS} ${TORCH_CXX_FLAGS})
 include_directories(${PROJECT_SOURCE_DIR})
 
 find_package(Torch REQUIRED)
-find_package(TorchVision REQUIRED)
+
+# find_package(TorchVision REQUIRED)
 find_package(CUDAToolkit REQUIRED)
 
 if(ENABLE_TORCH_TRT)
@@ -80,7 +81,7 @@ set(FUNCTS_LINK_LIBS
   ${FUNCTS_LINK_LIBS}
   ${TORCH_PYTHON_LIBRARY}
 
-  TorchVision::TorchVision
+  # TorchVision::TorchVision
   nlohmann_json::nlohmann_json
   cupti_ext
 )

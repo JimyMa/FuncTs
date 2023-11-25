@@ -1,7 +1,7 @@
 #include <torch/csrc/jit/serialization/import.h>
 #include <torch/serialize.h>
 #include <torch_tensorrt/torch_tensorrt.h>
-#include <torchvision/vision.h>
+// #include <torchvision/vision.h>
 
 #include "run_utils.h"
 

@@ -2,7 +2,7 @@
 #include <ATen/ops/allclose.h>
 #include <torch/csrc/jit/serialization/import.h>
 #include <torch/serialize.h>
-#include <torchvision/vision.h>
+// #include <torchvision/vision.h>
 
 #include "passes/canonicalize.h"
 #include "passes/common_passes.h"
@@ -123,7 +123,7 @@ int main(int argc, const char *argv[]) {
     return 1;
   }
   // at::cuda::cudart
-  vision::cuda_version();
+  // vision::cuda_version();
   at::globalContext().lazyInitCUDA();
   Module mod;
   try {

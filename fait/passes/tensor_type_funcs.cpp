@@ -910,8 +910,12 @@ static OperatorSet rankOneOps{
     "aten::arange.start_step(Scalar start, Scalar end, Scalar step=1, *, "
     "ScalarType? dtype=None, Layout? layout=None, Device? device=None, bool? "
     "pin_memory=None) -> Tensor",
-    "torchvision::nms(Tensor dets, Tensor scores, float iou_threshold) -> "
-    "Tensor",
+    // "torchvision::nms(Tensor dets, Tensor scores, float iou_threshold) -> "
+    // "Tensor",
+};
+
+static std::set<std::string> rankOneSymbolString {
+  "torchvision::nms"
 };
 
 static OperatorSet boolOps{
@@ -931,8 +935,12 @@ static OperatorSet boolOps{
 
 static OperatorSet longOps{
     "aten::nonzero(Tensor self) -> Tensor",
-    "torchvision::nms(Tensor dets, Tensor scores, float iou_threshold) -> "
-    "Tensor",
+    // "torchvision::nms(Tensor dets, Tensor scores, float iou_threshold) -> "
+    // "Tensor",
+};
+
+static std::set<std::string> longOpsSymbolString {
+  "torchvision::nms"
 };
 
 static OperatorSet minMaxOps{
@@ -1057,6 +1065,12 @@ static std::initializer_list<
     };
 
 static std::initializer_list<
+    std::pair<std::set<std::string>, c10::SymbolicShape (*)(INFER_PARAMS)>>
+    shapeFuncInitSymbolString{
+        {rankOneSymbolString, [](INFER_PARAMS) { return getRankedShape(1); }},
+    };
+
+static std::initializer_list<
     std::pair<OperatorSet, c10::ScalarType (*)(INFER_PARAMS)>>
     dtypeFuncInit{
         {convertOrFillOps, inferDtypeConvertOrFillOps},
@@ -1064,6 +1078,12 @@ static std::initializer_list<
         {combineOps, inferDtypeCombineOps},
         {boolOps, [](INFER_PARAMS) { return c10::kBool; }},
         {longOps, [](INFER_PARAMS) { return c10::kLong; }},
+    };
+
+static std::initializer_list<
+    std::pair<std::set<std::string>, c10::ScalarType (*)(INFER_PARAMS)>>
+    dtypeFuncInitSymbolString{
+        {longOpsSymbolString, [](INFER_PARAMS) { return c10::kLong; }},
     };
 
 static std::initializer_list<
@@ -1088,7 +1108,11 @@ static std::initializer_list<std::pair<OperatorSet, void (*)(INFER_PARAMS)>>
 
 static bool initialized = false;
 OperatorMap<c10::SymbolicShape (*)(INFER_PARAMS)> shapeFuncs;
+std::map<std::string, c10::SymbolicShape (*)(INFER_PARAMS)> shapeFuncSymbolString;
+
 OperatorMap<c10::ScalarType (*)(INFER_PARAMS)> dtypeFuncs;
+std::map<std::string, c10::ScalarType (*)(INFER_PARAMS)> dtypeFuncSymbolString;
+
 OperatorMap<c10::Device (*)(INFER_PARAMS)> deviceFuncs;
 OperatorMap<void (*)(Node *, ValueTypeMap &)> specialShapeHandlers;
 OperatorMap<void (*)(Node *, ValueTypeMap &)> specialDtypeHandlers;
@@ -1096,12 +1120,27 @@ OperatorMap<void (*)(Node *, ValueTypeMap &)> specialDtypeHandlers;
 void initTensorTypeFuncs() {
   if (initialized)
     return;
+
   for (auto &pair : shapeFuncInit)
     shapeFuncs.insert(pair.first, pair.second);
+  for (auto &pair : shapeFuncInitSymbolString) {
+    for (auto &op_string : pair.first) {
+      shapeFuncSymbolString.insert({op_string, pair.second});
+    }
+  }
+
   for (auto &pair : dtypeFuncInit)
     dtypeFuncs.insert(pair.first, pair.second);
+
+  for (auto &pair : dtypeFuncInitSymbolString) {
+    for (auto &op_string : pair.first) {
+      dtypeFuncSymbolString.insert({op_string, pair.second});
+    }
+  }
+
   for (auto &pair : deviceFuncInit)
     deviceFuncs.insert(pair.first, pair.second);
+
   for (auto &pair : specialShapeHandlerInit)
     specialShapeHandlers.insert(pair.first, pair.second);
   for (auto &pair : specialDtypeHandlerInit)

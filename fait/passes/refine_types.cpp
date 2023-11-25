@@ -410,6 +410,8 @@ static void inferDtypeIn(Block *block, ValueTypeMap &refinedTypes) {
         if (op && specialDtypeHandlers.contains(*op)) {
           (*specialDtypeHandlers.find(*op))(node, refinedTypes);
           continue;
+        } else if (op && dtypeFuncSymbolString.count(kind.toQualString())) {
+          dtype = (*dtypeFuncSymbolString.find(kind.toDisplayString())->second)(node, refinedTypes);
         } else if (op && dtypeFuncs.contains(*op)) {
           dtype = (*dtypeFuncs.find(*op))(node, refinedTypes);
         } else {
@@ -580,19 +582,23 @@ static void inferShapeIn(Block *block, ValueTypeMap &refinedTypes) {
         }
 
         // Use per-operator shape function to infer shape
-        
-        if (!shapeFuncs.contains(*op)) {
+        c10::SymbolicShape shape;
+        if (shapeFuncSymbolString.count(kind.toQualString())) {
+          shape = (*shapeFuncSymbolString.find(kind.toQualString())->second)(node, refinedTypes);
+        } else if (!shapeFuncs.contains(*op)) {
           if (!node->isMemberOf(unsupported)) unsupported.insert({toString((node->schema())).c_str()});
           continue;
+        } else {
+          shape = (*shapeFuncs.find(*op))(node, refinedTypes);
         }
 
-        auto shape = (*shapeFuncs.find(*op))(node, refinedTypes);
         for (auto output : outputs) {
           if (!isTensor(output)) continue;
           if (!shape.rank().has_value()) continue;
           output->setType(
               output->type()->cast<TensorType>()->withSymbolicShapes(shape));
         }
+
       } break;
     }
   }

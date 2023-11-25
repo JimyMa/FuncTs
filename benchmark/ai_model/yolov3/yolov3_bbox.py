@@ -3,7 +3,7 @@ from typing import List, Tuple
 from torch import Tensor
 
 import torch
-# import torchvision
+import torchvision
 
 test_cfg = {'nms_pre': 1000, 'min_bbox_size': 0, 'score_thr': 0.05, 'conf_thr': 0.005,
             'nms': {'type': 'nms', 'iou_threshold': 0.45}, 'max_per_img': 100}
@@ -174,7 +174,7 @@ def nms_wrapper(boxes: Tensor,
                 iou_threshold: float):
     # assert boxes.size(1) == 4
     # assert boxes.size(0) == scores.size(0)
-    inds = torch.ops.torchvision.nms(boxes, scores, iou_threshold)
+    inds = torchvision.ops.nms(boxes, scores, iou_threshold)
     dets = torch.cat((boxes[inds], scores[inds].reshape(-1, 1)), dim=1)
     return dets, inds
 

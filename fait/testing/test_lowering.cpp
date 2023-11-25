@@ -6,7 +6,7 @@
 #include <torch/csrc/jit/ir/ir.h>
 #include <torch/csrc/jit/passes/constant_propagation.h>
 #include <torch/csrc/jit/passes/lower_tuples.h>
-#include <torchvision/vision.h>
+// #include <torchvision/vision.h>
 
 #include <fstream>
 #include <iostream>
