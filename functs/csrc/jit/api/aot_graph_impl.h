@@ -2,8 +2,9 @@
 
 #include <ATen/core/function.h>
 #include <torch/csrc/jit/ir/ir.h>
-#include <torch/csrc/jit/runtime/graph_executor.h>
 #include <torch/csrc/utils/memory.h>
+
+#include <functs/csrc/jit/runtime/aot_graph_executor.h>
 
 // AOT GRAPH FUNCTION IMPL
 
@@ -85,7 +86,7 @@ struct TORCH_API AotGraphFunction : public Function {
                 "Use None/Tuple for 0 or 2+ outputs");
   }
 
-  GraphExecutor &get_executor() {
+  AotGraphExecutor &get_executor() {
     ensure_defined();
     std::lock_guard<std::recursive_mutex> lock(compile_mutex);
     auto &executor = executors_[currentSpecialization()];
@@ -95,7 +96,8 @@ struct TORCH_API AotGraphFunction : public Function {
     check_single_output();
     const std::string &name = name_.name();
     std::shared_ptr<Graph> opt_graph = optimized_graph();
-    executor = GraphExecutor(opt_graph, name);
+    executor = AotGraphExecutor(opt_graph, name);
+    // opt_graph->dump();
     return *executor;
   }
 
@@ -150,7 +152,7 @@ private:
   // executor_[1] - autocast cpu on
   // executor_[2] - autocast gpu on
   // executor_[3] - autocast cpu & gpu on
-  std::array<c10::optional<GraphExecutor>, SpecializationKey::TotalCount>
+  std::array<c10::optional<AotGraphExecutor>, SpecializationKey::TotalCount>
       executors_;
 
   // an optional function that actually creates the method when

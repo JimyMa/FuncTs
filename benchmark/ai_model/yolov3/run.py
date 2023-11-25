@@ -31,15 +31,6 @@ def process_feat_batch(feats):
 
 model = yolov3_bbox.YOLOV3BBox().cuda().eval()
 
-
-# # torchscript
-# jit_model = torch.jit.freeze(torch.jit.script(model))
-# # nvfuser
-# nvfuser_model = torch.jit.freeze(torch.jit.script(model))
-# # torch dynamo + inductor
-# torch._dynamo.reset()
-# tracing_model = torch.compile(model)
-
 # fait
 cls_scores: [torch.Size([1, 486, 20, 20]), torch.Size([1, 486, 10, 10]), torch.Size([1, 486, 5, 5]), torch.Size([1, 486, 3, 3]), torch.Size([1, 486, 2, 2]), torch.Size([1, 486, 1, 1])]
 bbox_preds: [torch.Size([1, 24, 20, 20]), torch.Size([1, 24, 10, 10]), torch.Size([1, 24, 5, 5]), torch.Size([1, 24, 3, 3]), torch.Size([1, 24, 2, 2]), torch.Size([1, 24, 1, 1])]
@@ -51,66 +42,59 @@ feats = torch.load("yolov3_feat.pt")
 feats = process_feat_batch(feats)
 num_samples = len(feats)
 
-num_samples = len(feats)
-
 # functs_model = functs.jit.script(torch.jit.freeze(torch.jit.script(model)))
-fait_model = functs.jit.script(model, backend="fait")
-functs._C._jit_pass_fait_pipeline(fait_model.graph, type_hint)
 
-code = functs._C._jit_get_code(fait_model.graph)
+with torch.no_grad():
+    # torchscript
+    jit_model = torch.jit.freeze(torch.jit.script(model))
+    
+    # nvfuser
+    nvfuser_model = torch.jit.freeze(torch.jit.script(model))
+    
+    # torch dynamo + inductor
+    torch._dynamo.reset()
+    tracing_model = torch.compile(model)
 
-# def eager_task(idx: int):
-#     model(*feats[idx % num_samples])
+    # functs
+    functs_model = functs.jit.script(model)
 
-# def jit_task(idx: int):
-#     jit_model(*feats[idx % num_samples])
+    # aot backend
+    fait_model = functs.jit.script(model, backend="fait")
+    functs._C._jit_pass_fait_pipeline(fait_model.graph, type_hint)
+    fait_model = functs._C._create_function_from_graph("forward", fait_model.graph)
 
-# def functs_task(idx: int):
-#     functs_model(*feats[idx % num_samples])
+    def eager_task(idx: int):
+        model(*feats[idx % num_samples])
 
-# def tracing_task(idx: int):
-#     tracing_model(*feats[idx % num_samples])
+    def jit_task(idx: int):
+        jit_model(*feats[idx % num_samples])
 
-# def nvfuser_task(idx: int):
-#     nvfuser_model(*feats[idx % num_samples])
+    def functs_task(idx: int):
+        functs_model(*feats[idx % num_samples])
 
-functs._C._jit_run_code(code, ("", ) + feats[0 % num_samples])
+    def tracing_task(idx: int):
+        tracing_model(*feats[idx % num_samples])
 
-# def fait_task(idx: int):
-#     functs._C._jit_run_code(code, ("", ) + feats[idx % num_samples])
+    def nvfuser_task(idx: int):
+        nvfuser_model(*feats[idx % num_samples])
 
-# for i in range(num_samples):
-#     # eager_task(i)
-#     # jit_task(i)
-#     # functs_task(i)
-#     # tracing_task(i)
-#     fait_task(i)
+    def fait_task(idx: int):
+        fait_model("",  *feats[idx % num_samples])
 
-# def dump_proflier(task, name):
-#     functs.utils.evaluate_task(task, name=name)
+    functs.utils.evaluate_task(eager_task, "eager", run_duration=2.)
+    functs.utils.evaluate_task(jit_task, "jit", run_duration=2.)
+    functs.utils.evaluate_task(functs_task, "functs", run_duration=2.)
+    functs.utils.evaluate_task(tracing_task, "dynamo+inductor", run_duration=2.)
+    functs.utils.evaluate_task(fait_task, "fait", run_duration=2.)
 
-# # torch.cuda.profiler.start()
-# # dump_proflier(eager_task, "eager")
-# # dump_proflier(jit_task, "jit")
-# # dump_proflier(functs_task, "functs")
-# # dump_proflier(tracing_task, "tracing jit")
-# # dump_proflier(fait_task, "fait")
-# # torch.cuda.profiler.stop()
+    # nvfuser
+    torch._C._jit_set_nvfuser_enabled(True)
+    functs.utils.evaluate_task(nvfuser_task, "nvfuser", run_duration=2.)
+    torch._C._jit_set_nvfuser_enabled(False)
 
-# # functs.utils.evaluate_task(eager_task, "eager", run_duration=2.)
-# # functs.utils.evaluate_task(jit_task, "jit", run_duration=2.)
-# # functs.utils.evaluate_task(functs_task, "functs", run_duration=2.)
-# # functs.utils.evaluate_task(tracing_task, "dynamo+inductor", run_duration=2.)
-# functs.utils.evaluate_task(fait_task, "fait", run_duration=2.)
-
-# # # nvfuser
-# # torch._C._jit_set_nvfuser_enabled(True)
-# # functs.utils.evaluate_task(nvfuser_task, "nvfuser", run_duration=2.)
-# # torch._C._jit_set_nvfuser_enabled(False)
-
-# # print(functs.utils.profiler_task(eager_task, "eager", run_duration=2.).key_metrics)
-# # print(functs.utils.profiler_task(jit_task, "jit", run_duration=2.).key_metrics)
-# # print(functs.utils.profiler_task(fait_task, "fait", run_duration=2.).key_metrics)
+    # print(functs.utils.profiler_task(eager_task, "eager", run_duration=2.).key_metrics)
+    # print(functs.utils.profiler_task(jit_task, "jit", run_duration=2.).key_metrics)
+    # print(functs.utils.profiler_task(fait_task, "fait", run_duration=2.).key_metrics)
 
 
 
