@@ -1,6 +1,7 @@
 #include "evaluate_dim.h"
 
 #include <iomanip>
+#include <iostream>
 
 #include "ir_utils.h"
 
@@ -14,13 +15,14 @@ using ExprRegMap = std::unordered_map<ExprPtr, RegId, ExprHasher, ExprEq>;
 
 class ConstCollector : public IRVisitor {
  public:
-  ConstCollector(std::vector<int64_t> &pool, ExprRegMap &exprToReg)
+  ConstCollector(std::vector<int64_t>& pool, ExprRegMap& exprToReg)
       : pool(pool), exprToReg(exprToReg) {}
 
 #define COLLECT_IMM(type)                 \
   void visit(type##ImmPtr imm) override { \
     auto expr = static_to<Expr>(imm);     \
-    if (exprToReg.count(expr)) return;    \
+    if (exprToReg.count(expr))            \
+      return;                             \
     auto val = int64_t(imm->value());     \
     auto idx = pool.size();               \
     pool.push_back(val);                  \
@@ -33,30 +35,31 @@ class ConstCollector : public IRVisitor {
 #undef COLLECT_IMM
 
  private:
-  std::vector<int64_t> &pool;
-  ExprRegMap &exprToReg;
+  std::vector<int64_t>& pool;
+  ExprRegMap& exprToReg;
 };
 
 class VarCollector : public IRVisitor {
  public:
-  VarCollector(VarRegMap &varToReg, ExprRegMap &exprToReg)
+  VarCollector(VarRegMap& varToReg, ExprRegMap& exprToReg)
       : varToReg(varToReg), exprToReg(exprToReg) {}
 
   void visit(VarPtr var) override {
-    if (varToReg.count(var)) return;
+    if (varToReg.count(var))
+      return;
     auto idx = exprToReg.size();
     varToReg.insert({var, idx});
     exprToReg.insert({static_to<Expr>(var), idx});
   }
 
  private:
-  VarRegMap &varToReg;
-  ExprRegMap &exprToReg;
+  VarRegMap& varToReg;
+  ExprRegMap& exprToReg;
 };
 
 class DimExprCompiler : public IRVisitor {
  public:
-  DimExprCompiler(ExprRegMap &exprToReg, std::vector<DimInst> &insts)
+  DimExprCompiler(ExprRegMap& exprToReg, std::vector<DimInst>& insts)
       : exprToReg(exprToReg), insts(insts) {}
 
   void visit(LongImmPtr imm) override {}
@@ -85,9 +88,10 @@ class DimExprCompiler : public IRVisitor {
          retVal1 = getRegFor(cmpSel->ret_val1()),
          retVal2 = getRegFor(cmpSel->ret_val2());
     nextReg(cmpSel);
-    insts.push_back({kCompareSelect,
-                     {lhs, rhs, retVal1, retVal2},
-                     cmpSel->compare_select_op()});
+    insts.push_back(
+        {kCompareSelect,
+         {lhs, rhs, retVal1, retVal2},
+         cmpSel->compare_select_op()});
   }
 
   void visit(IfThenElsePtr ite) override {
@@ -100,29 +104,32 @@ class DimExprCompiler : public IRVisitor {
 
   RegId getRegFor(ExprPtr expr) {
     auto it = exprToReg.find(expr);
-    if (it != exprToReg.end()) return it->second;
+    if (it != exprToReg.end())
+      return it->second;
     expr->accept(this);
     it = exprToReg.find(expr);
-    TORCH_CHECK(it != exprToReg.end(),
-                "Cannot compile expression: ", std::to_string(expr));
+    TORCH_CHECK(
+        it != exprToReg.end(),
+        "Cannot compile expression: ",
+        std::to_string(expr));
     return it->second;
   }
 
  private:
   template <class NodePtr>
-  RegId nextReg(const NodePtr &node) const {
+  RegId nextReg(const NodePtr& node) const {
     auto reg = exprToReg.size();
     exprToReg.insert({static_to<Expr>(node), reg});
     return reg;
   }
 
-  ExprRegMap &exprToReg;
-  std::vector<DimInst> &insts;
+  ExprRegMap& exprToReg;
+  std::vector<DimInst>& insts;
 };
 
-}  // namespace
+} // namespace
 
-DimExprEvaluator::DimExprEvaluator(const ExprPtr &expr) {
+DimExprEvaluator::DimExprEvaluator(const ExprPtr& expr) {
   // Collect all constants and variables
   ExprRegMap exprToReg;
   ConstCollector constCol(constPool, exprToReg);
@@ -137,22 +144,25 @@ DimExprEvaluator::DimExprEvaluator(const ExprPtr &expr) {
 }
 
 int64_t DimExprEvaluator::evaluate(
-    const std::unordered_map<VarPtr, int64_t> &args) const {
+    const std::unordered_map<VarPtr, int64_t>& args) const {
   // Create virtual registers
   std::vector<int64_t> regs(numRegs, 0);
   std::copy(constPool.begin(), constPool.end(), regs.begin());
 
   // Pass arguments
-  for (auto &pair : varToReg) {
+  for (auto& pair : varToReg) {
     auto it = args.find(pair.first);
-    TORCH_CHECK(it != args.end(), "Argument ", pair.first->name_hint(),
-                " is not provided");
+    TORCH_CHECK(
+        it != args.end(),
+        "Argument ",
+        pair.first->name_hint(),
+        " is not provided");
     regs[pair.second] = it->second;
   }
 
   // Execute instructions
   auto idx = constPool.size() + varToReg.size();
-  for (auto &inst : insts) {
+  for (auto& inst : insts) {
     int64_t result = 0;
     switch (inst.op) {
 #define EXEC_BINARY_OP(type, op)                     \
@@ -221,16 +231,20 @@ static constexpr auto kRegWidth = 4;
 
 static std::string cmpStrs[] = {"=", ">", ">=", "<", "<=", "!="};
 static std::unordered_map<IRNodeType, std::string> nodeTypeStrs{
-    {kAdd, "Add"},          {kSub, "Sub"},
-    {kMul, "Mul"},          {kDiv, "Div"},
-    {kMod, "Mod"},          {kMin, "Min"},
-    {kMax, "Max"},          {kCompareSelect, "CompareSelect"},
+    {kAdd, "Add"},
+    {kSub, "Sub"},
+    {kMul, "Mul"},
+    {kDiv, "Div"},
+    {kMod, "Mod"},
+    {kMin, "Min"},
+    {kMax, "Max"},
+    {kCompareSelect, "CompareSelect"},
     {kOther, "IfThenElse"},
 };
 
-std::ostream &operator<<(std::ostream &os, const DimInst &inst) {
-  TORCH_CHECK(nodeTypeStrs.count(inst.op), "Cannot print instruction of op ",
-              inst.op);
+std::ostream& operator<<(std::ostream& os, const DimInst& inst) {
+  TORCH_CHECK(
+      nodeTypeStrs.count(inst.op), "Cannot print instruction of op ", inst.op);
   os << std::setw(kOpWidth) << std::setiosflags(std::ios::left)
      << nodeTypeStrs[inst.op] << std::resetiosflags(std::ios::left);
   switch (inst.op) {
@@ -270,16 +284,17 @@ void DimExprEvaluator::dump() const {
     std::cout << std::setw(kRegWidth) << i << '\t' << constPool[i] << '\n';
   // Variables
   std::vector<VarPtr> vars(varToReg.size());
-  for (auto &pair : varToReg) vars[pair.second - constPool.size()] = pair.first;
+  for (auto& pair : varToReg)
+    vars[pair.second - constPool.size()] = pair.first;
   uint32_t idx = constPool.size();
-  for (auto &var : vars)
+  for (auto& var : vars)
     std::cout << std::setw(kRegWidth) << idx++ << '\t' << var->name_hint()
               << '\n';
   // Instructions
-  for (auto &inst : insts)
+  for (auto& inst : insts)
     std::cout << std::setw(kRegWidth) << idx++ << '\t' << inst;
 }
 
-}  // namespace tensorexpr
-}  // namespace jit
-}  // namespace torch
+} // namespace tensorexpr
+} // namespace jit
+} // namespace torch

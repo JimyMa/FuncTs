@@ -1,5 +1,6 @@
 #include "refine_types.h"
 
+#include <fstream>
 #include <iostream>
 
 #include <torch/csrc/jit/ir/ir_views.h>
@@ -23,9 +24,9 @@ static TypePtr convertToMatch(TypePtr src, TypePtr tgt) {
   auto srcKind = src->kind(), tgtKind = tgt->kind();
   if (srcKind == TypeKind::ListType && tgtKind == TypeKind::ListType) {
     // Convert element types
-    return ListType::create(
-        convertToMatch(src->cast<ListType>()->getElementType(),
-                       tgt->cast<ListType>()->getElementType()));
+    return ListType::create(convertToMatch(
+        src->cast<ListType>()->getElementType(),
+        tgt->cast<ListType>()->getElementType()));
   } else if (srcKind == TypeKind::TupleType && tgtKind == TypeKind::ListType) {
     // Unify types in the tuple
     auto elemTypes = src->cast<TupleType>()->elements();
@@ -37,9 +38,9 @@ static TypePtr convertToMatch(TypePtr src, TypePtr tgt) {
     return ListType::create(matched);
   } else if (tgtKind == TypeKind::OptionalType) {
     if (srcKind == TypeKind::OptionalType) {
-      return OptionalType::create(
-          convertToMatch(src->cast<OptionalType>()->getElementType(),
-                         tgt->cast<OptionalType>()->getElementType()));
+      return OptionalType::create(convertToMatch(
+          src->cast<OptionalType>()->getElementType(),
+          tgt->cast<OptionalType>()->getElementType()));
     } else {
       return OptionalType::create(
           convertToMatch(src, tgt->cast<OptionalType>()->getElementType()));
@@ -50,8 +51,10 @@ static TypePtr convertToMatch(TypePtr src, TypePtr tgt) {
     throw typeError("Cannot convert ", *src, " to match ", *tgt);
 }
 
-void setRefinedType(Value *value, const TypePtr &newType,
-                    ValueTypeMap &refinedTypes) {
+void setRefinedType(
+    Value* value,
+    const TypePtr& newType,
+    ValueTypeMap& refinedTypes) {
   // No need to refine non-list types
   if (value->type()->kind() != TypeKind::ListType) {
     value->setType(newType);
@@ -60,29 +63,37 @@ void setRefinedType(Value *value, const TypePtr &newType,
 
   // Refine list type while avoiding invalidating schema
   TypePtr matched = nullptr;
-  auto &uses = value->uses();
-  if (std::any_of(uses.begin(), uses.end(),
-                  [](const Use &use) { return use.user->maybeSchema(); })) {
+  auto& uses = value->uses();
+  if (std::any_of(uses.begin(), uses.end(), [](const Use& use) {
+        return use.user->maybeSchema();
+      })) {
     // cannot update value type if it is used by a node with schema
     matched = value->type();
   } else {
     matched = convertToMatch(newType, value->type());
     value->setType(matched);
   }
-  if (*matched != *newType) refinedTypes[value] = newType;
+  if (*matched != *newType)
+    refinedTypes[value] = newType;
 }
 
-static void markLiveValues(Block *block,
-                           std::unordered_set<Value *> &deadValues) {
-  for (auto param : block->inputs()) deadValues.erase(param);
+static void markLiveValues(
+    Block* block,
+    std::unordered_set<Value*>& deadValues) {
+  for (auto param : block->inputs())
+    deadValues.erase(param);
   for (auto node : block->nodes()) {
-    for (auto subBlock : node->blocks()) markLiveValues(subBlock, deadValues);
-    for (auto output : node->outputs()) deadValues.erase(output);
+    for (auto subBlock : node->blocks())
+      markLiveValues(subBlock, deadValues);
+    for (auto output : node->outputs())
+      deadValues.erase(output);
   }
 }
 
-static void transferRefinedTypesIn(Block *src, Block *dst,
-                                   ValueTypeMap &refinedTypes) {
+static void transferRefinedTypesIn(
+    Block* src,
+    Block* dst,
+    ValueTypeMap& refinedTypes) {
   transferRefinedTypesOf(src->param_node(), dst->param_node(), refinedTypes);
   for (auto srcNode = src->nodes().front(), dstNode = dst->nodes().front();
        srcNode != src->nodes().back() && dstNode != dst->nodes().back();
@@ -91,7 +102,7 @@ static void transferRefinedTypesIn(Block *src, Block *dst,
   }
 }
 
-void transferRefinedTypesOf(Node *src, Node *dst, ValueTypeMap &refinedTypes) {
+void transferRefinedTypesOf(Node* src, Node* dst, ValueTypeMap& refinedTypes) {
   TORCH_CHECK(src->outputs().size() == dst->outputs().size());
   TORCH_CHECK(src->blocks().size() == dst->blocks().size());
   for (auto i : c10::irange(src->outputs().size()))
@@ -100,11 +111,13 @@ void transferRefinedTypesOf(Node *src, Node *dst, ValueTypeMap &refinedTypes) {
     transferRefinedTypesIn(src->blocks()[i], dst->blocks()[i], refinedTypes);
 }
 
-void removeDeadRefinedTypes(ValueTypeMap &refinedTypes, Graph *graph) {
-  std::unordered_set<Value *> deadValues;
-  for (auto &pair : refinedTypes) deadValues.insert(pair.first);
+void removeDeadRefinedTypes(ValueTypeMap& refinedTypes, Graph* graph) {
+  std::unordered_set<Value*> deadValues;
+  for (auto& pair : refinedTypes)
+    deadValues.insert(pair.first);
   markLiveValues(graph->block(), deadValues);
-  for (auto dead : deadValues) refinedTypes.erase(dead);
+  for (auto dead : deadValues)
+    refinedTypes.erase(dead);
 }
 
 #define STR_TO_TYPE(type) {#type, TypeKind::type},
@@ -112,7 +125,7 @@ void removeDeadRefinedTypes(ValueTypeMap &refinedTypes, Graph *graph) {
 static std::unordered_map<std::string, TypeKind> strToTypeKind{
     C10_FORALL_TYPES(STR_TO_TYPE)};
 
-static TypePtr parseType(const json &jsonType) {
+static TypePtr parseType(const json& jsonType) {
   auto kind = strToTypeKind.at(jsonType.at("kind"));
   switch (kind) {
     case TypeKind::BoolType:
@@ -133,7 +146,8 @@ static TypePtr parseType(const json &jsonType) {
     case TypeKind::TupleType: {
       auto elements = jsonType.at("elements").get<std::vector<json>>();
       std::vector<TypePtr> elemTypes;
-      for (auto &elem : elements) elemTypes.push_back(parseType(elem));
+      for (auto& elem : elements)
+        elemTypes.push_back(parseType(elem));
       return TupleType::create(elemTypes);
     }
 
@@ -149,22 +163,27 @@ static TypePtr parseType(const json &jsonType) {
   }
 }
 
-std::vector<TypePtr> parseInputTypes(const std::string &path) {
+std::vector<TypePtr> parseInputTypes(const std::string& path) {
   std::ifstream ifs(path);
   TORCH_CHECK(ifs, "Cannot open file ", path);
   auto jsonTypes = json::parse(ifs).get<std::vector<json>>();
   std::vector<TypePtr> inputTypes;
-  for (auto &json : jsonTypes) inputTypes.push_back(parseType(json));
+  for (auto& json : jsonTypes)
+    inputTypes.push_back(parseType(json));
   return inputTypes;
 }
 
-void RefineInputTypes(const std::shared_ptr<Graph> &graph,
-                      const std::vector<TypePtr> &inputTypes,
-                      ValueTypeMap &refinedTypes) {
+void RefineInputTypes(
+    const std::shared_ptr<Graph>& graph,
+    const std::vector<TypePtr>& inputTypes,
+    ValueTypeMap& refinedTypes) {
   // Check if the number of type list matches the graph
   if (graph->inputs().size() != inputTypes.size() + 1) {
-    throw typeError("Expect ", graph->inputs().size() - 1, " types, got ",
-                    inputTypes.size());
+    throw typeError(
+        "Expect ",
+        graph->inputs().size() - 1,
+        " types, got ",
+        inputTypes.size());
   }
 
   // Refine input types
@@ -172,18 +191,25 @@ void RefineInputTypes(const std::shared_ptr<Graph> &graph,
     setRefinedType(graph->inputs()[i + 1], inputTypes[i], refinedTypes);
 }
 
-void dumpRefinedTypes(const ValueTypeMap &refinedTypes) {
-  std::vector<std::pair<Value *, TypePtr>> pairs(refinedTypes.begin(),
-                                                 refinedTypes.end());
-  std::sort(pairs.begin(), pairs.end(), [](auto &p1, auto &p2) {
+void dumpRefinedTypes(const ValueTypeMap& refinedTypes) {
+  std::vector<std::pair<Value*, TypePtr>> pairs(
+      refinedTypes.begin(), refinedTypes.end());
+  std::sort(pairs.begin(), pairs.end(), [](auto& p1, auto& p2) {
     return p1.first->unique() < p2.first->unique();
   });
-  for (auto &pair : pairs)
-    print(std::cout, "%", pair.first->debugName(), ": ", *pair.first->type(),
-          ' ', *pair.second, '\n');
+  for (auto& pair : pairs)
+    print(
+        std::cout,
+        "%",
+        pair.first->debugName(),
+        ": ",
+        *pair.first->type(),
+        ' ',
+        *pair.second,
+        '\n');
 }
 
-using BlockPropagator = std::function<void(Block *, ValueTypeMap &)>;
+using BlockPropagator = std::function<void(Block*, ValueTypeMap&)>;
 
 #define TYPE_PROP_PARAMS \
   Node *node, ValueTypeMap &refinedTypes, const BlockPropagator &propFunc
@@ -193,7 +219,8 @@ static void propagateConstant(TYPE_PROP_PARAMS) {
   if (ty->kind() == TypeKind::ListType) {
     auto listVal = node->ival(attr::value).toListRef();
     std::vector<TypePtr> elemTypes;
-    for (auto elem : listVal) elemTypes.push_back(elem.type());
+    for (auto elem : listVal)
+      elemTypes.push_back(elem.type());
     ty = TupleType::create(elemTypes);
   }
   setRefinedType(node->output(0), ty, refinedTypes);
@@ -212,7 +239,8 @@ static void propagateConstant(TYPE_PROP_PARAMS) {
 
 static void propagateTupleConstruct(TYPE_PROP_PARAMS) {
   std::vector<TypePtr> elemTypes;
-  for (auto input : node->inputs()) elemTypes.push_back(input->type());
+  for (auto input : node->inputs())
+    elemTypes.push_back(input->type());
   node->output(0)->setType(TupleType::create(elemTypes));
 }
 
@@ -231,13 +259,15 @@ static void propagateListUnpack(TYPE_PROP_PARAMS) {
       node->output(i)->setType(elemTypes[i]);
   } else {
     auto elemTy = list->type()->cast<ListType>()->getElementType();
-    for (auto output : node->outputs()) output->setType(elemTy);
+    for (auto output : node->outputs())
+      output->setType(elemTy);
   }
 }
 
 static void propagateListConstruct(TYPE_PROP_PARAMS) {
   std::vector<TypePtr> elemTypes;
-  for (auto input : node->inputs()) elemTypes.push_back(input->type());
+  for (auto input : node->inputs())
+    elemTypes.push_back(input->type());
   setRefinedType(node->output(0), TupleType::create(elemTypes), refinedTypes);
 }
 
@@ -267,8 +297,14 @@ static void propagateIf(TYPE_PROP_PARAMS) {
          elseTy = view.elseOutputs()[i]->type();
     auto outType = c10::unifyTypes(thenTy, elseTy);
     if (!outType) {
-      throw typeError("Cannot unify types ", *thenTy, " and ", *elseTy,
-                      " of the ", i, "-th `If` output");
+      throw typeError(
+          "Cannot unify types ",
+          *thenTy,
+          " and ",
+          *elseTy,
+          " of the ",
+          i,
+          "-th `If` output");
     }
     view.outputs()[i]->setType(*outType);
   }
@@ -294,7 +330,8 @@ static void propagateLoop(TYPE_PROP_PARAMS) {
         changed = true;
       }
     }
-    if (!changed) break;
+    if (!changed)
+      break;
   }
 
   // Propagate returns to outputs
@@ -309,20 +346,21 @@ static void propagateParallelMap(TYPE_PROP_PARAMS) {
   auto block = node->blocks().front();
   for (auto i = 1u; i < node->inputs().size(); i++) {
     auto inListTy = getRefinedType(node->input(i), refinedTypes);
-    setRefinedType(block->inputs()[i], getUnifiedElementType(inListTy),
-                   refinedTypes);
+    setRefinedType(
+        block->inputs()[i], getUnifiedElementType(inListTy), refinedTypes);
   }
 
   // Propagate types inside the block
   propFunc(block, refinedTypes);
 
   // Propagate return types to output lists
-  auto len = mapOpt<size_t>(constant_as<int64_t>(node->input(0)),
-                            [](int64_t val) { return size_t(val); });
+  auto len = mapOpt<size_t>(
+      constant_as<int64_t>(node->input(0)),
+      [](int64_t val) { return size_t(val); });
   for (auto i = 0u; i < node->outputs().size(); i++) {
     auto ret = block->outputs()[i], outList = node->output(i);
-    setRefinedType(outList, createRefinedListType(ret->type(), len),
-                   refinedTypes);
+    setRefinedType(
+        outList, createRefinedListType(ret->type(), len), refinedTypes);
   }
 }
 
@@ -342,10 +380,11 @@ static void propagateFusionGroup(TYPE_PROP_PARAMS) {
 
   // Move constants outside of body
   auto graph = node->owningGraph();
-  rewrite(block, [&](Node *cnstNode) -> Node * {
-    if (cnstNode->kind() != prim::Constant) return nullptr;
+  rewrite(block, [&](Node* cnstNode) -> Node* {
+    if (cnstNode->kind() != prim::Constant)
+      return nullptr;
     auto cnst = cnstNode->output(0);
-    auto newCnstNode = graph->createClone(cnstNode, [](Value *v) { return v; })
+    auto newCnstNode = graph->createClone(cnstNode, [](Value* v) { return v; })
                            ->insertBefore(node);
     auto newCnst = newCnstNode->output(0);
     if (cnst->type()->kind() == TypeKind::TensorType) {
@@ -377,7 +416,7 @@ std::unordered_map<Symbol, void (*)(TYPE_PROP_PARAMS)> symbolPropagators{
     {tssa::Update, propagateTssaOps},
 };
 
-static void inferDtypeIn(Block *block, ValueTypeMap &refinedTypes) {
+static void inferDtypeIn(Block* block, ValueTypeMap& refinedTypes) {
   auto graph = block->owningGraph();
   for (auto node = block->nodes().front(); node != block->nodes().back();
        node = node->next()) {
@@ -402,7 +441,8 @@ static void inferDtypeIn(Block *block, ValueTypeMap &refinedTypes) {
 
         // Skip if there is no tensor in the output
         auto outputs = node->outputs();
-        if (std::none_of(outputs.begin(), outputs.end(), isTensor)) continue;
+        if (std::none_of(outputs.begin(), outputs.end(), isTensor))
+          continue;
 
         // Use per-operator dtype function to infer dtype
         auto dtype = c10::kFloat;
@@ -411,12 +451,14 @@ static void inferDtypeIn(Block *block, ValueTypeMap &refinedTypes) {
           (*specialDtypeHandlers.find(*op))(node, refinedTypes);
           continue;
         } else if (op && dtypeFuncSymbolString.count(kind.toQualString())) {
-          dtype = (*dtypeFuncSymbolString.find(kind.toDisplayString())->second)(node, refinedTypes);
+          dtype = (*dtypeFuncSymbolString.find(kind.toDisplayString())->second)(
+              node, refinedTypes);
         } else if (op && dtypeFuncs.contains(*op)) {
           dtype = (*dtypeFuncs.find(*op))(node, refinedTypes);
         } else {
           for (auto input : node->inputs()) {
-            if (!isTensor(input)) continue;
+            if (!isTensor(input))
+              continue;
             auto inDtype = input->type()->cast<TensorType>()->scalarType();
             if (inDtype) {
               dtype = *inDtype;
@@ -427,7 +469,8 @@ static void inferDtypeIn(Block *block, ValueTypeMap &refinedTypes) {
 
         // Propagate device to outputs
         for (auto output : outputs) {
-          if (!isTensor(output)) continue;
+          if (!isTensor(output))
+            continue;
           output->setType(
               output->type()->cast<TensorType>()->withScalarType(dtype));
         }
@@ -436,7 +479,7 @@ static void inferDtypeIn(Block *block, ValueTypeMap &refinedTypes) {
   }
 }
 
-static void inferDeviceIn(Block *block, ValueTypeMap &refinedTypes) {
+static void inferDeviceIn(Block* block, ValueTypeMap& refinedTypes) {
   auto graph = block->owningGraph();
   for (auto node = block->nodes().front(); node != block->nodes().back();
        node = node->next()) {
@@ -461,7 +504,8 @@ static void inferDeviceIn(Block *block, ValueTypeMap &refinedTypes) {
 
         // Skip if there is no tensor in the output
         auto outputs = node->outputs();
-        if (std::none_of(outputs.begin(), outputs.end(), isTensor)) continue;
+        if (std::none_of(outputs.begin(), outputs.end(), isTensor))
+          continue;
 
         // Use per-operator device function to infer device
         c10::Device device(c10::kCUDA);
@@ -470,7 +514,8 @@ static void inferDeviceIn(Block *block, ValueTypeMap &refinedTypes) {
           device = (*deviceFuncs.find(*op))(node, refinedTypes);
         else {
           for (auto input : node->inputs()) {
-            if (!isTensor(input)) continue;
+            if (!isTensor(input))
+              continue;
             auto inputDev = input->type()->cast<TensorType>()->device();
             if (inputDev) {
               device = *inputDev;
@@ -481,7 +526,8 @@ static void inferDeviceIn(Block *block, ValueTypeMap &refinedTypes) {
 
         // Propagate device to outputs
         for (auto output : outputs) {
-          if (!isTensor(output)) continue;
+          if (!isTensor(output))
+            continue;
           output->setType(
               output->type()->cast<TensorType>()->withDevice(device));
         }
@@ -490,8 +536,9 @@ static void inferDeviceIn(Block *block, ValueTypeMap &refinedTypes) {
   }
 }
 
-void InferDtypeAndDevice(const std::shared_ptr<Graph> &graph,
-                         ValueTypeMap &refinedTypes) {
+void InferDtypeAndDevice(
+    const std::shared_ptr<Graph>& graph,
+    ValueTypeMap& refinedTypes) {
   initTensorTypeFuncs();
   inferDeviceIn(graph->block(), refinedTypes);
   inferDtypeIn(graph->block(), refinedTypes);
@@ -500,12 +547,12 @@ void InferDtypeAndDevice(const std::shared_ptr<Graph> &graph,
 static OperatorSet unsupported{};
 
 void collectUnsupported() {
-  for (auto &op : unsupported.getOps()) {
+  for (auto& op : unsupported.getOps()) {
     std::cout << op->schema() << std::endl;
   }
 }
 
-static void inferShapeIn(Block *block, ValueTypeMap &refinedTypes) {
+static void inferShapeIn(Block* block, ValueTypeMap& refinedTypes) {
   auto graph = block->owningGraph();
   for (auto node = block->nodes().front(); node != block->nodes().back();
        node = node->next()) {
@@ -526,14 +573,17 @@ static void inferShapeIn(Block *block, ValueTypeMap &refinedTypes) {
         auto tensorTy = node->input(0)->type()->cast<TensorType>();
         auto shape = tensorTy->sizes();
         graph->setInsertPoint(node->next());
-        Value *cnstVal = nullptr;
+        Value* cnstVal = nullptr;
         if (node->inputs().size() == 1 && shape.isComplete()) {
           cnstVal = graph->insertConstant(*shape.concrete_sizes());
         } else if (node->inputs().size() == 2 && shape.size()) {
           auto index = constant_as<int64_t>(node->input(1));
-          if (!index) continue;
-          if (*index < 0) *index += *shape.size();
-          if (!shape[*index]) continue;
+          if (!index)
+            continue;
+          if (*index < 0)
+            *index += *shape.size();
+          if (!shape[*index])
+            continue;
           cnstVal = graph->insertConstant(shape[*index].value());
         }
         if (cnstVal) {
@@ -548,10 +598,11 @@ static void inferShapeIn(Block *block, ValueTypeMap &refinedTypes) {
         c10::optional<int64_t> len;
         if (inTy->kind() == TypeKind::TensorType) {
           auto sizes = inTy->cast<TensorType>()->sizes();
-          if (sizes.size()) len = sizes[0];
-        } else if (inTy->kind() == TypeKind::ListType &&
-                   refinedTypes.count(input) &&
-                   refinedTypes[input]->kind() == TypeKind::TupleType) {
+          if (sizes.size())
+            len = sizes[0];
+        } else if (
+            inTy->kind() == TypeKind::ListType && refinedTypes.count(input) &&
+            refinedTypes[input]->kind() == TypeKind::TupleType) {
           len = refinedTypes[input]->cast<TupleType>()->elements().size();
         }
         if (len) {
@@ -571,11 +622,13 @@ static void inferShapeIn(Block *block, ValueTypeMap &refinedTypes) {
 
         // Skip if there is no tensor in the output
         auto outputs = node->outputs();
-        if (std::none_of(outputs.begin(), outputs.end(), isTensor)) continue;
+        if (std::none_of(outputs.begin(), outputs.end(), isTensor))
+          continue;
 
         // Use special shape handlers
         auto op = node->maybeOperator();
-        if (!op) continue;
+        if (!op)
+          continue;
         if (specialShapeHandlers.contains(*op)) {
           (*specialShapeHandlers.find(*op))(node, refinedTypes);
           continue;
@@ -584,17 +637,21 @@ static void inferShapeIn(Block *block, ValueTypeMap &refinedTypes) {
         // Use per-operator shape function to infer shape
         c10::SymbolicShape shape;
         if (shapeFuncSymbolString.count(kind.toQualString())) {
-          shape = (*shapeFuncSymbolString.find(kind.toQualString())->second)(node, refinedTypes);
+          shape = (*shapeFuncSymbolString.find(kind.toQualString())->second)(
+              node, refinedTypes);
         } else if (!shapeFuncs.contains(*op)) {
-          if (!node->isMemberOf(unsupported)) unsupported.insert({toString((node->schema())).c_str()});
+          if (!node->isMemberOf(unsupported))
+            unsupported.insert({toString((node->schema())).c_str()});
           continue;
         } else {
           shape = (*shapeFuncs.find(*op))(node, refinedTypes);
         }
 
         for (auto output : outputs) {
-          if (!isTensor(output)) continue;
-          if (!shape.rank().has_value()) continue;
+          if (!isTensor(output))
+            continue;
+          if (!shape.rank().has_value())
+            continue;
           output->setType(
               output->type()->cast<TensorType>()->withSymbolicShapes(shape));
         }
@@ -604,12 +661,14 @@ static void inferShapeIn(Block *block, ValueTypeMap &refinedTypes) {
   }
 }
 
-void InferShape(const std::shared_ptr<Graph> &graph,
-                ValueTypeMap &refinedTypes) {
+void InferShape(
+    const std::shared_ptr<Graph>& graph,
+    ValueTypeMap& refinedTypes) {
   initTensorTypeFuncs();
   while (true) {
     inferShapeIn(graph->block(), refinedTypes);
-    if (!FoldConstantsTSSA(graph)) break;
+    if (!FoldConstantsTSSA(graph))
+      break;
     EliminateDeadCodeTSSA(graph);
     removeDeadRefinedTypes(refinedTypes, graph.get());
   }
@@ -618,5 +677,5 @@ void InferShape(const std::shared_ptr<Graph> &graph,
   removeDeadRefinedTypes(refinedTypes, graph.get());
 }
 
-}  // namespace jit
-}  // namespace torch
+} // namespace jit
+} // namespace torch

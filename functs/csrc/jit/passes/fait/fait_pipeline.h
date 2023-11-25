@@ -3,11 +3,10 @@
 #include <ATen/Context.h>
 #include <ATen/core/jit_type_base.h>
 #include <ATen/ops/allclose.h>
-#include <memory>
 #include <torch/csrc/jit/ir/ir.h>
 #include <torch/csrc/jit/serialization/import.h>
 #include <torch/serialize.h>
-#include <torchvision/vision.h>
+#include <memory>
 
 #include "passes/canonicalize.h"
 #include "passes/common_passes.h"

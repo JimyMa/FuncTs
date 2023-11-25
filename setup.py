@@ -24,6 +24,7 @@ cmake_python_library = "{}/{}".format(
     sysconfig.get_config_var("LIBDIR"), sysconfig.get_config_var("INSTSONAME")
 )
 
+
 def build_cmake(build_type="Release", generate_command=1):
     os.makedirs(build_dir, exist_ok=True)
     os.makedirs(install_dir, exist_ok=True)
@@ -74,7 +75,8 @@ def main():
                 language="c",
                 extra_link_args=['-Wl,-rpath,$ORIGIN/lib']
             )
-        ]
+        ],
+        install_requires=["numpy<=1.23.5"]
     )
 
 
