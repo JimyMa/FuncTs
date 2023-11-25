@@ -15,16 +15,14 @@ build_dir = os.path.join(base_dir, "build")
 install_dir = os.path.join(base_dir, "functs")
 torch_dir = os.path.dirname(torch.__file__)
 torch_lib = os.path.join(torch_dir, "lib")
-torch_cmake_prefix_path = os.path.join(torch_dir,
-                                       "share",
-                                       "cmake",
-                                       "Torch")
-cmake_path = "/usr/local/bin/cmake"
+cmake_torch_dir = os.path.join(torch_dir, "share", "cmake", "Torch")
+# cmake_torchvision_dir = "~/src/meta/vision_install/share/cmake/TorchVision/"
+
+cmake_path = "cmake"
 cmake_python_include_dir = sysconfig.get_path("include")
 cmake_python_library = "{}/{}".format(
     sysconfig.get_config_var("LIBDIR"), sysconfig.get_config_var("INSTSONAME")
 )
-cmake_torchvision_dir = "~/src/meta/vision_install/share/cmake/TorchVision/"
 
 def build_cmake(build_type="Release", generate_command=1):
     os.makedirs(build_dir, exist_ok=True)
@@ -37,11 +35,10 @@ def build_cmake(build_type="Release", generate_command=1):
     gen_args += [".."]
 
     gen_args += ["-DCMAKE_INSTALL_PREFIX={}".format(install_dir)]
-    gen_args += ["-DCMAKE_PREFIX_PATH={}".format(torch_cmake_prefix_path)]
     gen_args += ["-DCMAKE_EXPORT_COMPILE_COMMANDS={}".format(generate_command)]
     gen_args += ["-DPYTHON_INCLUDE_DIR={}".format(cmake_python_include_dir)]
-    gen_args += ["-DPYTHONLIBRARIES={}".format(cmake_python_library)]
-    gen_args += ["-DTorchVision_DIR={}".format(cmake_torchvision_dir)]
+    gen_args += ["-DTorch_DIR={}".format(cmake_torch_dir)]
+    gen_args += ["-DENABLE_FUNCTS_PYTHON=ON"]
 
     # if fait backend is used, cmake version must be >= 3.27.0!!!
     gen_command = [cmake_path] + gen_args

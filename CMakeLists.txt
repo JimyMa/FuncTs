@@ -7,13 +7,14 @@ project(functs)
 
 cmake_policy(SET CMP0074 NEW)
 
-option(ENABLE_FAIT "enable fait backend" OFF)
 option(ENABLE_TORCH_TRT "enable torch-trt" OFF)
+option(ENABLE_FUNCTS_PYTHON "enable functs python wrapper" OFF)
 
 # Packages
 find_package(Torch REQUIRED)
 message(${TORCH_INCLUDE_DIRS})
 include_directories(${TORCH_INCLUDE_DIRS})
+
 find_package(CUDAToolkit REQUIRED)
 
 # python
@@ -28,6 +29,9 @@ find_package(Torch REQUIRED)
 
 # find_package(TorchVision REQUIRED)
 find_package(CUDAToolkit REQUIRED)
+find_library(CUDA_NVPERF_HOST nvperf_host PATHS ${CUDAToolkit_LIBRARY_DIR} REQUIRED)
+find_library(CUDA_NVPERF_TARGET nvperf_target PATHS ${CUDAToolkit_LIBRARY_DIR} REQUIRED)
+message(${CUDA_NVPERF_TARGET})
 
 if(ENABLE_TORCH_TRT)
   find_package(torchtrt REQUIRED)
@@ -40,14 +44,8 @@ file(GLOB SOURCES
   ${PROJECT_SOURCE_DIR}/functs/csrc/jit/api/*.cpp
   ${PROJECT_SOURCE_DIR}/functs/csrc/jit/ir/*.cpp
   ${PROJECT_SOURCE_DIR}/functs/csrc/jit/passes/*.cpp
-  ${PROJECT_SOURCE_DIR}/functs/csrc/jit/python/*.cpp
   ${PROJECT_SOURCE_DIR}/functs/csrc/jit/runtime/*.cpp
-  ${PROJECT_SOURCE_DIR}/functs/csrc/jit/tensorexpr/*.cpp
-  ${PROJECT_SOURCE_DIR}/functs/csrc/*.cpp)
-
-set(FUNCTS_LINK_LIBS
-  ${TORCH_LIBRARIES}
-)
+  ${PROJECT_SOURCE_DIR}/functs/csrc/jit/tensorexpr/*.cpp)
 
 file(GLOB FAIT_SOURCES
   ${PROJECT_SOURCE_DIR}/functs/csrc/jit/passes/fait/*.cpp
@@ -68,28 +66,21 @@ file(GLOB CUPTI_EXT_SOURCES
 )
 
 add_library(cupti_ext SHARED ${CUPTI_EXT_SOURCES})
-target_link_libraries(cupti_ext CUDA::cupti CUDA::nvperf_host CUDA::nvperf_target)
+target_link_libraries(cupti_ext CUDA::cupti ${CUDA_NVPERF_HOST} ${CUDA_NVPERF_TARGET})
 
 add_library(ltprof SHARED ${PROJECT_SOURCE_DIR}/fait/util/profile.cpp ${PROJECT_SOURCE_DIR}/fait/util/metrics.cpp ${CUPTI_EXT_SOURCES})
 target_link_libraries(ltprof ${TORCH_LIBRARIES} cupti_ext)
 
-find_library(TORCH_PYTHON_LIBRARY torch_python PATHS "${TORCH_INSTALL_PREFIX}/lib")
-message(${TORCH_PYTHON_LIBRARY})
-
 set(FUNCTS_LINK_LIBS
-  ${PYTHON_LIBRARIES}
-  ${FUNCTS_LINK_LIBS}
-  ${TORCH_PYTHON_LIBRARY}
-
-  # TorchVision::TorchVision
+  ${TORCH_LIBRARIES}
   nlohmann_json::nlohmann_json
   cupti_ext
 )
 
-add_library(functs_python SHARED ${SOURCES})
-target_link_libraries(functs_python ${FUNCTS_LINK_LIBS})
+add_library(functs SHARED ${SOURCES})
+target_link_libraries(functs ${FUNCTS_LINK_LIBS})
 
-install(TARGETS functs_python
+install(TARGETS functs
   DESTINATION lib
 )
 
@@ -100,3 +91,16 @@ install(TARGETS cupti_ext
 install(TARGETS ltprof
   DESTINATION lib
 )
+
+if(ENABLE_FUNCTS_PYTHON)
+  find_library(TORCH_PYTHON_LIBRARY torch_python PATHS "${TORCH_INSTALL_PREFIX}/lib")
+  file(GLOB PY_SOURCES
+    ${PROJECT_SOURCE_DIR}/functs/csrc/jit/python/*.cpp
+    ${PROJECT_SOURCE_DIR}/functs/csrc/*.cpp
+  )
+  add_library(functs_python SHARED ${PY_SOURCES})
+  target_link_libraries(functs_python functs ${PYTHON_LIBRARIES} ${TORCH_PYTHON_LIBRARY})
+  install(TARGETS functs_python
+    DESTINATION lib
+  )
+endif(ENABLE_FUNCTS_PYTHON)
