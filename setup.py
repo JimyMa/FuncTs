@@ -40,6 +40,7 @@ def build_cmake(build_type="Release", generate_command=1):
     gen_args += ["-DPYTHON_INCLUDE_DIR={}".format(cmake_python_include_dir)]
     gen_args += ["-DTorch_DIR={}".format(cmake_torch_dir)]
     gen_args += ["-DENABLE_FUNCTS_PYTHON=ON"]
+    gen_args += ["-DCMAKE_BUILD_TYPE={}".format(build_type)]
 
     # if fait backend is used, cmake version must be >= 3.27.0!!!
     gen_command = [cmake_path] + gen_args
