@@ -6,6 +6,7 @@
 #include <nvToolsExt.h>
 
 #include <chrono>
+#include <iostream>
 
 #include "util/common.h"
 #include "util/ir.h"
@@ -15,7 +16,9 @@ namespace jit {
 
 using namespace std::chrono;
 
-static bool cuptiEnabled() { return getenv("ENABLE_CUPTI") != nullptr; }
+static bool cuptiEnabled() {
+  return getenv("ENABLE_CUPTI") != nullptr;
+}
 
 static size_t totalAllocated = 0;
 static size_t totalKernelLaunch = 0;
@@ -23,10 +26,10 @@ static size_t totalKernelLaunch = 0;
 #define BUF_SIZE (32 * 1024)
 #define ALIGN_SIZE 8
 
-static void recordMemory(CUpti_Activity *record) {
+static void recordMemory(CUpti_Activity* record) {
   switch (record->kind) {
     case CUPTI_ACTIVITY_KIND_MEMORY2: {
-      auto memory = reinterpret_cast<CUpti_ActivityMemory3 *>(record);
+      auto memory = reinterpret_cast<CUpti_ActivityMemory3*>(record);
       if (memory->memoryOperationType !=
           CUPTI_ACTIVITY_MEMORY_OPERATION_TYPE_ALLOCATION)
         return;
@@ -42,18 +45,21 @@ static void recordMemory(CUpti_Activity *record) {
   }
 }
 
-static void CUPTIAPI bufferRequested(uint8_t **buffer, size_t *size,
-                                     size_t *maxNumRecords) {
+static void CUPTIAPI
+bufferRequested(uint8_t** buffer, size_t* size, size_t* maxNumRecords) {
   *size = BUF_SIZE;
-  *buffer = reinterpret_cast<uint8_t *>(aligned_alloc(ALIGN_SIZE, BUF_SIZE));
+  *buffer = reinterpret_cast<uint8_t*>(aligned_alloc(ALIGN_SIZE, BUF_SIZE));
   *maxNumRecords = 0;
 }
 
-static void CUPTIAPI bufferCompleted(CUcontext ctx, uint32_t streamId,
-                                     uint8_t *buffer, size_t size,
-                                     size_t validSize) {
+static void CUPTIAPI bufferCompleted(
+    CUcontext ctx,
+    uint32_t streamId,
+    uint8_t* buffer,
+    size_t size,
+    size_t validSize) {
   CUptiResult status;
-  CUpti_Activity *record = NULL;
+  CUpti_Activity* record = NULL;
 
   if (validSize > 0) {
     do {
@@ -82,23 +88,25 @@ static void beginCuptiTrace() {
   cuptiActivityRegisterCallbacks(bufferRequested, bufferCompleted);
 }
 
-static void endCuptiTrace() { 
+static void endCuptiTrace() {
   cuptiActivityDisable(CUPTI_ACTIVITY_KIND_MEMORY2);
   cuptiActivityDisable(CUPTI_ACTIVITY_KIND_CONCURRENT_KERNEL);
-  cuptiActivityFlushAll(1); 
+  cuptiActivityFlushAll(1);
 }
 
 static bool enabled = false;
 
 void enableProfiling() {
   cudaProfilerStart();
-  if (cuptiEnabled()) beginCuptiTrace();
+  if (cuptiEnabled())
+    beginCuptiTrace();
   enabled = true;
 }
 
 void disableProfiling() {
   cudaProfilerStop();
-  if (cuptiEnabled()) endCuptiTrace();
+  if (cuptiEnabled())
+    endCuptiTrace();
   enabled = false;
 }
 
@@ -112,8 +120,9 @@ struct TimeRecord {
 static std::vector<std::string> labels;
 static std::unordered_map<std::string, TimeRecord> records;
 
-void profBegin(const std::string &label) {
-  if (!enabled) return;
+void profBegin(const std::string& label) {
+  if (!enabled)
+    return;
   at::cuda::device_synchronize();
   if (!records.count(label)) {
     labels.push_back(label);
@@ -123,12 +132,13 @@ void profBegin(const std::string &label) {
   records[label].range = nvtxRangeStartA(label.c_str());
 }
 
-void profEnd(const std::string &label) {
-  if (!enabled) return;
+void profEnd(const std::string& label) {
+  if (!enabled)
+    return;
   at::cuda::device_synchronize();
-  auto &record = records.at(label);
-  TORCH_CHECK(record.begin.has_value(),
-              "`beginProfile` has not been called before.");
+  auto& record = records.at(label);
+  TORCH_CHECK(
+      record.begin.has_value(), "`beginProfile` has not been called before.");
   nvtxRangeEnd(record.range);
   auto dur = system_clock::now() - *record.begin;
   record.begin = c10::nullopt;
@@ -169,13 +179,17 @@ std::string fmtBytes(size_t bytes) {
 static constexpr auto kLabelWidth = 16;
 static constexpr auto kStatWidth = 10;
 
-static void printLabel(const std::string &label) {
-  print(std::cout, std::setw(kLabelWidth), std::setiosflags(std::ios::left),
-        label, std::resetiosflags(std::ios::left));
+static void printLabel(const std::string& label) {
+  print(
+      std::cout,
+      std::setw(kLabelWidth),
+      std::setiosflags(std::ios::left),
+      label,
+      std::resetiosflags(std::ios::left));
 }
 
 template <class T>
-static void printStat(T &&stat) {
+static void printStat(T&& stat) {
   print(std::cout, std::setw(kStatWidth), stat);
 }
 
@@ -187,7 +201,8 @@ void printProfilingResults(size_t count) {
     std::cout << "Memory allocation: " << fmtBytes(totalAllocated / count)
               << '\n';
 
-  if (records.empty()) return;
+  if (records.empty())
+    return;
 
   // Print ranges
   std::cout << "\nRanges:\n";
@@ -199,21 +214,21 @@ void printProfilingResults(size_t count) {
   printStat("Max");
   std::cout << '\n';
 
-  for (auto &label : labels) {
-    auto &record = records[label];
+  for (auto& label : labels) {
+    auto& record = records[label];
     printLabel(label);
-    printStat(record.count);  // count
+    printStat(record.count); // count
     if (record.count == 0) {
       std::cout << '\n';
       continue;
     }
-    printStat(fmtDuration(record.total));                 // total
-    printStat(fmtDuration(record.total / record.count));  // mean
-    printStat(fmtDuration(record.min));                   // min
-    printStat(fmtDuration(record.max));                   // max
+    printStat(fmtDuration(record.total)); // total
+    printStat(fmtDuration(record.total / record.count)); // mean
+    printStat(fmtDuration(record.min)); // min
+    printStat(fmtDuration(record.max)); // max
     std::cout << '\n';
   }
 }
 
-}  // namespace jit
-}  // namespace torch
+} // namespace jit
+} // namespace torch

@@ -1,3 +1,5 @@
+import argparse
+from functs.utils.evaluate import Timer
 import torch
 from torch.profiler import profile, ProfilerActivity
 import functs
@@ -12,9 +14,7 @@ device = torch.device('cuda')
 n_warmup = 100
 n_run = 100
 
-from functs.utils.evaluate import Timer
 
-import argparse
 parser = argparse.ArgumentParser()
 parser.add_argument('--bs', type=int, default=1)
 parser.add_argument('--maxlength', type=int, default=50)
@@ -25,6 +25,7 @@ MAX_LENGTH = 50
 OUTPUT_SIZE = 500
 HIDDEN_SIZE = 256
 
+
 class LSTMCell(nn.Module):
     def __init__(self, hidden_size, input_size):
         super().__init__()
@@ -32,8 +33,10 @@ class LSTMCell(nn.Module):
         # self.weight_hh_l0 = nn.Parameter(torch.randn(3 * hidden_size, input_size, dtype=torch.float32))
         # self.bias_ih_l0 = nn.Parameter(torch.randn(3 * hidden_size, dtype=torch.float32))
         # self.bias_hh_l0 = nn.Parameter(torch.randn(3 * hidden_size, dtype=torch.float32))
-        self.weight_ih_l0_t = nn.Parameter(torch.randn(4, input_size, hidden_size, dtype=torch.float32))
-        self.weight_hh_l0_t = nn.Parameter(torch.randn(4, input_size, hidden_size, dtype=torch.float32))
+        self.weight_ih_l0_t = nn.Parameter(torch.randn(
+            4, input_size, hidden_size, dtype=torch.float32))
+        self.weight_hh_l0_t = nn.Parameter(torch.randn(
+            4, input_size, hidden_size, dtype=torch.float32))
         # self.bias_ih_l0_t = nn.Parameter(torch.randn(3, 1, hidden_size, dtype=torch.float32))
         # self.bias_hh_l0_t = nn.Parameter(torch.randn(3, 1, hidden_size, dtype=torch.float32))
         self.bias_ih_0 = nn.Parameter(
@@ -56,7 +59,7 @@ class LSTMCell(nn.Module):
         self.input_size = input_size
         nn.init.xavier_uniform_(self.weight_ih_l0_t)
         nn.init.xavier_uniform_(self.weight_hh_l0_t)
-    
+
     def forward(self, x, h, c):
         ih = torch.matmul(x, self.weight_ih_l0_t)
         hh = torch.matmul(h, self.weight_hh_l0_t)
@@ -78,6 +81,7 @@ class LSTMCell(nn.Module):
         h = outgate * torch.tanh(c)
         return h, c
 
+
 class AttnDecoderRNN(nn.Module):
     def __init__(self, hidden_size, output_size, dropout_p=0.1, max_length=MAX_LENGTH):
         super(AttnDecoderRNN, self).__init__()
@@ -97,8 +101,11 @@ class AttnDecoderRNN(nn.Module):
         # hidden: (1, bs, hidden_size)
         # encoder_outputs: (max_length, bs, hidden_size)
         batch_size = encoder_output.size()[1]
-        output_all = torch.zeros(self.max_length, batch_size, dtype=torch.int64, device='cuda') + 0 # Hack for bug in ScatterND on Constant
-        output = torch.full((batch_size,), self.SOS_token, dtype=torch.int64, device='cuda')
+        # Hack for bug in ScatterND on Constant
+        output_all = torch.zeros(
+            self.max_length, batch_size, dtype=torch.int64, device='cuda') + 0
+        output = torch.full((batch_size,), self.SOS_token,
+                            dtype=torch.int64, device='cuda')
         cond = True
         # when disable cf
         # id = torch.zeros((), dtype=torch.int64, device='cuda')
@@ -130,7 +137,8 @@ class AttnDecoderRNN(nn.Module):
             output = output.argmax(1)
             output_all[id] = output
             id = id + 1
-            cond = bool((torch.max(output) > self.EOS_token).item()) & (id < self.max_length) # when testing torchscript
+            cond = bool((torch.max(output) > self.EOS_token).item()) & (
+                id < self.max_length)  # when testing torchscript
             # cond = (torch.max(output) > self.EOS_token) & (id < self.max_length)
         return output_all, h
 
@@ -140,31 +148,35 @@ def gen_mask_from_sequence(std):
     padded_std = torch.zeros((bs, MAX_LENGTH), dtype=std.dtype, device=device)
     padded_std[:, :std.shape[1]] = std
     mask = torch.zeros(bs, MAX_LENGTH, OUTPUT_SIZE, device=device)
-    mask[torch.arange(bs).unsqueeze(1), torch.arange(MAX_LENGTH).unsqueeze(0), padded_std] = 1000000.0
+    mask[torch.arange(bs).unsqueeze(1), torch.arange(
+        MAX_LENGTH).unsqueeze(0), padded_std] = 1000000.0
     mask = mask.transpose(0, 1).contiguous().clone()
     return mask
 
 
 batch_size = 1
 
-model = AttnDecoderRNN(HIDDEN_SIZE, OUTPUT_SIZE, dropout_p=0.1).to(device).eval()
+model = AttnDecoderRNN(HIDDEN_SIZE, OUTPUT_SIZE,
+                       dropout_p=0.1).to(device).eval()
 
 std = []
 MAX_LENGTH = 50
 h = torch.randn(batch_size, HIDDEN_SIZE, device=device)
 c = torch.randn(batch_size, HIDDEN_SIZE, device=device)
-sos = torch.full((batch_size,), model.SOS_token, dtype=torch.int64, device='cuda')
+sos = torch.full((batch_size,), model.SOS_token,
+                 dtype=torch.int64, device='cuda')
 for i in range(batch_size):
     l = 10
     lst = list(range(1, l))
     lst.append(0)
-    assert(len(lst) <= MAX_LENGTH)
+    assert (len(lst) <= MAX_LENGTH)
     # pad to MAX_LENGTH
     lst = lst + [0] * (MAX_LENGTH - len(lst))
     std.append(lst)
 std = torch.tensor(std, device=device)
 mask = gen_mask_from_sequence(std)
-encoder_output = torch.randn(MAX_LENGTH, batch_size, HIDDEN_SIZE, device=device)
+encoder_output = torch.randn(
+    MAX_LENGTH, batch_size, HIDDEN_SIZE, device=device)
 
 jit_model = torch.jit.script(model)
 dynamo_model = torch.compile(model)
@@ -172,26 +184,31 @@ nvfuser_model = torch.jit.freeze(torch.jit.script(model))
 
 functs_model = functs.jit.script(model)
 
-# functs.utils.evaluate_func(model, (encoder_output, mask, h, c), "eager", run_duration=2.)
-# functs.utils.evaluate_func(jit_model, (encoder_output, mask, h, c), "jit", run_duration=2.)
-# functs.utils.evaluate_func(dynamo_model, (encoder_output, mask, h, c), "dynamo", run_duration=2.)
-# functs.utils.evaluate_func(functs_model, (encoder_output, mask, h, c), "functs", run_duration=2.)
+functs.utils.evaluate_func(
+    model, (encoder_output, mask, h, c), "eager", run_duration=2.)
+functs.utils.evaluate_func(
+    jit_model, (encoder_output, mask, h, c), "jit", run_duration=2.)
+functs.utils.evaluate_func(
+    dynamo_model, (encoder_output, mask, h, c), "dynamo", run_duration=2.)
+functs.utils.evaluate_func(
+    functs_model, (encoder_output, mask, h, c), "functs", run_duration=2.)
 
-# torch._C._jit_set_nvfuser_enabled(True)
-# functs.utils.evaluate_func(nvfuser_model, (encoder_output, mask, h, c), "lstm nvfuser", run_duration=2.)
-# torch._C._jit_set_nvfuser_enabled(False)
+torch._C._jit_set_nvfuser_enabled(True)
+functs.utils.evaluate_func(
+    nvfuser_model, (encoder_output, mask, h, c), "lstm nvfuser", run_duration=2.)
+torch._C._jit_set_nvfuser_enabled(False)
 
-if arguments.tool in ["all", "eager"]:
-    print(functs.utils.proifler_func(model, (encoder_output, mask, h, c), "eager", run_duration=1.0, export_json="eager").key_metrics)
+# if arguments.tool in ["all", "eager"]:
+#     print(functs.utils.proifler_func(model, (encoder_output, mask, h, c), "eager", run_duration=1.0, export_json="eager").key_metrics)
 
-if arguments.tool in ["all", "jit"]:    
-    print(functs.utils.proifler_func(jit_model, (encoder_output, mask, h, c), "jit", run_duration=1.0, export_json="jit").key_metrics)
-if arguments.tool in ["all", "dynamo"]:
-    print(functs.utils.proifler_func(dynamo_model, (encoder_output, mask, h, c), "dynamo", run_duration=1.0, export_json="dynamo").key_metrics)
-if arguments.tool in ["all", "functs"]:
-    print(functs.utils.proifler_func(functs_model, (encoder_output, mask, h, c), "functs", run_duration=1.0, export_json="functs").key_metrics)
+# if arguments.tool in ["all", "jit"]:
+#     print(functs.utils.proifler_func(jit_model, (encoder_output, mask, h, c), "jit", run_duration=1.0, export_json="jit").key_metrics)
+# if arguments.tool in ["all", "dynamo"]:
+#     print(functs.utils.proifler_func(dynamo_model, (encoder_output, mask, h, c), "dynamo", run_duration=1.0, export_json="dynamo").key_metrics)
+# if arguments.tool in ["all", "functs"]:
+#     print(functs.utils.proifler_func(functs_model, (encoder_output, mask, h, c), "functs", run_duration=1.0, export_json="functs").key_metrics)
 
-if arguments.tool in ["all", "nvfuser"]:
-    torch._C._jit_set_nvfuser_enabled(True)
-    print(functs.utils.evaluate.proifler_func(nvfuser_model, (encoder_output, mask, h, c), "nvfuser", run_duration=1.0, export_json="nvfuser").key_metrics)
-    torch._C._jit_set_nvfuser_enabled(False)
+# if arguments.tool in ["all", "nvfuser"]:
+#     torch._C._jit_set_nvfuser_enabled(True)
+#     print(functs.utils.evaluate.proifler_func(nvfuser_model, (encoder_output, mask, h, c), "nvfuser", run_duration=1.0, export_json="nvfuser").key_metrics)
+#     torch._C._jit_set_nvfuser_enabled(False)

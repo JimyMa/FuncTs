@@ -5,6 +5,7 @@
 #include <c10/util/Exception.h>
 
 #include <algorithm>
+#include <iostream>
 #include <unordered_set>
 
 #include "passes/tensor_ssa.h"
@@ -20,7 +21,8 @@ std::unordered_set<Symbol> view_symbol = {
 };
 
 std::unordered_map<Symbol, Symbol> view_reverse_map = {
-    {aten::select, tssa::SelectSet}, {aten::slice, tssa::SliceSet}};
+    {aten::select, tssa::SelectSet},
+    {aten::slice, tssa::SliceSet}};
 
 std::vector<Node*> BufferDisjointSet::get_pass_up_chain(Value* value) {
   std::vector<Node*> result;
@@ -74,7 +76,8 @@ void UpdateSolver::run() {
         }
         Symbol new_node_kind = view_reverse_map[wandering_node->kind()];
         Node* new_node = graph_->create(new_node_kind, 1);
-        for (auto input : wandering_node->inputs()) new_node->addInput(input);
+        for (auto input : wandering_node->inputs())
+          new_node->addInput(input);
         new_node->insertInput(1, clue_value);
         clue_value = new_node->output(0);
         clue_value->copyMetadata(new_node->input(0));
@@ -87,7 +90,8 @@ void UpdateSolver::run() {
         auto wandering_node = pass_down_chain[i];
         Symbol new_node_kind = wandering_node->kind();
         Node* new_node = graph_->create(new_node_kind, 1);
-        for (auto input : wandering_node->inputs()) new_node->addInput(input);
+        for (auto input : wandering_node->inputs())
+          new_node->addInput(input);
         clue_value = new_node->output(0);
         clue_value->copyMetadata(wandering_node->output(0));
         new_node->insertAfter(pre_node);
@@ -106,5 +110,5 @@ void SolveUpdate(const std::shared_ptr<Graph>& graph) {
   UpdateSolver(graph).run();
 }
 
-}  // namespace jit
-}  // namespace torch
+} // namespace jit
+} // namespace torch

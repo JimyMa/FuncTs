@@ -1,3 +1,5 @@
+import functs
+import torch._dynamo
 from _ast import AnnAssign
 import ast
 from time import time
@@ -26,8 +28,10 @@ n_run = 100
 class NasRNN(nn.Module):
     def __init__(self, batch_size, input_size, hidden_size):
         super(NasRNN, self).__init__()
-        self.weight_ih = nn.Parameter(torch.randn(8, input_size, hidden_size, dtype=torch.float32))
-        self.weight_hh = nn.Parameter(torch.randn(8, hidden_size, hidden_size, dtype=torch.float32))
+        self.weight_ih = nn.Parameter(torch.randn(
+            8, input_size, hidden_size, dtype=torch.float32))
+        self.weight_hh = nn.Parameter(torch.randn(
+            8, hidden_size, hidden_size, dtype=torch.float32))
         self.hidden_size = hidden_size
         self.batch_size = batch_size
         nn.init.xavier_uniform_(self.weight_ih)
@@ -35,12 +39,15 @@ class NasRNN(nn.Module):
 
     def forward(self, inputs):  # seq_len, batch, input_size
         state_c = torch.zeros(self.batch_size, self.hidden_size, device='cuda')
-        state_m = torch.zeros(self.batch_size, self.hidden_size, device='cuda') # TODO: batch_size from shape
+        # TODO: batch_size from shape
+        state_m = torch.zeros(self.batch_size, self.hidden_size, device='cuda')
         # inputs_bcast = inputs.unsqueeze(1)
         # ihs = torch.matmul(inputs_bcast, self.weight_ih)
-        for i in range(inputs.size()[0]): # change to 1000 for fully unrolled exp
+        # change to 1000 for fully unrolled exp
+        for i in range(inputs.size()[0]):
             inp = inputs[i]
-            state_m = torch.reshape(state_m, (self.batch_size, self.hidden_size))
+            state_m = torch.reshape(
+                state_m, (self.batch_size, self.hidden_size))
 
             # ih = ihs[i]
             ih = torch.matmul(inp, self.weight_ih)
@@ -105,44 +112,47 @@ nasrnn_jit_fn = torch.jit.script(nasrnn)
 
 nasrnn_nvfuser_fn = torch.jit.freeze(torch.jit.script(nasrnn))
 nasrnn_dynamo_fn = torch.compile(nasrnn, dynamic=True)
-import torch._dynamo
 torch._dynamo.config.suppress_errors = True
 
-import functs
 nasrnn_functs_fn = functs.jit.script(nasrnn)
 # print(nasrnn_functs_fn.graph)
 
 with torch.no_grad():
     inp = torch.rand([SEQ_LEN, BATCH_SIZE, INPUT_SIZE]).cuda().float()
 
-    # if arguments.tool in ["all", "eager"]:
-    #     functs.utils.evaluate.evaluate_func(nasrnn, [inp], "nasrnn eager", run_duration=2.0)
-    # if arguments.tool in ["all", "jit"]:    
-    #     functs.utils.evaluate.evaluate_func(nasrnn_jit_fn, [inp], "nasrnn jit", run_duration=2.0)
-    # if arguments.tool in ["all", "dynamo"]:
-    #     functs.utils.evaluate.evaluate_func(nasrnn_dynamo_fn, [inp], "nasrnn dynamo", run_duration=2.0)
-    # if arguments.tool in ["all", "functs"]:
-    #     functs.utils.evaluate.evaluate_func(nasrnn_functs_fn, [inp], "nasrnn functs", run_duration=2.0)
-
-    # if arguments.tool in ["all", "nvfuser"]:
-    #     torch._C._jit_set_nvfuser_enabled(True)
-    #     functs.utils.evaluate_func(nasrnn_nvfuser_fn, [inp], "nvfuser", run_duration=2.)
-    #     torch._C._jit_set_nvfuser_enabled(False)
-
     if arguments.tool in ["all", "eager"]:
-        print(functs.utils.proifler_func(nasrnn, [inp], "nasrnn eager", run_duration=1.0, export_json="eager").key_metrics)
-    
-    if arguments.tool in ["all", "jit"]:    
-        print(functs.utils.proifler_func(nasrnn_jit_fn, [inp], "nasrnn jit", run_duration=1.0, export_json="jit").key_metrics)
+        functs.utils.evaluate.evaluate_func(
+            nasrnn, [inp], "nasrnn eager", run_duration=2.0)
+    if arguments.tool in ["all", "jit"]:
+        functs.utils.evaluate.evaluate_func(
+            nasrnn_jit_fn, [inp], "nasrnn jit", run_duration=2.0)
     if arguments.tool in ["all", "dynamo"]:
-        print(functs.utils.proifler_func(nasrnn_dynamo_fn, [inp], "nasrnn dynamo", run_duration=1.0, export_json="dynamo").key_metrics)
+        functs.utils.evaluate.evaluate_func(
+            nasrnn_dynamo_fn, [inp], "nasrnn dynamo", run_duration=2.0)
     if arguments.tool in ["all", "functs"]:
-        print(functs.utils.proifler_func(nasrnn_functs_fn, [inp], "nasrnn functs", run_duration=1.0, export_json="functs").key_metrics)
+        functs.utils.evaluate.evaluate_func(
+            nasrnn_functs_fn, [inp], "nasrnn functs", run_duration=2.0)
 
     if arguments.tool in ["all", "nvfuser"]:
         torch._C._jit_set_nvfuser_enabled(True)
-        print(functs.utils.evaluate.proifler_func(nasrnn_nvfuser_fn, [inp], "nasrnn nvfuser", run_duration=1.0, export_json="nvfuser").key_metrics)
+        functs.utils.evaluate_func(
+            nasrnn_nvfuser_fn, [inp], "nvfuser", run_duration=2.)
         torch._C._jit_set_nvfuser_enabled(False)
+
+    # if arguments.tool in ["all", "eager"]:
+    #     print(functs.utils.proifler_func(nasrnn, [inp], "nasrnn eager", run_duration=1.0, export_json="eager").key_metrics)
+
+    # if arguments.tool in ["all", "jit"]:
+    #     print(functs.utils.proifler_func(nasrnn_jit_fn, [inp], "nasrnn jit", run_duration=1.0).key_metrics)
+    # if arguments.tool in ["all", "dynamo"]:
+    #     print(functs.utils.proifler_func(nasrnn_dynamo_fn, [inp], "nasrnn dynamo", run_duration=1.0).key_metrics)
+    # if arguments.tool in ["all", "functs"]:
+    #     print(functs.utils.proifler_func(nasrnn_functs_fn, [inp], "nasrnn functs", run_duration=1.0).key_metrics)
+
+    # if arguments.tool in ["all", "nvfuser"]:
+    #     torch._C._jit_set_nvfuser_enabled(True)
+    #     print(functs.utils.evaluate.proifler_func(nasrnn_nvfuser_fn, [inp], "nasrnn nvfuser", run_duration=1.0).key_metrics)
+    #     torch._C._jit_set_nvfuser_enabled(False)
 
     # print("profiler latency cuda graph")
     # for i in range(2, 5 + 2):

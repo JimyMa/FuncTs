@@ -64,7 +64,7 @@ def main():
     build_cmake()
     setup(
         name="functs",
-        version="0.0.4",
+        version="0.0.5",
         ext_modules=[
             Extension(
                 "functs._C",
@@ -75,8 +75,7 @@ def main():
                 language="c",
                 extra_link_args=['-Wl,-rpath,$ORIGIN/lib']
             )
-        ],
-        install_requires=["numpy<=1.23.5"]
+        ]
     )
 
 

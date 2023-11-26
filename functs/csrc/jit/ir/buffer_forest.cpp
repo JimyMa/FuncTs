@@ -1,14 +1,15 @@
-#include <algorithm>
 #include <c10/util/Exception.h>
+#include <functs/csrc/jit/ir/buffer_forest.h>
+#include <algorithm>
 #include <cstddef>
 #include <deque>
-#include <functs/csrc/jit/ir/buffer_forest.h>
+#include <iostream>
 #include <memory>
 
 namespace torch {
 namespace jit {
 
-bool BufferTree::find(Value *v) {
+bool BufferTree::find(Value* v) {
   std::function<bool(std::shared_ptr<BufferNode>)> visit;
   visit = [&](std::shared_ptr<BufferNode> node) -> bool {
     if (node->bufferNode_->var == v)
@@ -24,7 +25,7 @@ bool BufferTree::find(Value *v) {
   return visit(root);
 }
 
-std::shared_ptr<BufferNode> BufferTree::getBufferNodeOrNone(Value *v) {
+std::shared_ptr<BufferNode> BufferTree::getBufferNodeOrNone(Value* v) {
   struct TraversalNode {
     TraversalNode(std::shared_ptr<BufferNode> n) : node(n), visited(false) {}
     std::shared_ptr<BufferNode> node;
@@ -43,7 +44,7 @@ std::shared_ptr<BufferNode> BufferTree::getBufferNodeOrNone(Value *v) {
     } else {
       traversalNode->visited = true;
       stack.push_back(traversalNode);
-      for (auto &child : traversalNode->node->pointedFrom)
+      for (auto& child : traversalNode->node->pointedFrom)
         stack.push_back(std::make_shared<TraversalNode>(child));
     }
   }
@@ -56,7 +57,7 @@ std::shared_ptr<BufferNode> BufferTree::getBufferNodeOrNone(Value *v) {
   return nullptr;
 }
 
-void BufferTree::addEdgeToBufferTree(Value *from, Value *to) {
+void BufferTree::addEdgeToBufferTree(Value* from, Value* to) {
   if (from == root->bufferNode_->var) {
     auto to_node = std::make_shared<BufferNode>(to);
     to_node->pointedFrom.push_back(root);
@@ -71,7 +72,7 @@ void BufferTree::addEdgeToBufferTree(Value *from, Value *to) {
       node->pointedFrom.push_back(from_node);
       from_node->pointsTo = node;
     } else {
-      for (auto &child : node->pointedFrom)
+      for (auto& child : node->pointedFrom)
         visit(child);
     }
   };
@@ -109,19 +110,19 @@ void BufferTree::dump() const {
     } else {
       traversalNode->visited = true;
       stack.push_back(traversalNode);
-      for (auto &point_from : traversalNode->node->pointedFrom) {
+      for (auto& point_from : traversalNode->node->pointedFrom) {
         stack.push_back(std::make_shared<TraversalNode>(point_from));
       }
     }
   }
   std::cout << std::endl;
   std::cout << "=== 2. Mutated Node ===" << std::endl;
-  for (auto &node : mutations)
+  for (auto& node : mutations)
     node->dump();
 }
 
-std::shared_ptr<BufferTree> BufferForest::getBufferTreeOrNone(Value *v) {
-  for (auto &bufferTree : bufferForest_) {
+std::shared_ptr<BufferTree> BufferForest::getBufferTreeOrNone(Value* v) {
+  for (auto& bufferTree : bufferForest_) {
     if (bufferTree->find(v))
       return bufferTree;
   }
@@ -133,23 +134,25 @@ std::shared_ptr<BufferTree> BufferForest::getBufferTreeOrNone(Value *v) {
   return nullptr;
 }
 
-std::shared_ptr<BufferNode> BufferForest::getBufferNodeOrNone(Value *v) {
+std::shared_ptr<BufferNode> BufferForest::getBufferNodeOrNone(Value* v) {
   if (auto tree = getBufferTreeOrNone(v))
     return tree->getBufferNodeOrNone(v);
   return nullptr;
 }
 
-void BufferForest::mergeBufferTree(Value *from, Value *to) {
+void BufferForest::mergeBufferTree(Value* from, Value* to) {
   auto from_tree = getBufferTreeOrNone(from);
   auto from_node = from_tree->getBufferNodeOrNone(from);
   auto to_tree = getBufferTreeOrNone(to);
   auto to_node = to_tree->getBufferNodeOrNone(to);
 
-  AT_ASSERT(from_tree && to_tree,
-            "If merge two trees, from_tree and to_tree must both exist!!!");
+  AT_ASSERT(
+      from_tree && to_tree,
+      "If merge two trees, from_tree and to_tree must both exist!!!");
 
-  AT_ASSERT(from_node && to_node,
-            "If merge two trees, from_node and to_node must both exist!!!");
+  AT_ASSERT(
+      from_node && to_node,
+      "If merge two trees, from_node and to_node must both exist!!!");
 
   from_node->pointsTo = to_node;
   to_node->pointedFrom.push_back(from_node);
@@ -157,13 +160,13 @@ void BufferForest::mergeBufferTree(Value *from, Value *to) {
   bufferForest_.erase(from_tree);
 }
 
-void BufferForest::replaceValue(Value *from, Value *to) {
+void BufferForest::replaceValue(Value* from, Value* to) {
   auto from_node = getBufferTreeOrNone(from)->getBufferNodeOrNone(from);
   from_node->bufferNode_->var = to;
 }
 
-void BufferForest::replaceMutation(Node *from, Node *to) {
-  for (auto &bufferTree : bufferForest_) {
+void BufferForest::replaceMutation(Node* from, Node* to) {
+  for (auto& bufferTree : bufferForest_) {
     if (bufferTree->mutations.count(from)) {
       bufferTree->mutations.insert(to);
       bufferTree->mutations.erase(from);
@@ -177,7 +180,7 @@ void BufferForest::replaceMutation(Node *from, Node *to) {
   return;
 }
 
-void BufferForest::addEdgeToBufferForest(Value *from, Value *to) {
+void BufferForest::addEdgeToBufferForest(Value* from, Value* to) {
   auto from_tree = getBufferTreeOrNone(from);
   auto to_tree = getBufferTreeOrNone(to);
 
@@ -204,7 +207,7 @@ void BufferForest::addEdgeToBufferForest(Value *from, Value *to) {
   }
 }
 
-void BufferForest::addMutationToBufferForest(Node *node) {
+void BufferForest::addMutationToBufferForest(Node* node) {
   auto tree = getBufferTreeOrNone(node->output());
   if (!tree) {
     return;
@@ -213,10 +216,11 @@ void BufferForest::addMutationToBufferForest(Node *node) {
   bufferTree->mutations.insert(node);
 }
 
-bool BufferForest::isBufferMutation(Node *node) {
-  for (auto &bufferTree : bufferForest_) {
-    if (std::find(bufferTree->mutations.begin(), bufferTree->mutations.end(),
-                  node) != bufferTree->mutations.end())
+bool BufferForest::isBufferMutation(Node* node) {
+  for (auto& bufferTree : bufferForest_) {
+    if (std::find(
+            bufferTree->mutations.begin(), bufferTree->mutations.end(), node) !=
+        bufferTree->mutations.end())
       return true;
   }
   return false;
@@ -225,7 +229,7 @@ bool BufferForest::isBufferMutation(Node *node) {
 void BufferForest::dump() const {
   // dump buffer forest for each buffer tree
   int cnt = 0;
-  for (auto &tree : bufferForest_) {
+  for (auto& tree : bufferForest_) {
     std::cout << "*** buffer " << cnt++ << " ***" << std::endl;
     tree->dump();
     std::cout << "*** **** **** ***" << std::endl << std::endl;
