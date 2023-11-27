@@ -1,7 +1,7 @@
 from typing import List, Tuple
 
 import torch
-# import torchvision
+import torchvision
 from torch import Tensor
 
 
@@ -104,8 +104,7 @@ def batched_nms(boxes: Tensor, scores: Tensor, idxs: Tensor):
 def nms_wrapper(boxes: Tensor, scores: Tensor, iou_threshold: float):
     # assert boxes.size(1) == 4
     # assert boxes.size(0) == scores.size(0)
-    # inds = torchvision.ops.nms(boxes, scores, iou_threshold)
-    inds = torch.ops.torchvision.nms(boxes, scores, iou_threshold)
+    inds = torchvision.ops.nms(boxes, scores, iou_threshold)
     dets = torch.cat((boxes[inds], scores[inds].reshape(-1, 1)), dim=1)
     return dets, inds
 

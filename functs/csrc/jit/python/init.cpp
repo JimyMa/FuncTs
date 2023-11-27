@@ -41,19 +41,19 @@ void initJITFuncTsBindings(PyObject *module) {
   m.def("_jit_get_code", [](std::shared_ptr<Graph> g) -> Code {
     return Code(g, "<func on demand>");
   });
-  m.def("_jit_run_code", [](Code code, const py::tuple &inputs) {
-    PyGILState_STATE gstate;
-    gstate = PyGILState_Ensure();
-    Stack stack;
-    stack.reserve(inputs.size()); // captures?
-    for (auto& obj : inputs) {
-      stack.push_back(toTypeInferredIValue(obj));
-    }
-    InterpreterState(code).run(stack);
-    auto return_stack = createPyObjectForStack(std::move(stack));;
-    PyGILState_Release(gstate);
-    return return_stack;
-  });
+  // m.def("_jit_run_code", [](Code code, const py::tuple &inputs) {
+  //   PyGILState_STATE gstate;
+  //   gstate = PyGILState_Ensure();
+  //   Stack stack;
+  //   stack.reserve(inputs.size()); // captures?
+  //   for (auto& obj : inputs) {
+  //     stack.push_back(toTypeInferredIValue(obj));
+  //   }
+  //   InterpreterState(code).run(stack);
+  //   auto return_stack = createPyObjectForStack(std::move(stack));;
+  //   PyGILState_Release(gstate);
+  //   return return_stack;
+  // });
 }
 } // namespace jit
 } // namespace torch

@@ -241,11 +241,11 @@ def export_model(batch_size, input_size, hidden_size, num_layers, seq_len):
 
 
 if __name__ == '__main__':
-    batch_size = 1
+    batch_size = arguments.bs
     input_size = 256
     hidden_size = 256
     num_layers = 10
-    seq_len = 50
+    seq_len = arguments.maxlength
 
     model = LSTM(input_size, hidden_size, num_layers).cuda().eval()
     jit_model = torch.jit.script(model)

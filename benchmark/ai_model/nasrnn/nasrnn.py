@@ -117,9 +117,9 @@ torch._dynamo.config.suppress_errors = True
 nasrnn_functs_fn = functs.jit.script(nasrnn)
 # print(nasrnn_functs_fn.graph)
 
-with torch.no_grad():
-    inp = torch.rand([SEQ_LEN, BATCH_SIZE, INPUT_SIZE]).cuda().float()
+inp = torch.rand([SEQ_LEN, BATCH_SIZE, INPUT_SIZE]).cuda().float()
 
+with torch.no_grad():
     if arguments.tool in ["all", "eager"]:
         functs.utils.evaluate.evaluate_func(
             nasrnn, [inp], "nasrnn eager", run_duration=2.0)

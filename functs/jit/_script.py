@@ -5,21 +5,61 @@ import torch
 
 import functs._C
 
-def script(fn, backend="ts_jit", remove_update=True, enable_dce_cse=True):
+
+class AotScriptFunction(object):
+    """
+    Interface of *Aot Graph Runtime*
+    """
+    def __init__(self, aot_script_fn, **kwargs):
+        self._aot_script_fn = aot_script_fn
+    
+    def __call__(self, *args, **kwargs):
+        return self._aot_script_fn("forward", *args, **kwargs)
+
+
+def build(fn, example_input):
+    """
+    compile functionalized model to aot_graph
+    """
+    if not isinstance(fn, torch.jit._script.ScriptModule):
+        raise AttributeError("{} only functionalized jit ScriptModule can be built")
+    def extract_type_hint_from_tensor(input_):
+        if isinstance(input_, bool):
+            return torch.BoolType.get()
+        elif isinstance(input_, int):
+            return torch.IntType.get()
+        elif isinstance(input_, float):
+            return torch.FloatType.get()
+        elif isinstance(input_, torch.Tensor):
+            return torch.TensorType.get().with_dtype(input_.dtype).with_sizes(input_.shape).with_device(input_.device)
+        elif isinstance(input_, list) or isinstance(input_, tuple):
+            return torch.TupleType([extract_type_hint_from_tensor(elem) for elem in input_])
+        else:
+            raise TypeError("unsupported type {} when build aot graph at the type hint stage")
+
+    type_hint = [extract_type_hint_from_tensor(input_) for input_ in example_input]
+
+    g = fn.graph
+    functs._C._jit_pass_fait_pipeline(g, type_hint)
+    aot_script_fn = functs._C._create_function_from_graph("forward", g)
+    return AotScriptFunction(aot_script_fn=aot_script_fn)
+
+
+def script(fn, backend="jit", remove_update=True, enable_dce_cse=True):
     """ 
-    convert PyTorch Program to Ts Graph IR
+    convert PyTorch Program to Ts Graph IR and perform functionalization
     backend ["ts_jit", "fait"]: 
     """
-    TS_JIT = "ts_jit"
-    FAIT = "fait"
-    BACKEND_LIST = [TS_JIT, FAIT]
+    JIT = "jit"
+    AOT = "aot"
+    BACKEND_LIST = [JIT, AOT]
 
     jit_fn = torch.jit.script(fn)
     if not inspect.isfunction(fn):
         jit_fn = jit_fn.cuda().eval()
-        if backend == TS_JIT:
+        if backend == JIT:
             jit_fn = torch.jit.freeze(jit_fn)
-        elif backend == FAIT:
+        elif backend == AOT:
             functs._C._jit_pass_freeze(torch.jit.script(fn).cuda().eval()._c)
         else:
             raise AttributeError("No backend named {}".format(backend))

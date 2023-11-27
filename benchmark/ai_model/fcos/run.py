@@ -7,148 +7,61 @@ import fcos_bbox
 
 import argparse
 
+torch.cuda.init()
+
 parser = argparse.ArgumentParser()
 parser.add_argument("--bs", default=1, type=int)
 arguments = parser.parse_args()
 
-# arguments.add_argument("bs", default=1, type=int)
-
-torch.cuda.init()
-
-# type hint
-
-cls_scores: [torch.Size([1, 486, 20, 20]), torch.Size([1, 486, 10, 10]), torch.Size([1, 486, 5, 5]), torch.Size([1, 486, 3, 3]), torch.Size([1, 486, 2, 2]), torch.Size([1, 486, 1, 1])]
-bbox_preds: [torch.Size([1, 24, 20, 20]), torch.Size([1, 24, 10, 10]), torch.Size([1, 24, 5, 5]), torch.Size([1, 24, 3, 3]), torch.Size([1, 24, 2, 2]), torch.Size([1, 24, 1, 1])]
-
-[
-  {
-    "kind": "TupleType",
-    "elements": [
-      { "kind": "TensorType", "shape": [ 1, 80, 40, 40 ], "dtype": "Float" },
-      { "kind": "TensorType", "shape": [ 1, 80, 20, 20 ], "dtype": "Float" },
-      { "kind": "TensorType", "shape": [ 1, 80, 10, 10 ], "dtype": "Float" },
-      { "kind": "TensorType", "shape": [ 1, 80, 5, 5 ], "dtype": "Float" },
-      { "kind": "TensorType", "shape": [ 1, 80, 3, 3 ], "dtype": "Float" }
-    ]
-  },
-  {
-    "kind": "TupleType",
-    "elements": [
-      { "kind": "TensorType", "shape": [ 1, 4, 40, 40 ], "dtype": "Float" },
-      { "kind": "TensorType", "shape": [ 1, 4, 20, 20 ], "dtype": "Float" },
-      { "kind": "TensorType", "shape": [ 1, 4, 10, 10 ], "dtype": "Float" },
-      { "kind": "TensorType", "shape": [ 1, 4, 5, 5 ], "dtype": "Float" },
-      { "kind": "TensorType", "shape": [ 1, 4, 3, 3 ], "dtype": "Float" }
-    ]
-  },
-  {
-    "kind": "TupleType",
-    "elements": [
-      { "kind": "TensorType", "shape": [ 1, 1, 40, 40 ], "dtype": "Float" },
-      { "kind": "TensorType", "shape": [ 1, 1, 20, 20 ], "dtype": "Float" },
-      { "kind": "TensorType", "shape": [ 1, 1, 10, 10 ], "dtype": "Float" },
-      { "kind": "TensorType", "shape": [ 1, 1, 5, 5 ], "dtype": "Float" },
-      { "kind": "TensorType", "shape": [ 1, 1, 3, 3 ], "dtype": "Float" }
-    ]
-  }
-]
-
-type_hint = [torch.TupleType([torch.TensorType.get().with_dtype(torch.float32).with_sizes([arguments.bs, 80, 40, 40]).with_device(torch.device("cuda")),
-                              torch.TensorType.get().with_dtype(torch.float32).with_sizes([arguments.bs, 80, 20, 20]).with_device(torch.device("cuda")),
-                              torch.TensorType.get().with_dtype(torch.float32).with_sizes([arguments.bs, 80, 10, 10]).with_device(torch.device("cuda")),
-                              torch.TensorType.get().with_dtype(torch.float32).with_sizes([arguments.bs, 80, 5, 5]).with_device(torch.device("cuda")),
-                              torch.TensorType.get().with_dtype(torch.float32).with_sizes([arguments.bs, 80, 3, 3 ]).with_device(torch.device("cuda"))],),
-             
-             torch.TupleType([torch.TensorType.get().with_dtype(torch.float32).with_sizes([arguments.bs, 4, 40, 40 ]).with_device(torch.device("cuda")),
-                              torch.TensorType.get().with_dtype(torch.float32).with_sizes([arguments.bs, 4, 20, 20 ]).with_device(torch.device("cuda")),
-                              torch.TensorType.get().with_dtype(torch.float32).with_sizes([arguments.bs, 4, 10, 10 ]).with_device(torch.device("cuda")),
-                              torch.TensorType.get().with_dtype(torch.float32).with_sizes([arguments.bs, 4, 5, 5 ]).with_device(torch.device("cuda")),
-                              torch.TensorType.get().with_dtype(torch.float32).with_sizes([arguments.bs, 4, 3, 3 ]).with_device(torch.device("cuda"))]),
-             
-             torch.TupleType([torch.TensorType.get().with_dtype(torch.float32).with_sizes([arguments.bs, 1, 40, 40 ]).with_device(torch.device("cuda")),
-                              torch.TensorType.get().with_dtype(torch.float32).with_sizes([arguments.bs, 1, 20, 20 ]).with_device(torch.device("cuda")),
-                              torch.TensorType.get().with_dtype(torch.float32).with_sizes([arguments.bs, 1, 10, 10 ]).with_device(torch.device("cuda")),
-                              torch.TensorType.get().with_dtype(torch.float32).with_sizes([arguments.bs, 1, 5, 5 ]).with_device(torch.device("cuda")),
-                              torch.TensorType.get().with_dtype(torch.float32).with_sizes([arguments.bs, 1, 3, 3 ]).with_device(torch.device("cuda"))])]
-
-def process_feat(feat, bs):
+def process_feat(feat):
     new_feat = []
-    for data_tuple in feat:
-        new_data_tuple =[data.repeat(bs, 1, 1, 1) for data in data_tuple]
-        new_feat.append(new_data_tuple)
+    for data in feat:
+        if isinstance(data, torch.Tensor):
+            new_feat.append(data.repeat(arguments.bs, 1, 1, 1))
+        else:
+            new_data_tuple =[tensor_data.repeat(arguments.bs, 1, 1, 1) for tensor_data in data]
+            new_feat.append(new_data_tuple)
     return tuple(new_feat)
 
-def process_feat_batch(feats, bs):
+def process_feat_batch(feats):
     new_feats = []
     for feat in feats:
-        new_feats.append(process_feat(feat, bs))
+        new_feats.append(process_feat(feat))
     return new_feats
 
-# data load
-model = fcos_bbox.FCOSBBox().cuda().eval()
-
-# torchscript nvfuser
-jit_model = torch.jit.freeze(torch.jit.script(model))
-
-# torchscript nnc
-nvfuser_model = torch.jit.freeze(torch.jit.script(model))
-
-# functs
-# functs_model = functs.jit.script(torch.jit.freeze(torch.jit.script(model)))
-
-
-# torch dynamo + inductor
-tracing_model = torch.compile(model, dynamic=True)
-
-# fait
-# fait_model = functs.jit.script(model, backend="fait")
-# functs._C._jit_pass_fait_pipeline(fait_model.graph, type_hint)
-# code = torch._C._jit_get_code(fait_model.graph)
-# print("done")
-
 feats = torch.load("fcos_feat.pt")
-
-feats = process_feat_batch(feats, arguments.bs)
+feats = process_feat_batch(feats)
 num_samples = len(feats)
 
-# code = torch._C._jit_get_code(fait_model.graph)
+with torch.no_grad():
+    model = fcos_bbox.FCOSBBox().cuda().eval()
+    # torchscript
+    jit_model = torch.jit.freeze(torch.jit.script(model))
 
-def eager_task(idx: int):
-    model(*feats[idx % num_samples] )
+    # nvfuser
+    nvfuser_model = torch.jit.freeze(torch.jit.script(model))
 
-def jit_task(idx: int):
-    jit_model(*feats[idx % num_samples])
+    # torch dynamo + inductor
+    torch._dynamo.reset()
+    dynamo_model = torch.compile(model, dynamic=True)
 
-def functs_task(idx: int):
-    functs_model(*feats[idx % num_samples])
+    # functs
+    functs_model = functs.jit.script(model)
 
-def tracing_task(idx: int):
-    tracing_model(*feats[idx % num_samples])
+    # aot backend
+    fait_model = functs.jit.build(functs.jit.script(model, backend="aot"), feats[0]) 
 
-def nvfuser_task(idx: int):
-    nvfuser_model(*feats[idx % num_samples])
+    task = lambda fn: lambda idx: fn(*feats[idx % num_samples])
 
-def fait_task(idx: int):
-    torch._C._jit_run_code(code, ("", ) + feats[idx % num_samples])
+    functs.utils.evaluate_task(task(model), "eager", run_duration=2.)
+    functs.utils.evaluate_task(task(jit_model), "jit", run_duration=2.)
+    functs.utils.evaluate_task(task(functs_model), "functs", run_duration=2.)
+    functs.utils.evaluate_task(
+        task(dynamo_model), "dynamo+inductor", run_duration=2.)
+    functs.utils.evaluate_task(task(fait_model), "fait", run_duration=2.)
 
-# functs.utils.evaluate_task(eager_task, "eager", run_duration=2.)
-# functs.utils.evaluate_task(jit_task, "jit", run_duration=2.)
-# functs.utils.evaluate_task(functs_task, "functs", run_duration=2.)
-
-# functs.utils.evaluate_task(fait_task, "fait", run_duration=2.)
-# functs.utils.evaluate_task(tracing_task, "dynamo", run_duration=2.)
-
-# # nvfuser
-# torch._C._jit_set_nvfuser_enabled(True)
-# functs.utils.evaluate_task(nvfuser_task, "nvfuser", run_duration=2.)
-# torch._C._jit_set_nvfuser_enabled(False)
-
-# print(functs.utils.profiler_task(eager_task, "eager", run_duration=2.).key_metrics)
-print(functs.utils.profiler_task(jit_task, "jit", run_duration=2.).key_metrics)
-# print(functs.utils.profiler_task(fait_task, "fait", run_duration=2.).key_metrics)
-
-# nvfuser
-# torch._C._jit_set_nvfuser_enabled(True)
-# print(functs.utils.profiler_task(nvfuser_task, "nvfuser", run_duration=2.).key_metrics)
-# torch._C._jit_set_nvfuser_enabled(False)
+    # nvfuser
+    torch._C._jit_set_nvfuser_enabled(True)
+    functs.utils.evaluate_task(task(nvfuser_model), "nvfuser", run_duration=2.)
+    torch._C._jit_set_nvfuser_enabled(False)
 

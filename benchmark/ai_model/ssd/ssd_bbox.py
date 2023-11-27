@@ -2,7 +2,7 @@ from typing import List, Tuple
 
 import numpy as np
 import torch
-# import torchvision
+import torchvision
 from torch import Tensor
 
 
@@ -209,7 +209,7 @@ def nms_wrapper(boxes: Tensor,
                 iou_threshold: float):
     # assert boxes.size(1) == 4
     # assert boxes.size(0) == scores.size(0)
-    inds = torch.ops.torchvision.nms(boxes, scores, iou_threshold)
+    inds = torchvision.ops.nms(boxes, scores, iou_threshold)
     dets = torch.cat((boxes[inds], scores[inds].reshape(-1, 1)), dim=1)
     return dets, inds
 

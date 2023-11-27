@@ -125,6 +125,8 @@ def evaluate_task(task: Callable[[int], None],
                   device="cuda") -> Timer:
     for i in range(warmup_runs):
         task(i)
+    for i in range(warmup_runs):
+        task(i)
     torch.cuda.synchronize() 
     timer = Timer(name)
     begin = timer.start()
