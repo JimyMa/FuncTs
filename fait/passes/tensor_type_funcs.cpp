@@ -272,6 +272,22 @@ static c10::SymbolicShape inferShapeSumOp(INFER_PARAMS) {
   return result;
 }
 
+static OperatorSet linearOp{
+  "aten::linear(Tensor input, Tensor weight, Tensor? bias=None) -> Tensor",
+};
+
+static c10::SymbolicShape inferShapeLinearOp(INFER_PARAMS) {
+  auto lShape = getShape(node->input(0)->type());
+  auto rShape = getShape(node->input(1)->type());
+  if (!lShape || !rShape) return {};
+  TORCH_CHECK(rShape->size() == 2);
+  TORCH_CHECK(rShape->back() == rShape->back());
+  std::vector<ShapeDim> outShape(lShape->begin(), lShape->end() - 2);
+  outShape.push_back(*(lShape->end() - 2));
+  outShape.push_back(*(rShape->end() - 2));
+  return outShape;
+}
+
 static OperatorSet mmOp{
     "aten::mm(Tensor self, Tensor mat2) -> Tensor",
 };
@@ -864,10 +880,12 @@ static OperatorSet sameShapeOps{
     "Tensor(a)",
     "aten::exp(Tensor self) -> Tensor",
     "aten::log(Tensor self) -> Tensor",
+    "aten::tanh(Tensor self) -> Tensor",
     "aten::sin(Tensor self) -> Tensor",
     "aten::cos(Tensor self) -> Tensor",
     "aten::sqrt(Tensor self) -> Tensor",
     "aten::sigmoid(Tensor self) -> Tensor",
+    "aten::relu(Tensor self) -> Tensor",
     "aten::tril(Tensor self, int diagonal=0) -> Tensor",
     "aten::triu(Tensor self, int diagonal=0) -> Tensor",
     "aten::clamp(Tensor self, Scalar? min=None, Scalar? max=None) -> Tensor",
@@ -943,14 +961,17 @@ static std::set<std::string> longOpsSymbolString {
   "torchvision::nms"
 };
 
-static OperatorSet minMaxOps{
+static OperatorSet reduceOps{
     "aten::max.dim(Tensor self, int dim, bool keepdim=False) -> (Tensor "
     "values, Tensor indices)",
     "aten::min.dim(Tensor self, int dim, bool keepdim=False) -> (Tensor "
     "values, Tensor indices)",
+    "aten::prod.dim_int(Tensor self, int dim, bool keepdim=False, "
+    "*, ScalarType? dtype=None) -> Tensor",
+    "aten::argmax(Tensor self, int? dim=None, bool keepdim=False) -> Tensor",
 };
 
-static void handleShapeMinMax(INFER_PARAMS) {
+static void handleShapeReduce(INFER_PARAMS) {
   // Process inputs
   auto selfShape = getShape(node->input(0)->type());
   if (!selfShape)
@@ -968,7 +989,8 @@ static void handleShapeMinMax(INFER_PARAMS) {
   else
     outShape.erase(outShape.begin() + dim);
   setShape(node->output(0), outShape);
-  setShape(node->output(1), outShape);
+  if (node->outputs().size() > 1)
+    setShape(node->output(1), outShape);
 }
 
 static OperatorSet sortOp{
@@ -1033,6 +1055,25 @@ static void handleDtypeIndices(INFER_PARAMS) {
   setDtype(node->output(1), c10::kLong);
 }
 
+static OperatorSet embeddingOps{
+  "aten::embedding(Tensor weight, Tensor indices, SymInt padding_idx=-1, "
+  "bool scale_grad_by_freq=False, bool sparse=False) -> Tensor",
+};
+
+static void handleShapeEmbeddingOps(INFER_PARAMS) {
+  auto inputShape = getShape(node->input(1)->type());
+  auto weightShape = getShape(node->input(0)->type());
+  if (!inputShape || !weightShape) return;
+  auto embedding_size = weightShape->at(1);
+  auto outputShape = *inputShape;
+  outputShape.push_back(embedding_size);
+  setShape(node->output(0), outputShape);
+}
+
+static void handleDtypeEmbeddingOps(INFER_PARAMS) {
+  setDtype(node->output(0), *node->input(0)->type()->cast<TensorType>()->scalarType());
+}
+
 static std::initializer_list<
     std::pair<OperatorSet, c10::SymbolicShape (*)(INFER_PARAMS)>>
     shapeFuncInit{
@@ -1041,6 +1082,7 @@ static std::initializer_list<
         {bcastOps, inferShapeBcastOps},
         {sumOp, inferShapeSumOp},
         {mmOp, inferShapeMmOp},
+        {linearOp, inferShapeLinearOp},
         {matmulOp, inferShapeMatmulOp},
         {selectOp, inferShapeSelectOp},
         {sliceOp, inferShapeSliceOp},
@@ -1095,15 +1137,17 @@ static std::initializer_list<
 
 static std::initializer_list<std::pair<OperatorSet, void (*)(INFER_PARAMS)>>
     specialShapeHandlerInit{
-        {minMaxOps, handleShapeMinMax},
+        {reduceOps, handleShapeReduce},
         {sortOp, handleShapeSort},
         {topkOp, handleShapeTopk},
         {unique2Op, handleShapeUnique2Op},
+        {embeddingOps, handleShapeEmbeddingOps},
     };
 
 static std::initializer_list<std::pair<OperatorSet, void (*)(INFER_PARAMS)>>
     specialDtypeHandlerInit{
         {indicesOps, handleDtypeIndices},
+        {embeddingOps, handleDtypeEmbeddingOps},
     };
 
 static bool initialized = false;

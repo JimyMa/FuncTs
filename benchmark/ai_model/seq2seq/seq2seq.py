@@ -183,6 +183,7 @@ dynamo_model = torch.compile(model)
 nvfuser_model = torch.jit.freeze(torch.jit.script(model))
 
 functs_model = functs.jit.script(model)
+fait_model = functs.jit.build(functs.jit.script(torch.jit.freeze(torch.jit.script(model))), (encoder_output, mask, h, c))
 
 functs.utils.evaluate_func(
     model, (encoder_output, mask, h, c), "eager", run_duration=2.)
@@ -192,6 +193,8 @@ functs.utils.evaluate_func(
     dynamo_model, (encoder_output, mask, h, c), "dynamo", run_duration=2.)
 functs.utils.evaluate_func(
     functs_model, (encoder_output, mask, h, c), "functs", run_duration=2.)
+functs.utils.evaluate_func(
+    fait_model, (encoder_output, mask, h, c), "fait", run_duration=2.)
 
 torch._C._jit_set_nvfuser_enabled(True)
 functs.utils.evaluate_func(

@@ -336,6 +336,8 @@ OperatorSet identicalShapeOps{
     "aten::contiguous(Tensor(a) self, *, MemoryFormat memory_format=0) -> "
     "Tensor(a)",
     "aten::sigmoid(Tensor self) -> Tensor",
+    "aten::relu(Tensor self) -> Tensor",
+    "aten::tanh(Tensor self) -> Tensor",
     "aten::clone(Tensor self, *, MemoryFormat? memory_format=None) -> Tensor",
     "aten::exp(Tensor self) -> Tensor",
     "immut::assign(Tensor self, Tensor src, bool? n=None) -> Tensor",

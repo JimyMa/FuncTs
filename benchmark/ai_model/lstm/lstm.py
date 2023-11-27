@@ -247,37 +247,42 @@ if __name__ == '__main__':
     num_layers = 10
     seq_len = arguments.maxlength
 
+    inp = torch.randn([seq_len, batch_size, input_size], device=cuda_device)
+
     model = LSTM(input_size, hidden_size, num_layers).cuda().eval()
     jit_model = torch.jit.script(model)
     dynamo_model = torch.compile(model)
     nvfuser_model = torch.jit.freeze(torch.jit.script(model))
     functs_model = functs.jit.script(model)
-
-    inp = torch.randn([seq_len, batch_size, input_size], device=cuda_device)
+    fait_model = functs.jit.build(functs.jit.script(torch.jit.freeze(torch.jit.script(model))), [inp])
+    
 
     torch._dynamo.config.suppress_errors = True
     with torch.no_grad():
         print("profiler latency")
         if arguments.tool in ["all", "eager"]:
-            evaluate_func(model, [inp], "lstm eager", run_duration=5.)
+            evaluate_func(model, [inp], "eager", run_duration=5.)
         if arguments.tool in ["all", "jit"]:
-            evaluate_func(jit_model, [inp], "lstm jit", run_duration=5.)
+            evaluate_func(jit_model, [inp], "jit", run_duration=5.)
         if arguments.tool in ["all", "functs"]:
-            evaluate_func(functs_model, [inp], "lstm functs", run_duration=5.)
+            evaluate_func(functs_model, [inp], "functs", run_duration=5.)
+        
+        if arguments.tool in ["all", "fait"]:
+            evaluate_func(fait_model, [inp], "fait", run_duration=5.)
 
         if arguments.tool in ["all", "dynamo"]:
             import torch._dynamo
             torch._dynamo.config.suppress_errors = True
             torch._dynamo.reset()
-            evaluate_func(dynamo_model, [inp], "lstm dynamo", run_duration=5.)
+            evaluate_func(dynamo_model, [inp], "dynamo", run_duration=5.)
 
         if arguments.tool in ["all", "nvfuser"]:
             torch._C._jit_set_nvfuser_enabled(True)
-            evaluate_func(nvfuser_model, [inp], "lstm nvfuser", run_duration=5.)
+            evaluate_func(nvfuser_model, [inp], "nvfuser", run_duration=5.)
             torch._C._jit_set_nvfuser_enabled(False)
 
-        if arguments.tool in ["all", "eager"]:
-            print(functs.utils.proifler_func(model, [inp], "nasrnn eager", run_duration=1.0, export_json="eager").key_metrics)
+        # if arguments.tool in ["all", "eager"]:
+        #     print(functs.utils.proifler_func(model, [inp], "nasrnn eager", run_duration=1.0, export_json="eager").key_metrics)
     
         # if arguments.tool in ["all", "jit"]:    
         #     print(functs.utils.proifler_func(jit_model, [inp], "nasrnn jit", run_duration=1.0, export_json="jit").key_metrics)

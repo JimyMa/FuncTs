@@ -48,7 +48,6 @@ class NasRNN(nn.Module):
             inp = inputs[i]
             state_m = torch.reshape(
                 state_m, (self.batch_size, self.hidden_size))
-
             # ih = ihs[i]
             ih = torch.matmul(inp, self.weight_ih)
             hh = torch.matmul(state_m, self.weight_hh)
@@ -106,6 +105,8 @@ HIDDEN_SIZE = 256
 SEQ_LEN = arguments.maxlength
 BATCH_SIZE = arguments.bs
 
+inp = torch.rand([SEQ_LEN, BATCH_SIZE, INPUT_SIZE]).cuda().float()
+
 nasrnn = NasRNN(BATCH_SIZE, INPUT_SIZE, HIDDEN_SIZE).cuda().eval()
 nasrnn_jit_fn = torch.jit.script(nasrnn)
 # print(nasrnn_jit_fn.graph)
@@ -116,8 +117,8 @@ torch._dynamo.config.suppress_errors = True
 
 nasrnn_functs_fn = functs.jit.script(nasrnn)
 # print(nasrnn_functs_fn.graph)
+nasrnn_fait_fn = functs.jit.build(functs.jit.script(torch.jit.freeze(torch.jit.script(nasrnn))), [inp])
 
-inp = torch.rand([SEQ_LEN, BATCH_SIZE, INPUT_SIZE]).cuda().float()
 
 with torch.no_grad():
     if arguments.tool in ["all", "eager"]:
@@ -132,6 +133,10 @@ with torch.no_grad():
     if arguments.tool in ["all", "functs"]:
         functs.utils.evaluate.evaluate_func(
             nasrnn_functs_fn, [inp], "nasrnn functs", run_duration=2.0)
+    
+    if arguments.tool in ["all", "fait"]:
+        functs.utils.evaluate.evaluate_func(
+            nasrnn_fait_fn, [inp], "nasrnn fait", run_duration=2.0)
 
     if arguments.tool in ["all", "nvfuser"]:
         torch._C._jit_set_nvfuser_enabled(True)

@@ -47,6 +47,8 @@ OperatorSet fusableOps{
     "Tensor",
     "aten::exp(Tensor self) -> Tensor",
     "aten::sigmoid(Tensor self) -> Tensor",
+    "aten::tanh(Tensor self) -> Tensor",
+    "aten::relu(Tensor self) -> Tensor",
     "aten::tril(Tensor self, int diagonal=0) -> Tensor",
     "aten::triu(Tensor self, int diagonal=0) -> Tensor",
     "aten::clamp(Tensor self, Scalar? min=None, Scalar? max=None) -> Tensor",
@@ -119,10 +121,10 @@ static std::unordered_set<Symbol> workingSymbols{
     aten::max, aten::softmax,
     // Copy
     aten::repeat, aten::cat, aten::stack, aten::index,
-    // // TensorSSA
-    // c10::immutable::Assign,
-    // c10::immutable::Select, c10::immutable::SelectReverse,
-    // c10::immutable::Slice, c10::immutable::SliceReverse
+    // TensorSSA
+    c10::immutable::Assign,
+    c10::immutable::Select, c10::immutable::SelectReverse,
+    c10::immutable::Slice, c10::immutable::SliceReverse
 };
 
 static std::unordered_map<Symbol, bool (*)(Node *node)> fusabilityCheckers{
@@ -187,7 +189,7 @@ static bool isFusable(Node *node, bool isOut,
   if (isOut) {
     // Fused subgraphs cannot have non-tensor outputs
     for (auto output : node->outputs()) {
-      if (!output->type()->castRaw<TensorType>())
+      if (!output->type()->castRaw<TensorType>() || output->type()->castRaw<TensorType>()->dim() <= 0)
         return false;
     }
   } else {

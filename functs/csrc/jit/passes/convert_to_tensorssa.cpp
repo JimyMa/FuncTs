@@ -491,7 +491,7 @@ void ConvertToTensorSSA(std::shared_ptr<Graph> graph) {
   // Preprocess: A dumb pass to eliminate interprecedure view
   // DumbRemoveInterPrecedureMutation(graph);
 
-  // Step 0. convert inplace operator (add_, mul_, ...) to copy
+  // Step 0. convert inplace operator (add_, mul_, ...) to copy_
   RemoveInplace(graph);
 
   // Step 1. Get Buffer Forest
