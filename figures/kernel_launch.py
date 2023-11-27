@@ -53,7 +53,7 @@ plt.rc("pdf", fonttype=42)
 
 base = 4
 
-fig, axes = plt.subplots(int(latency_eager_normal.shape[0] / base), base, figsize=(14, 6), layout="constrained")
+fig, axes = plt.subplots(int(latency_eager_normal.shape[0] / base), base, figsize=(12, 6), layout="constrained")
 # ax_big = fig.add_subplot(111)  
 # fig = plt.figure(figsize=(14, 3), layout='constrained')
 for b, (c, h) in enumerate(zip(colors, data)):

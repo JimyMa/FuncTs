@@ -15,7 +15,7 @@ compile_commands.json
 
 *.egg-info
 
-*.png
+
 *.dot
 
 # pytest
@@ -28,6 +28,7 @@ compile_commands.json
 # figure
 *.pdf
 figures/*.jpg
+figures/*.png
 
 
 

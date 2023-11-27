@@ -6,18 +6,20 @@ models = ["NASRNN", "Attention", "LSTM"]
 
 # LSTM
 iters = [1.0, 2.0, 3.0, 4.0, 5.0]
-latency_eager = np.array([82.22, 71.55, 70.12, 66.53, 66.61])
-latency_jit = np.array([28.36, 28.27, 28.23, 29.44, 28.801])
-latency_dynamo = np.array([0, 0, 0, 0, 0])
-latency_functs = np.array([15.56, 15.47, 16.14, 15.71, 15.78])
-latency_nvfuser = np.array([37.83, 37.52, 38.73, 38.36, 38.57])
+latency_eager = np.array([72.68, 74.15, 67.77, 69.25, 67.96])
+latency_jit = np.array([31.92, 32.83, 33.02, 32.65, 33.42])
+latency_dynamo = np.array([32.31, 30.96, 31.54, 30.72, 31.68])
+latency_functs = np.array([18.24, 18.11, 18.21, 18.05, 18.62])
+latency_nvfuser = np.array([38.7, 39.32, 38.95, 38.77, 38.41])
 # latency_tracing_jit = [1.101, 2.858]
 
-latency_eager_normal = latency_eager
-latency_jit_normal = latency_jit
-latency_functs_normal = latency_functs
+latency_eager_normal =  latency_eager / latency_eager
+latency_dynamo_normal = latency_eager / latency_dynamo
+latency_nvfuser_normal = latency_eager / latency_nvfuser
+latency_jit_normal = latency_eager / latency_jit
+latency_functs_normal = latency_eager / latency_functs
 
-lstm_data = np.stack([latency_eager_normal, latency_dynamo, latency_nvfuser, latency_jit_normal, latency_functs_normal])
+lstm_data = np.stack([latency_eager_normal, latency_dynamo_normal, latency_nvfuser_normal, latency_jit_normal, latency_functs_normal])
 
 # NASRNN
 iters = [1.0, 2.0, 3.0, 4.0, 5.0]
@@ -28,11 +30,13 @@ latency_functs = np.array([0.854, 0.838, 0.834, 0.863, 0.838])
 latency_nvfuser = np.array([2.332, 2.274, 2.25, 2.275, 2.248])
 # latency_tracing_jit = [1.101, 2.858]
 
-latency_eager_normal = latency_eager
-latency_jit_normal = latency_jit
-latency_functs_normal = latency_functs
+latency_eager_normal =  latency_eager / latency_eager
+latency_dynamo_normal = latency_eager / latency_dynamo
+latency_nvfuser_normal = latency_eager / latency_nvfuser
+latency_jit_normal = latency_eager / latency_jit
+latency_functs_normal = latency_eager / latency_functs
 
-nasrnn_data = np.stack([latency_eager_normal, latency_dynamo, latency_nvfuser, latency_jit_normal, latency_functs_normal])
+nasrnn_data = np.stack([latency_eager_normal, latency_dynamo_normal, latency_nvfuser_normal, latency_jit_normal, latency_functs_normal])
 
 # Attention
 iters = [1.0, 2.0, 3.0, 4.0, 5.0]
@@ -43,13 +47,14 @@ latency_functs = np.array([2.014, 2.013, 2.005, 2.008, 2.008])
 latency_nvfuser = np.array([2.384, 2.37, 2.4, 2.395, 2.38])
 # latency_tracing_jit = [1.101, 2.858]
 
-latency_eager_normal = latency_eager
-latency_jit_normal = latency_jit
+latency_eager_normal =  latency_eager / latency_eager
+latency_dynamo_normal = latency_eager / latency_dynamo
+latency_nvfuser_normal = latency_eager / latency_nvfuser
+latency_jit_normal = latency_eager / latency_jit
+latency_functs_normal = latency_eager / latency_functs
 
-latency_functs_normal = latency_functs
 
-
-attention_data = np.stack([latency_eager_normal, latency_dynamo, latency_nvfuser, latency_jit_normal, latency_functs_normal])
+attention_data = np.stack([latency_eager_normal, latency_dynamo_normal, latency_nvfuser_normal, latency_jit_normal, latency_functs_normal])
 
 data = {
     "NASRNN": nasrnn_data,
@@ -86,13 +91,13 @@ for model, ax in zip(models, axes):
     ax.set_xlabel("Iters / Capture")
     # print(model)
     if model == "Attention":
-        ax.set_yticks([0, 1, 2, 3, 4, 5])
+        ax.set_yticks([1.0, 1.2, 1.4, 1.6, 1.8])
         # ax.set_ylim([1.5, np.ceil(np.max(data[model]))])
     elif model == "NASRNN":
-        ax.set_yticks([0, 2, 4, 6, 8])
+        ax.set_yticks([1, 3, 5, 7, 9])
         ax.set_xlim(0.88, 5.12)
     else:
-        ax.set_yticks([0, 20, 40, 60, 80, 100])
+        ax.set_yticks([1, 2, 3, 4, 5])
         ax.set_xlim(0.88, 5.12)
     
 

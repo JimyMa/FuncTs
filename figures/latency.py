@@ -87,7 +87,7 @@ plt.rc("font", family="Linux Biolinum O", size=12)
 plt.rc("pdf", fonttype=42)
 
 # Post-processing
-fig, axes = plt.subplots(1, 2, figsize=(18, 3), layout="constrained")
+fig, axes = plt.subplots(2, 1, figsize=(12, 6), layout="constrained")
 max_ylim = -1
 for plat, ax in zip(platforms, axes):
     perf = data[plat]
@@ -132,7 +132,7 @@ fig.supylabel("Speed Up", weight='bold')
 #         va="bottom",
 #         weight='bold'
 #     )
-fig.legend(labels=tools, ncol=np.ceil(len(tools)), loc="outside upper center", fontsize=16)
+fig.legend(labels=tools, ncol=np.ceil(len(tools) / 2), loc="outside upper center", fontsize=16)
 # fig.supylabel("Speed Up")
 plt.savefig('latency.pdf')
 plt.savefig('latency.jpg')

@@ -13,12 +13,10 @@ def func(a: torch.Tensor, b: torch.Tensor, n: int):
     b[i] = b[i] + 1
   return b
 
-def func_data_control_flow_dependency(a_list: List[Tuple[torch.Tensor, torch.Tensor]], 
+def func_data_control_flow_dependency(a: torch.Tensor, b: torch.Tensor, 
                                       idx: int):
-  a = a_list[0][0].clone()
-  b = a_list[0][1].clone()
-  b += 1
-  b = b.copy_(b + 1)
+  a = a.clone()
+  b = b.clone()
   if idx >= 0:
     a += 1
     b[idx].copy_(a[idx])
@@ -27,8 +25,9 @@ def func_data_control_flow_dependency(a_list: List[Tuple[torch.Tensor, torch.Ten
     b[-idx].copy_(a[-idx])
   return a + b
 
-# func = func_data_control_flow_dependency
-func = func
+# func = func
+func = func_data_control_flow_dependency
+
 
 # torchscript
 jit_func = torch.jit.script(func)
