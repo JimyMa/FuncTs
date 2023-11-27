@@ -29,14 +29,14 @@ def func_data_control_flow_dependency(a_list: List[Tuple[torch.Tensor, torch.Ten
 
 # func = func_data_control_flow_dependency
 func = func
-jit_func = torch.jit.script(func)
-functs_func = functs.jit.script(func)
 
 # torchscript
+jit_func = torch.jit.script(func)
 print("graph before functionalization")
 jit_func.graph.alias_db().dump()
 
 # functs
+functs_func = functs.jit.script(func)
 print("graph after functionalization")
 functs_func.graph.alias_db().dump()
 
