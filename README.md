@@ -133,13 +133,13 @@ graph(%a.1 : Tensor,
   %11 : bool = aten::ge(%idx.1, %10)
   %a : Tensor = prim::If(%11)
     block0():
-      %a.9 : Tensor = aten::add_(%a.5, %14, %14)
+      %a.9 : Tensor = aten::add(%a.5, %14, %14)
       %23 : Tensor = aten::select(%b.5, %10, %idx.1)
       %29 : Tensor = aten::select(%a.9, %10, %idx.1)
       %31 : Tensor = aten::copy_(%23, %29, %30)
       -> (%a.9)
     block1():
-      %a.17 : Tensor = aten::sub_(%a.5, %14, %14)
+      %a.17 : Tensor = aten::sub(%a.5, %14, %14)
       %42 : int = aten::neg(%idx.1)
       %44 : Tensor = aten::select(%b.5, %10, %42)
       %51 : int = aten::neg(%idx.1)
@@ -153,28 +153,30 @@ graph(%a.1 : Tensor,
 - After functionalization
 
 ```ruby
-graph(%a.1 : Tensor,
-      %b.1 : Tensor,
+graph(%a.35 : Tensor,
+      %b.11 : Tensor,
       %idx.1 : int):
-  %4 : NoneType = prim::Constant()
+  %79 : NoneType = prim::Constant()
+  %b.1 : Tensor = aten::clone(%b.11, %79)
+  %a.1 : Tensor = aten::clone(%a.35, %79)
   %10 : int = prim::Constant[value=0]()
   %14 : int = prim::Constant[value=1]()
-  %a.5 : Tensor = aten::clone(%a.1, %4)
-  %b.5 : Tensor = aten::clone(%b.1, %4)
+  %a.5 : Tensor = aten::clone(%a.1, %79)
+  %b.5 : Tensor = aten::clone(%b.1, %79)
   %11 : bool = aten::ge(%idx.1, %10)
-  %a : Tensor, %104 : Tensor = prim::If(%11)
+  %a : Tensor, %93 : Tensor = prim::If(%11)
     block0():
-      %78 : Tensor = aten::add(%a.5, %14, %14)
-      %85 : Tensor = immut::select(%78, %10, %idx.1)
-      %94 : Tensor = immut::select_rev(%b.5, %85, %10, %idx.1)
-      -> (%78, %94)
+      %a.9 : Tensor = aten::add(%a.5, %14, %14)
+      %29 : Tensor = aten::select(%a.9, %10, %idx.1)
+      %86 : Tensor = immut::select_rev(%b.5, %29, %10, %idx.1)
+      -> (%a.9, %86)
     block1():
-      %81 : Tensor = aten::sub(%a.5, %14, %14)
+      %a.17 : Tensor = aten::sub(%a.5, %14, %14)
       %42 : int = aten::neg(%idx.1)
-      %89 : Tensor = immut::select(%81, %10, %42)
-      %100 : Tensor = immut::select_rev(%b.5, %89, %10, %42)
-      -> (%81, %100)
-  %64 : Tensor = aten::add(%a, %104, %14)
+      %53 : Tensor = aten::select(%a.17, %10, %42)
+      %90 : Tensor = immut::select_rev(%b.5, %53, %10, %42)
+      -> (%a.17, %90)
+  %64 : Tensor = aten::add(%a, %93, %14)
   return (%64)
 ```
 

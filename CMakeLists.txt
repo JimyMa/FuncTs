@@ -52,10 +52,6 @@ file(GLOB CUPTI_EXT_SOURCES
   ${PROJECT_SOURCE_DIR}/util/cupti_ext/*.cpp
 )
 
-file(GLOB CUPTI_EXT_SOURCES
-  ${PROJECT_SOURCE_DIR}/fait/util/cupti_ext/*.cpp
-)
-
 file(GLOB PROFILER_SOURCES
   ${PROJECT_SOURCE_DIR}/fait/util/profile.cpp
   ${PROJECT_SOURCE_DIR}/fait/util/metrics.cpp

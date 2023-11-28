@@ -48,13 +48,7 @@ struct TensorSSAMutateInfo {
 
 static void GetBufferTreeAliasDb(std::shared_ptr<Graph> g,
                                  AliasDbCopy &aliasDb_buffer_tree) {
-  // Note: Unsupported alias relationship by now:
-  // // - An element points to more than one elements (i.e. a <- c, b <- c)
-  // TODO: Cannot support add Container alias analysis by now
-  // Note: Only intra-procedure are supported by now
-
   // g: Graph-level IR based tensor program
-  // alias_db_origin: origin alias relationship
   // alias_db_buffer_tree: modified alias relationship
 
   // Step 1. visit all elements in aliasdb, delete all unsupported alias
@@ -73,9 +67,10 @@ static void GetBufferTreeAliasDb(std::shared_ptr<Graph> g,
     auto element = ptrPair.second;
 
     if (element->pointsTo.count() > 1 /* Step 1.1: count > 1 */ ||
-        aliasDb_buffer_tree.mayAliasWildcard(value) /* wildcard node */ ||
+        aliasDb_buffer_tree.mayAliasWildcard(value) /* Inter-procedure dependency */ ||
         prim::Loop == value->node()->kind() /* Loop carried dependency */ ||
-        element->values.size() > 1 || /* Container object */
+        prim::If == value->node()->kind() /* Control flow dependency */ ||
+        element->values.size() > 1 /* Container dependency */ || 
         value->type()->kind() == TypeKind::ListType ||
         value->type()->kind() == TypeKind::DictType ||
         value->type()->kind() == TypeKind::ClassType) {
@@ -85,7 +80,7 @@ static void GetBufferTreeAliasDb(std::shared_ptr<Graph> g,
 
   ska::flat_hash_map<const Value *, Element *> may_alias;
 
-  // Step 2
+  // Step 1.2
   // get may_alias
   for (const auto &ptrPair : elementMap) {
     for (const auto &ptrPairAmbigious : ambigious_alias) {
@@ -220,15 +215,15 @@ TensorSSAAliasRemoval(Block *b, std::shared_ptr<BufferForest> bufferForest,
             auto from_value = point_from_buffer_node->bufferNode_->var;
             auto from_node = from_value->node();
 
-            // node is dominated by from_node is nesessary!!!
+            // node is dominated by from_node is nesessary !!!
+            // the variable `copy_` at escaping scope may cause soundness concern !!!
             // def func(a, b):
             // // if cond:
             // // // c = a[0]
             // // else:
             // // // pass
             // // c.copy_(b)
-            // this pattern is unsupport
-            // a tensor which is not dominated by value try to mutate the value
+            // a tensor which is not dominated by value try to mutate the value is forbidden in Functionalization
             // NOTE: this feature is unsupported in TorchScript either.
 
             // For easily comperahension, If from node is node, generate a new

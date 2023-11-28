@@ -18,10 +18,10 @@ def func_data_control_flow_dependency(a: torch.Tensor, b: torch.Tensor,
   a = a.clone()
   b = b.clone()
   if idx >= 0:
-    a += 1
+    a = a + 1
     b[idx].copy_(a[idx])
   else:
-    a -= 1
+    a = a - 1
     b[-idx].copy_(a[-idx])
   return a + b
 
