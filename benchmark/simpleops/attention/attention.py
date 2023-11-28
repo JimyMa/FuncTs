@@ -5,8 +5,6 @@ from torch import nn
 from torch.profiler import profile, ProfilerActivity
 
 
-
-
 parser = argparse.ArgumentParser()
 parser.add_argument('--bs', type=int, default=1)
 parser.add_argument('--maxlength', type=int, default=50)

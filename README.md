@@ -193,7 +193,6 @@ We use PyTorch NNC to impelement several view tensor expression, a domain specif
 ## Benchmark
 
 ### Latency Benchmark
-
 - The performance speed up is shown as follow:
 
 ![latency](./docs/imgs/latency.jpg)

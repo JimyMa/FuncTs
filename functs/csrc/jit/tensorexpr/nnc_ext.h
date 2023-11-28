@@ -56,6 +56,21 @@ TORCH_API Tensor computeImmutRepeat(
     const std::vector<ExprHandle> &outputShape,
     c10::optional<std::vector<ExprHandle>> outputStrides = c10::nullopt);
 
+TORCH_API Tensor computeImmutPermute(
+    const std::vector<ArgValue> &inputValues,
+    const std::vector<ExprHandle> &outputShape,
+    c10::optional<std::vector<ExprHandle>> outputStrides = c10::nullopt);
+
+TORCH_API Tensor computeImmutExpand(
+    const std::vector<ArgValue> &inputValues,
+    const std::vector<ExprHandle> &outputShape,
+    c10::optional<std::vector<ExprHandle>> outputStrides = c10::nullopt);
+
+TORCH_API Tensor computeTensor(
+    const std::vector<ArgValue> &inputValues,
+    const std::vector<ExprHandle> &outputShape,
+    c10::optional<std::vector<ExprHandle>> outputStrides = c10::nullopt);
+
 } // namespace tensorexpr
 } // namespace jit
 } // namespace torch

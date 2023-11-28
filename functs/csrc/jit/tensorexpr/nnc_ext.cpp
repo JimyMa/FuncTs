@@ -1,12 +1,16 @@
-#include <cstdint>
 #include <functs/csrc/jit/tensorexpr/nnc_ext.h>
 #include <torch/csrc/jit/tensorexpr/lowerings.h>
+#include <cstdint>
 
 namespace torch {
 namespace jit {
 namespace tensorexpr {
 
-ExprHandle constant(const ArgValue &v) {
+ExprHandle broadcast(BufHandle b, const std::vector<ExprHandle>& axes) {
+  return b.load(computeIndicesToBroadcast(axes, b.dims()));
+}
+
+ExprHandle constant(const ArgValue& v) {
   if (auto s = c10::get_if<tensorexpr::VarHandle>(&v)) {
     return *s;
   } else if (auto d = c10::get_if<double>(&v)) {
@@ -25,67 +29,92 @@ ExprHandle constant(const ArgValue &v) {
   }
 }
 
-ExprHandle scalarOrConstant(const ArgValue &v) {
+std::vector<ExprHandle> computeIndicesToBroadcast(
+    const std::vector<ExprHandle>& outputAxes,
+    const std::vector<ExprHandle>& inputSizes) {
+  if (outputAxes.size() < inputSizes.size()) {
+    throw malformed_input("Cannot broadcast to a lower rank tensor");
+  }
+  std::vector<ExprHandle> bcast;
+  auto axisIt = outputAxes.rbegin();
+  auto sizeIt = inputSizes.rbegin();
+  while (sizeIt != inputSizes.rend()) {
+    auto const& size = intValue(*sizeIt);
+    if (size && *size == 1) {
+      bcast.emplace_back(LongImm::make(0));
+    } else {
+      bcast.emplace_back(*axisIt);
+    }
+    ++axisIt;
+    ++sizeIt;
+  }
+  std::reverse(bcast.begin(), bcast.end());
+  return bcast;
+}
+
+ExprHandle scalarOrConstant(const ArgValue& v) {
   if (auto vh = c10::get_if<VarHandle>(&v)) {
     return *vh;
   }
   return constant(v);
 }
 
-Tensor computeClone(const std::vector<ArgValue> &inputValues,
-                    const std::vector<ExprHandle> &outputShape,
-                    c10::optional<std::vector<ExprHandle>> outputStrides) {
-  return Compute("clone", outputShape, [&](ParameterList &axes) {
+Tensor computeClone(
+    const std::vector<ArgValue>& inputValues,
+    const std::vector<ExprHandle>& outputShape,
+    c10::optional<std::vector<ExprHandle>> outputStrides) {
+  return Compute("clone", outputShape, [&](ParameterList& axes) {
     auto src = c10::get<BufHandle>(inputValues[0]);
     return src.load(axes);
   });
 }
 
-Tensor
-computeImmutAssign(const std::vector<ArgValue> &inputValues,
-                   const std::vector<ExprHandle> &outputShape,
-                   c10::optional<std::vector<ExprHandle>> outputStrides) {
-  return Compute("assign", outputShape, [&](ParameterList &axes) {
+Tensor computeImmutAssign(
+    const std::vector<ArgValue>& inputValues,
+    const std::vector<ExprHandle>& outputShape,
+    c10::optional<std::vector<ExprHandle>> outputStrides) {
+  return Compute("assign", outputShape, [&](ParameterList& axes) {
     auto src = c10::get<BufHandle>(inputValues[1]);
     return src.load(axes);
   });
 }
 
-Tensor computeImmutSlice(const std::vector<ArgValue> &inputValues,
-                         const std::vector<ExprHandle> &outputShape,
-                         c10::optional<std::vector<ExprHandle>> outputStrides) {
-  return Compute("immut_slice", outputShape, outputStrides,
-                 [&](ParameterList &axes) {
-                   // Source tensor
-                   auto src = c10::get<BufHandle>(inputValues[0]);
-                   auto rank = src.dims().size();
+Tensor computeImmutSlice(
+    const std::vector<ArgValue>& inputValues,
+    const std::vector<ExprHandle>& outputShape,
+    c10::optional<std::vector<ExprHandle>> outputStrides) {
+  return Compute(
+      "immut_slice", outputShape, outputStrides, [&](ParameterList& axes) {
+        // Source tensor
+        auto src = c10::get<BufHandle>(inputValues[0]);
+        auto rank = src.dims().size();
 
-                   auto dim = c10::get<int64_t>(inputValues[1]);
-                   if (dim < 0)
-                     dim += rank;
-                   auto dimSize = src.dims().at(dim);
-                   // Start
-                   ExprHandle start = scalarOrConstant(inputValues[2]);
-                   // IfThenElse::make(start >= int64_t(0), Min::make(start,
-                   // dimSize, true),
-                   //                  start + dimSize);
+        auto dim = c10::get<int64_t>(inputValues[1]);
+        if (dim < 0)
+          dim += rank;
+        auto dimSize = src.dims().at(dim);
+        // Start
+        ExprHandle start = scalarOrConstant(inputValues[2]);
+        // IfThenElse::make(start >= int64_t(0), Min::make(start,
+        // dimSize, true),
+        //                  start + dimSize);
 
-                   // Step
-                   auto step = scalarOrConstant(inputValues[4]);
-                   // Source indices
-                   std::vector<ExprHandle> output_idx(axes.begin(), axes.end());
-                   output_idx[dim] = start + step * output_idx[dim];
+        // Step
+        auto step = scalarOrConstant(inputValues[4]);
+        // Source indices
+        std::vector<ExprHandle> output_idx(axes.begin(), axes.end());
+        output_idx[dim] = start + step * output_idx[dim];
 
-                   return src.load(output_idx);
-                 });
+        return src.load(output_idx);
+      });
 }
 
-Tensor
-computeImmutSliceRev(const std::vector<ArgValue> &inputValues,
-                     const std::vector<ExprHandle> &outputShape,
-                     c10::optional<std::vector<ExprHandle>> outputStrides) {
+Tensor computeImmutSliceRev(
+    const std::vector<ArgValue>& inputValues,
+    const std::vector<ExprHandle>& outputShape,
+    c10::optional<std::vector<ExprHandle>> outputStrides) {
   return Compute(
-      "slice_rev", outputShape, outputStrides, [&](ParameterList &axes) {
+      "slice_rev", outputShape, outputStrides, [&](ParameterList& axes) {
         // Tensor
         auto self = c10::get<BufHandle>(inputValues[0]);
         auto rank = self.dims().size();
@@ -101,9 +130,10 @@ computeImmutSliceRev(const std::vector<ArgValue> &inputValues,
           start = int64_t(0);
         else
           start = scalarOrConstant(inputValues[3]);
-        start =
-            IfThenElse::make(start >= int64_t(0),
-                             Min::make(start, dimSize, true), start + dimSize);
+        start = IfThenElse::make(
+            start >= int64_t(0),
+            Min::make(start, dimSize, true),
+            start + dimSize);
 
         // End
         ExprHandle end;
@@ -111,8 +141,8 @@ computeImmutSliceRev(const std::vector<ArgValue> &inputValues,
           end = dimSize;
         else
           end = scalarOrConstant(inputValues[4]);
-        end = IfThenElse::make(end >= int64_t(0), Min::make(end, dimSize, true),
-                               end + dimSize);
+        end = IfThenElse::make(
+            end >= int64_t(0), Min::make(end, dimSize, true), end + dimSize);
 
         // Step
         auto step = constant(inputValues[5]);
@@ -127,17 +157,17 @@ computeImmutSliceRev(const std::vector<ArgValue> &inputValues,
 
         // Select elements
         auto notSet = (dimAxis < start) || (dimAxis >= end) ||
-                      ((dimAxis - start) % step != int64_t(0));
+            ((dimAxis - start) % step != int64_t(0));
         auto result = IfThenElse::make(notSet, self.load(axes), srcElem);
         return result;
       });
 }
 
-Tensor
-computeImmutSelect(const std::vector<ArgValue> &inputValues,
-                   const std::vector<ExprHandle> &outputShape,
-                   c10::optional<std::vector<ExprHandle>> outputStrides) {
-  return Compute("select", outputShape, [&](ParameterList &axes) {
+Tensor computeImmutSelect(
+    const std::vector<ArgValue>& inputValues,
+    const std::vector<ExprHandle>& outputShape,
+    c10::optional<std::vector<ExprHandle>> outputStrides) {
+  return Compute("select", outputShape, [&](ParameterList& axes) {
     auto src = c10::get<BufHandle>(inputValues[0]);
     auto rank = src.dims().size();
     int64_t dim = c10::get<int64_t>(inputValues[1]);
@@ -154,11 +184,11 @@ computeImmutSelect(const std::vector<ArgValue> &inputValues,
   });
 }
 
-Tensor
-computeImmutSelectRev(const std::vector<ArgValue> &inputValues,
-                      const std::vector<ExprHandle> &outputShape,
-                      c10::optional<std::vector<ExprHandle>> outputStrides) {
-  return Compute("select_rev", outputShape, [&](ParameterList &axes) {
+Tensor computeImmutSelectRev(
+    const std::vector<ArgValue>& inputValues,
+    const std::vector<ExprHandle>& outputShape,
+    c10::optional<std::vector<ExprHandle>> outputStrides) {
+  return Compute("select_rev", outputShape, [&](ParameterList& axes) {
     auto self = c10::get<BufHandle>(inputValues[0]);
     auto rank = self.dims().size();
     auto src = c10::get<BufHandle>(inputValues[1]);
@@ -171,43 +201,47 @@ computeImmutSelectRev(const std::vector<ArgValue> &inputValues,
 
     std::vector<ExprHandle> srcAxes(axes.begin(), axes.end());
     srcAxes.erase(srcAxes.begin() + dim);
-    auto cond =
-        CompareSelect::make(axes[dim], idx, src.load(srcAxes), self.load(axes),
-                            CompareSelectOperation::kEQ);
+    auto cond = CompareSelect::make(
+        axes[dim],
+        idx,
+        src.load(srcAxes),
+        self.load(axes),
+        CompareSelectOperation::kEQ);
     return cond;
   });
 }
 
-Tensor
-computeImmutUnsqueeze(const std::vector<ArgValue> &inputValues,
-                      const std::vector<ExprHandle> &outputShape,
-                      c10::optional<std::vector<ExprHandle>> outputStrides) {
-  return Compute("unsqueeze", outputShape, outputStrides,
-                 [&](ParameterList &axes) {
-                   auto self = c10::get<BufHandle>(inputValues[0]);
-                   auto rank = self.dims().size();
-                   auto dim = c10::get<int64_t>(inputValues[1]);
-                   if (dim < 0)
-                     dim += rank + 1;
-                   auto loadAxes = axes;
-                   loadAxes.erase(loadAxes.begin() + dim);
-                   return self.load(loadAxes);
-                 });
+Tensor computeImmutUnsqueeze(
+    const std::vector<ArgValue>& inputValues,
+    const std::vector<ExprHandle>& outputShape,
+    c10::optional<std::vector<ExprHandle>> outputStrides) {
+  return Compute(
+      "unsqueeze", outputShape, outputStrides, [&](ParameterList& axes) {
+        auto self = c10::get<BufHandle>(inputValues[0]);
+        auto rank = self.dims().size();
+        auto dim = c10::get<int64_t>(inputValues[1]);
+        if (dim < 0)
+          dim += rank + 1;
+        auto loadAxes = axes;
+        loadAxes.erase(loadAxes.begin() + dim);
+        return self.load(loadAxes);
+      });
 }
 
-Tensor computeImmutView(const std::vector<ArgValue> &inputValues,
-                        const std::vector<ExprHandle> &outputShape,
-                        c10::optional<std::vector<ExprHandle>> outputStrides) {
+Tensor computeImmutView(
+    const std::vector<ArgValue>& inputValues,
+    const std::vector<ExprHandle>& outputShape,
+    c10::optional<std::vector<ExprHandle>> outputStrides) {
   auto A = c10::get<BufHandle>(inputValues[0]);
   if (A.ndim() == 0) {
-    return Compute("aten_view", outputShape,
-                   [&](const std::vector<VarHandle> &axes) {
-                     std::vector<ExprHandle> empty_indices;
-                     return A.load(empty_indices);
-                   });
+    return Compute(
+        "aten_view", outputShape, [&](const std::vector<VarHandle>& axes) {
+          std::vector<ExprHandle> empty_indices;
+          return A.load(empty_indices);
+        });
   }
   return Compute(
-      "aten_reshape", outputShape, [&](const std::vector<VarHandle> &axes) {
+      "aten_reshape", outputShape, [&](const std::vector<VarHandle>& axes) {
         std::vector<VarHandle> new_axes;
         assert(outputShape.size() == axes.size());
         /*
@@ -260,11 +294,11 @@ Tensor computeImmutView(const std::vector<ArgValue> &inputValues,
       });
 }
 
-Tensor
-computeImmutRepeat(const std::vector<ArgValue> &inputValues,
-                   const std::vector<ExprHandle> &outputShape,
-                   c10::optional<std::vector<ExprHandle>> outputStrides) {
-  return Compute("repeat", outputShape, [&](ParameterList &axes) {
+Tensor computeImmutRepeat(
+    const std::vector<ArgValue>& inputValues,
+    const std::vector<ExprHandle>& outputShape,
+    c10::optional<std::vector<ExprHandle>> outputStrides) {
+  return Compute("repeat", outputShape, [&](ParameterList& axes) {
     // Remove front axes
     auto self = c10::get<BufHandle>(inputValues[0]);
     auto inShape = self.dims();
@@ -274,12 +308,73 @@ computeImmutRepeat(const std::vector<ArgValue> &inputValues,
 
     // Update load axes
     for (auto i : c10::irange(inRank)) {
-      const auto &axis = loadAxes[i];
-      loadAxes[i] = IfThenElse::make(inShape[i] == outputShape[i], axis,
-                                     axis % inShape[i]);
+      const auto& axis = loadAxes[i];
+      loadAxes[i] = IfThenElse::make(
+          inShape[i] == outputShape[i], axis, axis % inShape[i]);
     }
 
     return self.load(loadAxes);
+  });
+}
+
+TORCH_API Tensor computeImmutPermute(
+    const std::vector<ArgValue>& inputValues,
+    const std::vector<ExprHandle>& outputShape,
+    c10::optional<std::vector<ExprHandle>> outputStrides) {
+  auto A = c10::get<BufHandle>(inputValues[0]);
+  // Trivial case of 0-dim tensors: just a copy of the input
+  if (A.ndim() == 0) {
+    auto tensor = Compute(
+        "permute",
+        outputShape,
+        outputStrides,
+        [&](const std::vector<VarHandle>& axes) {
+          std::vector<ExprHandle> empty_indices;
+          return A.load(empty_indices);
+        });
+    if (A.node()->qscale()) {
+      tensor.buf()->set_qscale(A.node()->qscale());
+      tensor.buf()->set_qzero(A.node()->qzero());
+    }
+    return tensor;
+  }
+  auto permute_dims = c10::get<IntList>(inputValues[1]);
+  auto tensor = Compute(
+      "aten_permute", outputShape, [&](const std::vector<VarHandle>& axes) {
+        std::vector<VarHandle> new_axes;
+        new_axes.resize(axes.size());
+        assert(permute_dims.size() == axes.size());
+        for (unsigned i = 0; i < axes.size(); i++) {
+          auto new_dim = at::maybe_wrap_dim(permute_dims[i], A.ndim());
+          new_axes[new_dim] = axes[i];
+        }
+        return A.load(new_axes);
+      });
+  if (A.node()->qscale()) {
+    tensor.buf()->set_qscale(A.node()->qscale());
+    tensor.buf()->set_qzero(A.node()->qzero());
+  }
+  return tensor;
+}
+
+TORCH_API Tensor computeImmutExpand(
+    const std::vector<ArgValue>& inputValues,
+    const std::vector<ExprHandle>& outputShape,
+    c10::optional<std::vector<ExprHandle>> outputStrides) {
+  auto A = c10::get<BufHandle>(inputValues[0]);
+  return Compute(
+      "expand", outputShape, [&](const std::vector<VarHandle>& axes) {
+        std::vector<ExprHandle> indices(axes.begin(), axes.end());
+        return broadcast(A, indices);
+      });
+}
+
+TORCH_API Tensor computeTensor(
+    const std::vector<ArgValue>& inputValues,
+    const std::vector<ExprHandle>& outputShape,
+    c10::optional<std::vector<ExprHandle>> outputStrides) {
+  return Compute("tensor", outputShape, [&](ParameterList& axes) {
+    return scalarOrConstant(inputValues[0]);
   });
 }
 

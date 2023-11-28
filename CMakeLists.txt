@@ -49,7 +49,7 @@ set(JSON_Install OFF CACHE INTERNAL "")
 set(SOURCES ${SOURCES} ${FAIT_SOURCES})
 
 file(GLOB CUPTI_EXT_SOURCES
-  ${PROJECT_SOURCE_DIR}/util/cupti_ext/*.cpp
+  ${PROJECT_SOURCE_DIR}/fait/util/cupti_ext/*.cpp
 )
 
 file(GLOB PROFILER_SOURCES
