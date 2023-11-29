@@ -1,3 +1,4 @@
+import os
 import time
 
 import torch
@@ -27,7 +28,7 @@ def process_feat_batch(feats):
         new_feats.append(process_feat(feat))
     return new_feats
 
-feats = torch.load("ssd_feat.pt")
+feats = torch.load(os.path.join(os.path.dirname(__file__), "ssd_feat.pt"))
 feats = process_feat_batch(feats)
 num_samples = len(feats)
 
@@ -57,6 +58,8 @@ with torch.no_grad():
     # functs.utils.evaluate_task(
     #     task(dynamo_model), "dynamo+inductor", run_duration=2.)
     # functs.utils.evaluate_task(task(fait_model), "fait", run_duration=2.)
+
+    print(functs_model.graph_for(feats[0 % num_samples]))
 
     # nvfuser
     # torch._C._jit_set_nvfuser_enabled(True)

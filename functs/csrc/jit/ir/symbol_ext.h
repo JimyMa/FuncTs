@@ -40,6 +40,9 @@ static auto PermuteRev = Symbol::fromQualString("immut::permute_rev");
 static auto Expand = Symbol::fromQualString("immut::expand");
 static auto ExpandRev = Symbol::fromQualString("immut::expand_rev");
 
+static auto ExpandAs = Symbol::fromQualString("immut::expand_as");
+static auto ExpandAsRev = Symbol::fromQualString("immut::expand_as_rev");
+
 // for fusion immutable operators
 static auto Tensor = Symbol::fromQualString("immut::tensor");
 
@@ -53,7 +56,7 @@ static std::unordered_map<Symbol, Symbol> immutableVersion{
     // {aten::view, c10::immutable::View},
     {aten::reshape, c10::immutable::Reshape},
     {aten::expand, c10::immutable::Expand},
-};
+    {aten::expand_as, c10::immutable::ExpandAs}};
 
 static std::unordered_map<Symbol, Symbol> reverseVersion{
     {c10::immutable::Assign, c10::immutable::Assign},
@@ -64,7 +67,8 @@ static std::unordered_map<Symbol, Symbol> reverseVersion{
     {c10::immutable::Unsqueeze, c10::immutable::Squeeze},
     {c10::immutable::View, c10::immutable::View},
     {c10::immutable::Reshape, c10::immutable::View},
-    {c10::immutable::Expand, c10::immutable::ExpandRev}};
+    {c10::immutable::Expand, c10::immutable::ExpandRev},
+    {c10::immutable::ExpandAs, c10::immutable::ExpandAsRev}};
 
 } // namespace immutable
 } // namespace c10

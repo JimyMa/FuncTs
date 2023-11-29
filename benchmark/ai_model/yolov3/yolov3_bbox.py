@@ -111,7 +111,7 @@ def multiclass_nms(multi_bboxes: Tensor,
     max_num = 100
 
     num_classes = multi_scores.size(1) - 1
-    bboxes = multi_bboxes[:, None].expand(143, 80, 4)
+    bboxes = multi_bboxes[:, None].expand(multi_scores.size(0), num_classes, 4)
 
     scores = multi_scores[:, :-1]
 
@@ -124,11 +124,11 @@ def multiclass_nms(multi_bboxes: Tensor,
 
     valid_mask = scores > score_thr
 
-    score_factors = score_factors.reshape(-1, 1).expand(143, 80)
+    score_factors = score_factors.reshape(-1, 1).expand(multi_scores.size(0), num_classes)
     score_factors = score_factors.reshape(-1)
     scores = scores * score_factors
 
-    inds = valid_mask.nonzero()[:, 0]
+    inds = valid_mask.nonzero()[:, 0].clone()
     bboxes, scores, labels = bboxes[inds], scores[inds], labels[inds]
 
     dets, keep = batched_nms(bboxes, scores, labels)
@@ -318,7 +318,7 @@ class YOLOV3BBox(torch.nn.Module):
         flatten_strides = []
         for pred, stride in zip(pred_maps, featmap_strides):
             pred = pred.clone()
-            pred = pred.permute(0, 2, 3, 1).reshape(1, -1, 85).clone()
+            pred = pred.permute(0, 2, 3, 1).reshape(num_imgs, -1, 85).clone()
             pred[..., :2].sigmoid_().clone()
             flatten_preds.append(pred.clone())
             flatten_strides.append(

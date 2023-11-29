@@ -13,7 +13,6 @@
 #include <functs/csrc/jit/ir/symbol_ext.h>
 #include <functs/csrc/jit/passes/convert_to_tensorssa.h>
 #include <functs/csrc/jit/passes/remove_inplace.h>
-#include <functs/csrc/jit/passes/replace_tensor_to_immute.h>
 #include <torch/csrc/jit/ir/ir.h>
 #include <torch/csrc/jit/passes/utils/memory_dag.h>
 #include <unordered_map>

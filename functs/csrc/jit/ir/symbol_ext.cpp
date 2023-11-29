@@ -87,17 +87,14 @@ at::Tensor ImmutExpandRev(
   return src.expand(sizes, implicit);
 }
 
-at::Tensor ImmutTensor(
-    int64_t t,
-    c10::optional<c10::ScalarType> type,
-    c10::optional<c10::Device> device,
-    bool requires_grad = false) {
-  auto tensor = at::scalar_to_tensor(t);
-  if (device.has_value()) {
-    tensor.to(*device);
-  }
-  tensor.set_requires_grad(requires_grad);
-  return tensor;
+at::Tensor ImmutExpandAs(at::Tensor src, at::Tensor other) {
+  return src.expand_as(other);
+}
+
+at::Tensor ImmutExpandAsRev(at::Tensor self, at::Tensor src, at::Tensor other) {
+  auto immut_self = self;
+  immut_self.expand_as(other).copy_(src);
+  return immut_self;
 }
 
 static auto _registry =
@@ -161,8 +158,12 @@ static auto _registry =
             ImmutExpandRev,
             RegisterOperators::options().aliasAnalysis(
                 c10::AliasAnalysisKind::PURE_FUNCTION))
-        .op("immut::tensor.int(int t, *, ScalarType? dtype=None, Device? device=None, bool requires_grad=False) -> Tensor",
-            ImmutTensor,
+        .op("immut::expand_as(Tensor self, Tensor other) -> Tensor",
+            ImmutExpandAs,
+            RegisterOperators::options().aliasAnalysis(
+                c10::AliasAnalysisKind::PURE_FUNCTION))
+        .op("immut::expand_as_rev(Tensor self, Tensor src, Tensor other) -> Tensor",
+            ImmutExpandAsRev,
             RegisterOperators::options().aliasAnalysis(
                 c10::AliasAnalysisKind::PURE_FUNCTION));
 static auto x = 1;
