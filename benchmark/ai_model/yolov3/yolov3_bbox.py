@@ -197,7 +197,7 @@ class YOLOV3BBox(torch.nn.Module):
         base_sizes=[[(116, 90), (156, 198), (373, 326)],
                         [(30, 61), (62, 45), (59, 119)],
                         [(10, 13), (16, 30), (33, 23)]]
-        
+
         for base_sizes_per_level in base_sizes:
             # assert len(base_sizes[0]) == len(base_sizes_per_level)
             self.base_sizes.append(
@@ -208,7 +208,7 @@ class YOLOV3BBox(torch.nn.Module):
             center = None
             if self.centers is not None:
                 center = self.centers[i]
-            
+
             x_center, y_center = center
             base_anchors = []
             for base_size in base_sizes_per_level:
@@ -232,26 +232,6 @@ class YOLOV3BBox(torch.nn.Module):
         featmap_sizes = ((10, 10), (20, 20), (40, 40))
         
         multi_level_anchors = []
-        # for i in range(3):
-        #     featmap_size = featmap_sizes[i]
-        #     base_anchors = self.base_anchors[i]
-        #     feat_h, feat_w = featmap_size
-        #     stride_w, stride_h = self.strides[i]
-
-        #     shift_x = torch.arange(0, feat_w, dtype=torch.float32, device="cuda") * stride_w
-        #     shift_y = torch.arange(0, feat_h, dtype=torch.float32, device="cuda") * stride_h
-            
-        #     shifts = torch.zeros(feat_h * feat_w, 4, device="cuda", dtype=torch.float32)
-        #     shift_xx = shift_x.repeat(feat_h)
-        #     shift_yy = shift_y.reshape(-1, 1).repeat(1, feat_w).reshape(-1)
-        #     # shifts = torch.stack([shift_xx, shift_yy, shift_xx, shift_yy], dim=-1)
-        #     shifts[:, 0].copy_(shift_xx)
-        #     shifts[:, 1].copy_(shift_yy)
-        #     shifts[:, 2].copy_(shift_xx)
-        #     shifts[:, 3].copy_(shift_yy)
-        #     anchors = base_anchors[None, :, :] + shifts[:, None, :]
-        #     anchors = anchors.reshape(-1, 4).clone()
-        #     multi_level_anchors.append(anchors)
         featmap_size = featmap_sizes[0]
         base_anchors = self.base_anchors[0]
         feat_h, feat_w = featmap_size
@@ -259,7 +239,7 @@ class YOLOV3BBox(torch.nn.Module):
 
         shift_x = torch.arange(0, feat_w, dtype=torch.float32, device="cuda") * stride_w
         shift_y = torch.arange(0, feat_h, dtype=torch.float32, device="cuda") * stride_h
-        
+
         shifts = torch.zeros(feat_h * feat_w, 4, device="cuda", dtype=torch.float32)
         shift_xx = shift_x.repeat(10)
         shift_yy = shift_y.reshape(-1, 1).repeat(1, 10).reshape(-1)

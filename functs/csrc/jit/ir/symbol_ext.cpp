@@ -87,6 +87,19 @@ at::Tensor ImmutExpandRev(
   return src.expand(sizes, implicit);
 }
 
+at::Tensor ImmutRepeat(at::Tensor self, at::IntArrayRef sizes) {
+  return self.repeat(sizes);
+}
+
+at::Tensor ImmutRepeatRev(
+    at::Tensor self,
+    at::Tensor src,
+    at::IntArrayRef sizes) {
+  auto immut_self = self;
+  immut_self.repeat(sizes).copy_(src);
+  return immut_self;
+}
+
 at::Tensor ImmutExpandAs(at::Tensor src, at::Tensor other) {
   return src.expand_as(other);
 }
@@ -95,6 +108,12 @@ at::Tensor ImmutExpandAsRev(at::Tensor self, at::Tensor src, at::Tensor other) {
   auto immut_self = self;
   immut_self.expand_as(other).copy_(src);
   return immut_self;
+}
+
+at::Tensor ImmutIndex_Tensor(
+    at::Tensor src,
+    c10::List<c10::optional<at::Tensor>> indices) {
+  return src.index(indices);
 }
 
 static auto _registry =
@@ -158,12 +177,24 @@ static auto _registry =
             ImmutExpandRev,
             RegisterOperators::options().aliasAnalysis(
                 c10::AliasAnalysisKind::PURE_FUNCTION))
+        .op("immut::repeat(Tensor self, int[] size) -> Tensor",
+            ImmutRepeat,
+            RegisterOperators::options().aliasAnalysis(
+                c10::AliasAnalysisKind::PURE_FUNCTION))
+        .op("immut::repeat_rev(Tensor self, Tensor src, int[] size) -> Tensor",
+            ImmutRepeatRev,
+            RegisterOperators::options().aliasAnalysis(
+                c10::AliasAnalysisKind::PURE_FUNCTION))
         .op("immut::expand_as(Tensor self, Tensor other) -> Tensor",
             ImmutExpandAs,
             RegisterOperators::options().aliasAnalysis(
                 c10::AliasAnalysisKind::PURE_FUNCTION))
         .op("immut::expand_as_rev(Tensor self, Tensor src, Tensor other) -> Tensor",
             ImmutExpandAsRev,
+            RegisterOperators::options().aliasAnalysis(
+                c10::AliasAnalysisKind::PURE_FUNCTION))
+        .op("immut::index.Tensor(Tensor self, Tensor?[] indices) -> Tensor",
+            ImmutIndex_Tensor,
             RegisterOperators::options().aliasAnalysis(
                 c10::AliasAnalysisKind::PURE_FUNCTION));
 static auto x = 1;

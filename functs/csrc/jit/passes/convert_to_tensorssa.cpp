@@ -500,6 +500,29 @@ void TensorSSARemoveUpdate(std::shared_ptr<Graph> graph) {
   removeUpdateImpl(graph->block());
 }
 
+void indexBoolFallback(std::shared_ptr<Graph> graph) {
+  std::function<void(Block*)> indexBoolFallbackImpl;
+  indexBoolFallbackImpl = [&indexBoolFallbackImpl](Block* b) -> void {
+    auto nodes = b->nodes();
+    for (auto node = nodes.front(); node != nodes.back();) {
+      for (auto& block : node->blocks()) {
+        indexBoolFallbackImpl(block);
+      }
+      if (immutable::Index == node->kind()) {
+        auto indices = node->input(1)->node()->inputs();
+        if (indices.front()->type()->cast<TensorType>()->scalarType() !=
+            c10::kLong) {
+          node->replaceWithNewSymbol(aten::index);
+          node = node->next();
+        }
+      } else {
+        node = node->next();
+      }
+    }
+  };
+  indexBoolFallbackImpl(graph->block());
+}
+
 void ConvertToTensorSSA(std::shared_ptr<Graph> graph) {
   // Preprocess: A dumb pass to eliminate interprecedure view
   // DumbRemoveInterPrecedureMutation(graph);
@@ -526,6 +549,9 @@ void ConvertToTensorSSA(std::shared_ptr<Graph> graph) {
 
   // Step 5. rename stack
   TensorSSARename(graph, mutateInfo);
+
+  // Step 6. fall back
+  indexBoolFallback(graph);
 }
 
 } // namespace jit

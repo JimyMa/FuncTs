@@ -117,8 +117,8 @@ void init_nnc_ext() {
   registerNNCImmutLoweringFunction(immutViewSchema, immut_view_fn);
   registerNNCImmutLoweringFunction(immutReshapeSchema, immut_view_fn);
 
-  // const char *immutRepeatSchema =
-  //     "aten::repeat(Tensor self, int[] repeats) -> Tensor";
+  const char* immutRepeatSchema =
+      "immut::repeat(Tensor self, int[] size) -> Tensor";
   const char* immutExpandSchema =
       "immut::expand(Tensor self, int[] size, *, bool implicit) -> Tensor";
   const char* immutExpandAsSchema =
@@ -130,7 +130,7 @@ void init_nnc_ext() {
                             at::Device device) {
     return computeImmutRepeat(inputs, outputShape);
   };
-  // registerNNCImmutLoweringFunction(immutRepeatSchema, immut_repeat_fn);
+  registerNNCImmutLoweringFunction(immutRepeatSchema, immut_repeat_fn);
   registerNNCImmutLoweringFunction(immutExpandSchema, immut_repeat_fn);
   registerNNCImmutLoweringFunction(immutExpandAsSchema, immut_repeat_fn);
   const char* immutPermuteSchema =
@@ -144,16 +144,28 @@ void init_nnc_ext() {
   };
   registerNNCImmutLoweringFunction(immutPermuteSchema, immut_permute_fn);
 
-  const char* tensorSchema =
-      "aten::tensor.int(int t, *, ScalarType? dtype=None, Device? device=None, bool requires_grad=False) -> Tensor";
-  auto tensor_fn = [](const std::vector<ArgValue>& inputs,
-                      const std::vector<ExprHandle>& outputShape,
-                      const std::vector<ExprHandle>& outputStrides,
-                      const c10::optional<ScalarType>& outputType,
-                      at::Device device) {
-    return computeTensor(inputs, outputShape);
+  const char* immutIndexSchema =
+      "immut::index.Tensor(Tensor self, Tensor?[] indices) -> Tensor";
+  auto immut_index_fn = [](const std::vector<ArgValue>& inputs,
+                           const std::vector<ExprHandle>& outputShape,
+                           const std::vector<ExprHandle>& outputStrides,
+                           const c10::optional<ScalarType>& outputType,
+                           at::Device device) {
+    return computeImmutIndex(inputs, outputShape);
   };
-  registerNNCImmutLoweringFunction(tensorSchema, tensor_fn);
+  registerNNCImmutLoweringFunction(immutIndexSchema, immut_index_fn);
+
+  // const char* tensorSchema =
+  //     "aten::tensor.int(int t, *, ScalarType? dtype=None, Device?
+  //     device=None, bool requires_grad=False) -> Tensor";
+  // auto tensor_fn = [](const std::vector<ArgValue>& inputs,
+  //                     const std::vector<ExprHandle>& outputShape,
+  //                     const std::vector<ExprHandle>& outputStrides,
+  //                     const c10::optional<ScalarType>& outputType,
+  //                     at::Device device) {
+  //   return computeTensor(inputs, outputShape);
+  // };
+  // registerNNCImmutLoweringFunction(tensorSchema, tensor_fn);
 }
 
 } // namespace tensorexpr

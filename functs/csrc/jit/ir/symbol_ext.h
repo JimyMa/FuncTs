@@ -43,6 +43,12 @@ static auto ExpandRev = Symbol::fromQualString("immut::expand_rev");
 static auto ExpandAs = Symbol::fromQualString("immut::expand_as");
 static auto ExpandAsRev = Symbol::fromQualString("immut::expand_as_rev");
 
+static auto Repeat = Symbol::fromQualString("immut::repeat");
+static auto RepeatRev = Symbol::fromQualString("immut::repeat_rev");
+
+static auto Index = Symbol::fromQualString("immut::index");
+static auto IndexRev = Symbol::fromQualString("immut::index_rev");
+
 // for fusion immutable operators
 static auto Tensor = Symbol::fromQualString("immut::tensor");
 
@@ -53,10 +59,13 @@ static std::unordered_map<Symbol, Symbol> immutableVersion{
     {aten::permute, c10::immutable::Permute},
     {aten::squeeze, c10::immutable::Squeeze},
     {aten::unsqueeze, c10::immutable::Unsqueeze},
-    // {aten::view, c10::immutable::View},
+    {aten::view, c10::immutable::View},
     {aten::reshape, c10::immutable::Reshape},
     {aten::expand, c10::immutable::Expand},
-    {aten::expand_as, c10::immutable::ExpandAs}};
+    {aten::expand_as, c10::immutable::ExpandAs},
+    {aten::repeat, c10::immutable::Repeat},
+    {aten::index, c10::immutable::Index},
+};
 
 static std::unordered_map<Symbol, Symbol> reverseVersion{
     {c10::immutable::Assign, c10::immutable::Assign},
@@ -68,7 +77,10 @@ static std::unordered_map<Symbol, Symbol> reverseVersion{
     {c10::immutable::View, c10::immutable::View},
     {c10::immutable::Reshape, c10::immutable::View},
     {c10::immutable::Expand, c10::immutable::ExpandRev},
-    {c10::immutable::ExpandAs, c10::immutable::ExpandAsRev}};
+    {c10::immutable::ExpandAs, c10::immutable::ExpandAsRev},
+    {c10::immutable::Repeat, c10::immutable::RepeatRev},
+    {c10::immutable::Index, c10::immutable::IndexRev},
+};
 
 } // namespace immutable
 } // namespace c10

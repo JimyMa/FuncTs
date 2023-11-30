@@ -52,14 +52,14 @@ with torch.no_grad():
 
     task = lambda fn: lambda idx: fn(*feats[0 % num_samples])
 
-    # functs.utils.evaluate_task(task(model), "eager", run_duration=2.)
+    functs.utils.evaluate_task(task(model), "eager", run_duration=2.)
     functs.utils.evaluate_task(task(jit_model), "jit", run_duration=2.)
     functs.utils.evaluate_task(task(functs_model), "functs", run_duration=2.)
     # functs.utils.evaluate_task(
     #     task(dynamo_model), "dynamo+inductor", run_duration=2.)
     # functs.utils.evaluate_task(task(fait_model), "fait", run_duration=2.)
 
-    print(functs_model.graph_for(feats[0 % num_samples]))
+    # print(functs_model.graph_for(feats[0 % num_samples]))
 
     # nvfuser
     # torch._C._jit_set_nvfuser_enabled(True)

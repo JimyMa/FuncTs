@@ -72,7 +72,9 @@ class SSDAnchorGenerator(torch.nn.Module):
             hs = (h * scales[:, None] * h_ratios[None, :]).view(-1)
 
         base_anchors = [
-            x_center - 0.5 * ws, y_center - 0.5 * hs, x_center + 0.5 * ws,
+            x_center - 0.5 * ws, 
+            y_center - 0.5 * hs, 
+            x_center + 0.5 * ws,
             y_center + 0.5 * hs
         ]
         base_anchors = torch.stack(base_anchors, dim=-1)
@@ -106,8 +108,15 @@ class SSDAnchorGenerator(torch.nn.Module):
                                dtype=dtype) * stride_w
         shift_y = torch.arange(0, feat_h, device=device,
                                dtype=dtype) * stride_h
-        shift_xx, shift_yy = self._meshgrid(shift_x, shift_y)
-        shifts = torch.stack([shift_xx, shift_yy, shift_xx, shift_yy], dim=-1)
+        # shift_xx, shift_yy = self._meshgrid(shift_x, shift_y)
+        shifts = torch.zeros(feat_h * feat_w, 4, device="cuda", dtype=torch.float32)
+        shift_xx = shift_x.repeat(feat_h)
+        shift_yy = shift_y.reshape(-1, 1).repeat(1, feat_w).reshape(-1)
+        shifts[:, 0].copy_(shift_xx)
+        shifts[:, 1].copy_(shift_yy)
+        shifts[:, 2].copy_(shift_xx)
+        shifts[:, 3].copy_(shift_yy)
+        # shifts = torch.stack([shift_xx, shift_yy, shift_xx, shift_yy], dim=-1)
         all_anchors = base_anchors[None, :, :] + shifts[:, None, :]
         all_anchors = all_anchors.view(-1, 4)
         return all_anchors
@@ -148,8 +157,10 @@ def delta2bbox(rois: Tensor,
     x1y1 = gxy - (gwh * 0.5)
     x2y2 = gxy + (gwh * 0.5)
     bboxes = torch.cat([x1y1, x2y2], dim=-1)
-    bboxes[..., 0::2].clamp_(min=0, max=max_shape[1])
-    bboxes[..., 1::2].clamp_(min=0, max=max_shape[0])
+    # bboxes[..., 0::2].clamp_(min=0, max=max_shape[1])
+    # bboxes[..., 1::2].clamp_(min=0, max=max_shape[0])
+
+    torch.clamp_(bboxes, min=0, max=max_shape[1])
 
     return bboxes.clone()
 
@@ -227,6 +238,8 @@ class SSDBBox(torch.nn.Module):
             max_sizes=[100, 150, 202, 253, 304, 320],
             scale_major=False
         )
+        self.strides = [(16, 16), (32, 32), (64, 64), (107, 107), (160, 160), (320, 320)]
+        self.base_anchors = self.prior_generator.base_anchors
 
     def forward(self,
                 cls_scores: List[Tensor],
@@ -236,10 +249,117 @@ class SSDBBox(torch.nn.Module):
         # assert len(cls_scores) == len(bbox_preds)
         featmap_sizes = [(cls_score.size(-2), cls_score.size(-1))
                          for cls_score in cls_scores]
-        mlvl_priors = self.prior_generator(
-            featmap_sizes,
-            dtype=cls_scores[0].dtype,
-            device=cls_scores[0].device)
+        # mlvl_priors = self.prior_generator(
+        #     featmap_sizes,
+        #     dtype=cls_scores[0].dtype,
+        #     device=cls_scores[0].device)
+        mlvl_priors: List[Tensor] = []
+        # for level_idx in range(6):
+            # anchors = self.single_level_grid_priors(
+            #     featmap_sizes[i], level_idx=i, dtype=dtype, device=device)
+            # print(anchors.shape)
+        base_anchors = self.base_anchors[0].to(device="cuda", dtype=torch.float32)
+        feat_h, feat_w = featmap_sizes[0]
+        stride_w, stride_h = self.strides[0]
+        shift_x = torch.arange(0, 20, device="cuda", dtype=torch.float32) * stride_w
+        shift_y = torch.arange(0, 20, device="cuda", dtype=torch.float32) * stride_h
+        shifts = torch.zeros(feat_h * feat_w, 4, device="cuda", dtype=torch.float32)
+        shift_xx = shift_x.repeat(20)
+        shift_yy = shift_y.reshape(-1, 1).repeat(1, 20).reshape(-1)
+        shifts[:, 0].copy_(shift_xx)
+        shifts[:, 1].copy_(shift_yy)
+        shifts[:, 2].copy_(shift_xx)
+        shifts[:, 3].copy_(shift_yy)
+        # shifts = torch.stack([shift_xx, shift_yy, shift_xx, shift_yy], dim=-1)
+        anchors = base_anchors[None, :, :] + shifts[:, None, :]
+        anchors = anchors.view(-1, 4).clone()
+        mlvl_priors.append(anchors)
+
+        base_anchors = self.base_anchors[1].to(device="cuda", dtype=torch.float32)
+        feat_h, feat_w = featmap_sizes[1]
+        stride_w, stride_h = self.strides[1]
+        shift_x = torch.arange(0, 10, device="cuda", dtype=torch.float32) * stride_w
+        shift_y = torch.arange(0, 10, device="cuda", dtype=torch.float32) * stride_h
+        shifts = torch.zeros(feat_h * feat_w, 4, device="cuda", dtype=torch.float32)
+        shift_xx = shift_x.repeat(10)
+        shift_yy = shift_y.reshape(-1, 1).repeat(1, 10).reshape(-1)
+        shifts[:, 0].copy_(shift_xx)
+        shifts[:, 1].copy_(shift_yy)
+        shifts[:, 2].copy_(shift_xx)
+        shifts[:, 3].copy_(shift_yy)
+        # shifts = torch.stack([shift_xx, shift_yy, shift_xx, shift_yy], dim=-1)
+        anchors = base_anchors[None, :, :] + shifts[:, None, :]
+        anchors = anchors.view(-1, 4).clone()
+        mlvl_priors.append(anchors)
+
+        base_anchors = self.base_anchors[2].to(device="cuda", dtype=torch.float32)
+        feat_h, feat_w = featmap_sizes[2]
+        stride_w, stride_h = self.strides[2]
+        shift_x = torch.arange(0, 5, device="cuda", dtype=torch.float32) * stride_w
+        shift_y = torch.arange(0, 5, device="cuda", dtype=torch.float32) * stride_h
+        shifts = torch.zeros(feat_h * feat_w, 4, device="cuda", dtype=torch.float32)
+        shift_xx = shift_x.repeat(5)
+        shift_yy = shift_y.reshape(-1, 1).repeat(1, 5).reshape(-1)
+        shifts[:, 0].copy_(shift_xx)
+        shifts[:, 1].copy_(shift_yy)
+        shifts[:, 2].copy_(shift_xx)
+        shifts[:, 3].copy_(shift_yy)
+        # shifts = torch.stack([shift_xx, shift_yy, shift_xx, shift_yy], dim=-1)
+        anchors = base_anchors[None, :, :] + shifts[:, None, :]
+        anchors = anchors.view(-1, 4).clone()
+        mlvl_priors.append(anchors)
+
+        base_anchors = self.base_anchors[3].to(device="cuda", dtype=torch.float32)
+        feat_h, feat_w = featmap_sizes[3]
+        stride_w, stride_h = self.strides[3]
+        shift_x = torch.arange(0, 3, device="cuda", dtype=torch.float32) * stride_w
+        shift_y = torch.arange(0, 3, device="cuda", dtype=torch.float32) * stride_h
+        shifts = torch.zeros(feat_h * feat_w, 4, device="cuda", dtype=torch.float32)
+        shift_xx = shift_x.repeat(3)
+        shift_yy = shift_y.reshape(-1, 1).repeat(1, 3).reshape(-1)
+        shifts[:, 0].copy_(shift_xx)
+        shifts[:, 1].copy_(shift_yy)
+        shifts[:, 2].copy_(shift_xx)
+        shifts[:, 3].copy_(shift_yy)
+        # shifts = torch.stack([shift_xx, shift_yy, shift_xx, shift_yy], dim=-1)
+        anchors = base_anchors[None, :, :] + shifts[:, None, :]
+        anchors = anchors.view(-1, 4).clone()
+        mlvl_priors.append(anchors)
+
+        base_anchors = self.base_anchors[4].to(device="cuda", dtype=torch.float32)
+        feat_h, feat_w = featmap_sizes[4]
+        stride_w, stride_h = self.strides[4]
+        shift_x = torch.arange(0, 2, device="cuda", dtype=torch.float32) * stride_w
+        shift_y = torch.arange(0, 2, device="cuda", dtype=torch.float32) * stride_h
+        shifts = torch.zeros(feat_h * feat_w, 4, device="cuda", dtype=torch.float32)
+        shift_xx = shift_x.repeat(2)
+        shift_yy = shift_y.reshape(-1, 1).repeat(1, 2).reshape(-1)
+        shifts[:, 0].copy_(shift_xx)
+        shifts[:, 1].copy_(shift_yy)
+        shifts[:, 2].copy_(shift_xx)
+        shifts[:, 3].copy_(shift_yy)
+        # shifts = torch.stack([shift_xx, shift_yy, shift_xx, shift_yy], dim=-1)
+        anchors = base_anchors[None, :, :] + shifts[:, None, :]
+        anchors = anchors.view(-1, 4).clone()
+        mlvl_priors.append(anchors)
+
+        base_anchors = self.base_anchors[5].to(device="cuda", dtype=torch.float32)
+        feat_h, feat_w = featmap_sizes[5]
+        stride_w, stride_h = self.strides[5]
+        shift_x = torch.arange(0, 1, device="cuda", dtype=torch.float32) * stride_w
+        shift_y = torch.arange(0, 1, device="cuda", dtype=torch.float32) * stride_h
+        shifts = torch.zeros(feat_h * feat_w, 4, device="cuda", dtype=torch.float32)
+        shift_xx = shift_x.repeat(1)
+        shift_yy = shift_y.reshape(-1, 1).repeat(1, 1).reshape(-1)
+        shifts[:, 0].copy_(shift_xx)
+        shifts[:, 1].copy_(shift_yy)
+        shifts[:, 2].copy_(shift_xx)
+        shifts[:, 3].copy_(shift_yy)
+        # shifts = torch.stack([shift_xx, shift_yy, shift_xx, shift_yy], dim=-1)
+        anchors = base_anchors[None, :, :] + shifts[:, None, :]
+        anchors = anchors.view(-1, 4).clone()
+        mlvl_priors.append(anchors)
+
 
         result_list: List[Tuple[Tensor, Tensor]] = []
         for img_id in range(cls_scores[0].size(0)):
@@ -261,21 +381,123 @@ class SSDBBox(torch.nn.Module):
         mlvl_bboxes = []
         mlvl_scores = []
         mlvl_labels = []
-        for cls_score, bbox_pred, priors in zip(cls_score_list, bbox_pred_list, mlvl_priors):
-            # assert cls_score.size()[-2:] == bbox_pred.size()[-2:]
-            bbox_pred = bbox_pred.permute(1, 2, 0).reshape(-1, 4)
-            cls_score = cls_score.permute(1, 2, 0).reshape(-1, self.cls_out_channels)
-            scores = cls_score.softmax(-1)[:, :-1]
-            scores, labels, keep_idxs = filter_scores_and_topk(
-                scores, score_thr, nms_pre)
+        # for cls_score, bbox_pred, priors in zip(cls_score_list, bbox_pred_list, mlvl_priors):
+        #     # assert cls_score.size()[-2:] == bbox_pred.size()[-2:]
+        #     bbox_pred = bbox_pred.clone().permute(1, 2, 0).reshape(-1, 4)
+        #     cls_score = cls_score.clone().permute(1, 2, 0).reshape(-1, self.cls_out_channels)
+        #     scores = cls_score.clone().softmax(-1)[:, :-1]
+        #     scores, labels, keep_idxs = filter_scores_and_topk(
+        #         scores, score_thr, nms_pre)
 
-            bbox_pred = bbox_pred[keep_idxs]
-            priors = priors[keep_idxs]
-            bboxes = delta2bbox(priors, bbox_pred)
+        #     bbox_pred = bbox_pred[keep_idxs]
+        #     priors = priors[keep_idxs]
+        #     bboxes = delta2bbox(priors, bbox_pred)
 
-            mlvl_bboxes.append(bboxes)
-            mlvl_scores.append(scores)
-            mlvl_labels.append(labels)
+        #     mlvl_bboxes.append(bboxes)
+        #     mlvl_scores.append(scores)
+        #     mlvl_labels.append(labels)
+        
+        cls_score = cls_score_list[0].clone()
+        bbox_pred = bbox_pred_list[0].clone()
+        priors = mlvl_priors[0]
+        bbox_pred = bbox_pred.permute(1, 2, 0).reshape(-1, 4)
+        cls_score = cls_score.permute(1, 2, 0).reshape(-1, 81)
+        scores = cls_score.softmax(-1)[:, :-1]
+        scores, labels, keep_idxs = filter_scores_and_topk(
+            scores, score_thr, nms_pre)
+
+        bbox_pred = bbox_pred[keep_idxs]
+        priors = priors[keep_idxs]
+        bboxes = delta2bbox(priors, bbox_pred)
+
+        mlvl_bboxes.append(bboxes)
+        mlvl_scores.append(scores)
+        mlvl_labels.append(labels)
+
+        cls_score = cls_score_list[1].clone()
+        bbox_pred = bbox_pred_list[1].clone()
+        priors = mlvl_priors[1]
+        bbox_pred = bbox_pred.permute(1, 2, 0).reshape(-1, 4)
+        cls_score = cls_score.permute(1, 2, 0).reshape(-1, 81)
+        scores = cls_score.softmax(-1)[:, :-1]
+        scores, labels, keep_idxs = filter_scores_and_topk(
+            scores, score_thr, nms_pre)
+
+        bbox_pred = bbox_pred[keep_idxs]
+        priors = priors[keep_idxs]
+        bboxes = delta2bbox(priors, bbox_pred)
+
+        mlvl_bboxes.append(bboxes)
+        mlvl_scores.append(scores)
+        mlvl_labels.append(labels)
+
+        cls_score = cls_score_list[2].clone()
+        bbox_pred = bbox_pred_list[2].clone()
+        priors = mlvl_priors[2]
+        bbox_pred = bbox_pred.permute(1, 2, 0).reshape(-1, 4)
+        cls_score = cls_score.permute(1, 2, 0).reshape(-1, 81)
+        scores = cls_score.softmax(-1)[:, :-1]
+        scores, labels, keep_idxs = filter_scores_and_topk(
+            scores, score_thr, nms_pre)
+
+        bbox_pred = bbox_pred[keep_idxs]
+        priors = priors[keep_idxs]
+        bboxes = delta2bbox(priors, bbox_pred)
+
+        mlvl_bboxes.append(bboxes)
+        mlvl_scores.append(scores)
+        mlvl_labels.append(labels)
+
+        cls_score = cls_score_list[3].clone()
+        bbox_pred = bbox_pred_list[3].clone()
+        priors = mlvl_priors[3]
+        bbox_pred = bbox_pred.permute(1, 2, 0).reshape(-1, 4)
+        cls_score = cls_score.permute(1, 2, 0).reshape(-1, 81)
+        scores = cls_score.softmax(-1)[:, :-1]
+        scores, labels, keep_idxs = filter_scores_and_topk(
+            scores, score_thr, nms_pre)
+
+        bbox_pred = bbox_pred[keep_idxs]
+        priors = priors[keep_idxs]
+        bboxes = delta2bbox(priors, bbox_pred)
+
+        mlvl_bboxes.append(bboxes)
+        mlvl_scores.append(scores)
+        mlvl_labels.append(labels)
+
+        cls_score = cls_score_list[4].clone()
+        bbox_pred = bbox_pred_list[4].clone()
+        priors = mlvl_priors[4]
+        bbox_pred = bbox_pred.permute(1, 2, 0).reshape(-1, 4)
+        cls_score = cls_score.permute(1, 2, 0).reshape(-1, 81)
+        scores = cls_score.softmax(-1)[:, :-1]
+        scores, labels, keep_idxs = filter_scores_and_topk(
+            scores, score_thr, nms_pre)
+
+        bbox_pred = bbox_pred[keep_idxs]
+        priors = priors[keep_idxs]
+        bboxes = delta2bbox(priors, bbox_pred)
+
+        mlvl_bboxes.append(bboxes)
+        mlvl_scores.append(scores)
+        mlvl_labels.append(labels)
+
+        cls_score = cls_score_list[5].clone()
+        bbox_pred = bbox_pred_list[5].clone()
+        priors = mlvl_priors[5]
+        bbox_pred = bbox_pred.permute(1, 2, 0).reshape(-1, 4)
+        cls_score = cls_score.permute(1, 2, 0).reshape(-1, 81)
+        scores = cls_score.softmax(-1)[:, :-1]
+        scores, labels, keep_idxs = filter_scores_and_topk(
+            scores, score_thr, nms_pre)
+
+        bbox_pred = bbox_pred[keep_idxs]
+        priors = priors[keep_idxs]
+        bboxes = delta2bbox(priors, bbox_pred)
+
+        mlvl_bboxes.append(bboxes)
+        mlvl_scores.append(scores)
+        mlvl_labels.append(labels)
 
         mlvl_bboxes = torch.cat(mlvl_bboxes)
         mlvl_scores = torch.cat(mlvl_scores)

@@ -1,3 +1,4 @@
+import os
 import time
 
 import torch
@@ -29,7 +30,7 @@ def process_feat_batch(feats):
         new_feats.append(process_feat(feat))
     return new_feats
 
-feats = torch.load("yolact_feat.pt")
+feats = torch.load(os.path.join(os.path.dirname(__file__), "yolact_feat.pt"))
 feats = process_feat_batch(feats)
 num_samples = len(feats)
 
@@ -49,16 +50,18 @@ with torch.no_grad():
     functs_model = functs.jit.script(model)
 
     # aot backend
-    fait_model = functs.jit.build(functs.jit.script(model, backend="aot"), feats[0]) 
+    # fait_model = functs.jit.build(functs.jit.script(model, backend="aot"), feats[0]) 
 
-    task = lambda fn: lambda idx: fn(*feats[idx % num_samples])
+    task = lambda fn: lambda _: fn(*feats[0 % num_samples])
 
     functs.utils.evaluate_task(task(model), "eager", run_duration=2.)
     functs.utils.evaluate_task(task(jit_model), "jit", run_duration=2.)
     functs.utils.evaluate_task(task(functs_model), "functs", run_duration=2.)
     functs.utils.evaluate_task(
         task(dynamo_model), "dynamo+inductor", run_duration=2.)
-    functs.utils.evaluate_task(task(fait_model), "fait", run_duration=2.)
+    # functs.utils.evaluate_task(task(fait_model), "fait", run_duration=2.)
+
+    # print(functs_model.graph_for(feats[0]))
 
     # nvfuser
     torch._C._jit_set_nvfuser_enabled(True)

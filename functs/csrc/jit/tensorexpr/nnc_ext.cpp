@@ -369,6 +369,28 @@ TORCH_API Tensor computeImmutExpand(
       });
 }
 
+TORCH_API Tensor computeImmutIndex(
+    const std::vector<ArgValue>& inputValues,
+    const std::vector<ExprHandle>& outputShape,
+    c10::optional<std::vector<ExprHandle>> outputStrides) {
+  return Compute("index", outputShape, [&](const std::vector<VarHandle>& axes) {
+    // Process inputs
+    auto self = c10::get<BufHandle>(inputValues[0]);
+    auto indexBuf = c10::get<BufList>(inputValues[1]).front();
+    auto indexRank = indexBuf.dims().size();
+
+    // Load index
+    std::vector<VarHandle> indexAxes(axes.begin(), axes.begin() + indexRank);
+    auto index = indexBuf.load(indexAxes);
+
+    // Select `self` at dim 0 with loaded index
+    std::vector<ExprHandle> selfAxes(axes.begin() + indexRank, axes.end());
+    selfAxes.insert(selfAxes.begin(), index);
+
+    return self.load(selfAxes);
+  });
+}
+
 TORCH_API Tensor computeTensor(
     const std::vector<ArgValue>& inputValues,
     const std::vector<ExprHandle>& outputShape,
