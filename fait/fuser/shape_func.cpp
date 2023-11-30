@@ -6,7 +6,9 @@ namespace torch {
 namespace jit {
 namespace tensorexpr {
 
-static ShapeVec getScalarShape(SHAPE_FUNC_PARAMS) { return {}; }
+static ShapeVec getScalarShape(SHAPE_FUNC_PARAMS) {
+  return {};
+}
 
 static ShapeVec computeAsShape(SHAPE_FUNC_PARAMS) {
   return GET_BUF_AT(1).dims();
@@ -88,8 +90,8 @@ static ShapeVec computeSliceShape(SHAPE_FUNC_PARAMS) {
     start = LongImm::make(0);
   else
     start = getScalarExpr<int64_t>(startVal, valueToExpr);
-  start = IfThenElse::make(start >= int64_t(0), Min::make(start, dimSize, true),
-                           start + dimSize);
+  start = IfThenElse::make(
+      start >= int64_t(0), Min::make(start, dimSize, true), start + dimSize);
 
   // End
   auto endVal = node->input(3);
@@ -98,8 +100,8 @@ static ShapeVec computeSliceShape(SHAPE_FUNC_PARAMS) {
     end = dimSize;
   else
     end = getScalarExpr<int64_t>(endVal, valueToExpr);
-  end = IfThenElse::make(end >= int64_t(0), Min::make(end, dimSize, true),
-                         end + dimSize);
+  end = IfThenElse::make(
+      end >= int64_t(0), Min::make(end, dimSize, true), end + dimSize);
 
   // Step
   int64_t step = GET_INT_CONST_AT(4);
@@ -150,9 +152,11 @@ static ShapeVec computeReshapeShape(SHAPE_FUNC_PARAMS) {
   // Count elements in source tensor
   auto src = GET_BUF_AT(0);
   auto srcShape = src.dims();
-  auto srcCount =
-      std::accumulate(srcShape.begin(), srcShape.end(), LongImm::make(1),
-                      std::mem_fn(&ExprHandle::operator*));
+  auto srcCount = std::accumulate(
+      srcShape.begin(),
+      srcShape.end(),
+      LongImm::make(1),
+      std::mem_fn(&ExprHandle::operator*));
 
   // Count elements in new tensor
   auto result = GET_INT_EXPR_LIST_AT(1);
@@ -194,8 +198,8 @@ static ShapeVec computeExpandShape(SHAPE_FUNC_PARAMS) {
     else if (sizeIdx < 0)
       outDim = inShape[inIdx];
     else
-      outDim = IfThenElse::make(size[sizeIdx] < int64_t(0), inShape[inIdx],
-                                size[sizeIdx]);
+      outDim = IfThenElse::make(
+          size[sizeIdx] < int64_t(0), inShape[inIdx], size[sizeIdx]);
     outShape[outIdx] = outDim;
   }
 
@@ -314,15 +318,22 @@ OperatorMap<NNCShapeFunction> shapeFuncs{
      computeTransposeShape},
     {"aten::permute(Tensor(a) self, int[] dims) -> Tensor(a)",
      computePermuteShape},
+    {"immut::permute(Tensor self, int[] sizes) -> Tensor", computePermuteShape},
     {"aten::reshape(Tensor(a) self, SymInt[] shape) -> Tensor(a)",
      computeReshapeShape},
+    {"immut::reshape(Tensor self, int[] size) -> Tensor", computeReshapeShape},
+    {"immut::view(Tensor self, int[] size) -> Tensor", computeReshapeShape},
     {"aten::expand(Tensor(a) self, SymInt[] size, *, bool implicit=False) -> "
      "Tensor(a)",
      computeExpandShape},
+    {"immut::expand(Tensor self, int[] size, *, bool implicit) -> Tensor",
+     computeExpandShape},
     {"aten::expand_as(Tensor(a) self, Tensor other) -> Tensor(a)",
      computeAsShape},
+    {"immut::expand_as(Tensor self, Tensor other) -> Tensor", computeAsShape},
     {"aten::repeat(Tensor self, SymInt[] repeats) -> Tensor",
      computeRepeatShape},
+    {"immut::repeat(Tensor self, int[] size) -> Tensor", computeRepeatShape},
     {"aten::index.Tensor(Tensor self, Tensor?[] indices) -> Tensor",
      computeIndexShape},
     {"aten::cat(Tensor[] tensors, int dim=0) -> Tensor", computeCatShape},

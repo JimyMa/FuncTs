@@ -29,8 +29,6 @@ data_1660ti = np.stack([latency_eager_normal,
                         latency_functs_normal])
 
 
-
-
 # 3090
 models =                        ["YOLOV3",     "SSD",        "YOLACT",      "FCOS",                 "NASRNN", "LSTM", "seq2seq", "Attention"]
 latency_eager =    1 / np.array([1.443 + 1.49, 4.092 + 1.52, 4.354 + 1.83,  2.77 + 8.75,            13.23,    105.2,  19.13,     3.241,     ])

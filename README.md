@@ -197,7 +197,6 @@ The functional part of the program can be representated as a direct acyclic grap
 ## Benchmark
 
 ### Latency Benchmark
-
 - The performance speed up is shown as follow:
 
 ![latency](./docs/imgs/latency.jpg)

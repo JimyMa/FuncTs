@@ -27,7 +27,7 @@ class MlvlPointGenerator(torch.nn.Module):
             priors = self.single_level_grid_priors(
                 featmap_sizes[i], level_idx=i, dtype=dtype, device=device
             )
-            multi_level_priors.append(priors)
+            multi_level_priors.append(priors.clone())
         return multi_level_priors
 
     def single_level_grid_priors(
@@ -43,8 +43,12 @@ class MlvlPointGenerator(torch.nn.Module):
                    self.offset) * stride_w
         shift_y = (torch.arange(0, feat_h, dtype=dtype, device=device) +
                    self.offset) * stride_h
-        shift_xx, shift_yy = self._meshgrid(shift_x, shift_y)
-        shifts = torch.stack([shift_xx, shift_yy], dim=-1)
+        shifts = torch.zeros(feat_h * feat_w, 2, device="cuda", dtype=torch.float32)
+        shift_xx = shift_x.repeat(feat_h)
+        shift_yy = shift_y.reshape(-1, 1).repeat(1, feat_w).reshape(-1)
+        # shifts = torch.stack([shift_xx, shift_yy, shift_xx, shift_yy], dim=-1)
+        shifts[:, 0].copy_(shift_xx)
+        shifts[:, 1].copy_(shift_yy)
         return shifts
 
     def _meshgrid(self, x: Tensor, y: Tensor) -> Tuple[Tensor, Tensor]:

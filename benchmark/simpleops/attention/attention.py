@@ -5,8 +5,6 @@ from torch import nn
 from torch.profiler import profile, ProfilerActivity
 
 
-
-
 parser = argparse.ArgumentParser()
 parser.add_argument('--bs', type=int, default=1)
 parser.add_argument('--maxlength', type=int, default=50)
@@ -78,7 +76,7 @@ with torch.no_grad():
     timer_eager = functs.utils.evaluate_func(model, [x, k, v], "eager", run_duration=2.)
     timer_jit = functs.utils.evaluate_func(jit_model, [x, k, v], "jit", run_duration=2.)
     timer_functs = functs.utils.evaluate_func(functs_model, [x, k, v], "functs", run_duration=2.)
-    timer_fait = functs.utils.evaluate_func(fait_model, [x, k, v], "fait", run_duration=2.)
+    # timer_fait = functs.utils.evaluate_func(fait_model, [x, k, v], "fait", run_duration=2.)
     timer_dynamo = functs.utils.evaluate_func(dynamo_model, [x, k, v], "dynamo", run_duration=2.)
 
     torch._C._jit_set_nvfuser_enabled(True)

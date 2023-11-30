@@ -25,29 +25,31 @@ namespace torch {
 namespace jit {
 
 struct TensorSSAMutateInfo {
-  std::vector<Value *> mutValues{};
-  std::unordered_map<Value *, std::vector<Node *>> mutNodes{};
-  std::unordered_map<Value *, Value *> valueToMut{};
-  std::unordered_map<Value *, std::vector<Value *>> renameStacks{};
+  std::vector<Value*> mutValues{};
+  std::unordered_map<Value*, std::vector<Node*>> mutNodes{};
+  std::unordered_map<Value*, Value*> valueToMut{};
+  std::unordered_map<Value*, std::vector<Value*>> renameStacks{};
 
-  void addMutNodes(Node *updateNode) {
-    AT_ASSERT(tensorssa::Update == updateNode->kind(),
-              "don't forget we use update node to annotate mutation");
+  void addMutNodes(Node* updateNode) {
+    AT_ASSERT(
+        tensorssa::Update == updateNode->kind(),
+        "don't forget we use update node to annotate mutation");
 
     auto mutated = updateNode->input(1);
     auto mutatee = updateNode->input(0);
 
     if (!mutNodes.count(mutated)) {
       mutValues.push_back(mutated);
-      mutNodes.insert({mutated, std::vector<Node *>()});
+      mutNodes.insert({mutated, std::vector<Node*>()});
     }
     valueToMut.insert({mutatee, mutated});
     mutNodes[mutated].push_back(updateNode);
   }
 };
 
-static void GetBufferTreeAliasDb(std::shared_ptr<Graph> g,
-                                 AliasDbCopy &aliasDb_buffer_tree) {
+static void GetBufferTreeAliasDb(
+    std::shared_ptr<Graph> g,
+    AliasDbCopy& aliasDb_buffer_tree) {
   // g: Graph-level IR based tensor program
   // alias_db_buffer_tree: modified alias relationship
 
@@ -59,18 +61,19 @@ static void GetBufferTreeAliasDb(std::shared_ptr<Graph> g,
   bool any_changed = true;
   auto elementMap = aliasDb_buffer_tree.elementMapMutable();
 
-  ska::flat_hash_map<const Value *, Element *> ambigious_alias;
+  ska::flat_hash_map<const Value*, Element*> ambigious_alias;
 
   // Step 1
-  for (const auto &ptrPair : elementMap) {
+  for (const auto& ptrPair : elementMap) {
     auto value = ptrPair.first;
     auto element = ptrPair.second;
 
     if (element->pointsTo.count() > 1 /* Step 1.1: count > 1 */ ||
-        aliasDb_buffer_tree.mayAliasWildcard(value) /* Inter-procedure dependency */ ||
-        prim::Loop == value->node()->kind() /* Loop carried dependency */ ||
+        aliasDb_buffer_tree.mayAliasWildcard(
+            value) /* Inter-procedure dependency */
+        || prim::Loop == value->node()->kind() /* Loop carried dependency */ ||
         prim::If == value->node()->kind() /* Control flow dependency */ ||
-        element->values.size() > 1 /* Container dependency */ || 
+        element->values.size() > 1 /* Container dependency */ ||
         value->type()->kind() == TypeKind::ListType ||
         value->type()->kind() == TypeKind::DictType ||
         value->type()->kind() == TypeKind::ClassType) {
@@ -78,12 +81,12 @@ static void GetBufferTreeAliasDb(std::shared_ptr<Graph> g,
     }
   }
 
-  ska::flat_hash_map<const Value *, Element *> may_alias;
+  ska::flat_hash_map<const Value*, Element*> may_alias;
 
   // Step 1.2
   // get may_alias
-  for (const auto &ptrPair : elementMap) {
-    for (const auto &ptrPairAmbigious : ambigious_alias) {
+  for (const auto& ptrPair : elementMap) {
+    for (const auto& ptrPairAmbigious : ambigious_alias) {
       if (aliasDb_buffer_tree.mayAlias(ptrPair.first, ptrPairAmbigious.first) &&
           !may_alias.count(ptrPair.first)) {
         may_alias.insert(ptrPair);
@@ -92,26 +95,26 @@ static void GetBufferTreeAliasDb(std::shared_ptr<Graph> g,
   }
 
   // Delete from elementMap
-  for (const auto &ptrPair : may_alias) {
+  for (const auto& ptrPair : may_alias) {
     aliasDb_buffer_tree.elementMapErase(ptrPair.first);
   }
 }
 
-static std::shared_ptr<BufferForest>
-TensorSSAGetBufferForest(std::shared_ptr<Graph> graph) { // AliasDb
+static std::shared_ptr<BufferForest> TensorSSAGetBufferForest(
+    std::shared_ptr<Graph> graph) { // AliasDb
   auto aliasDb_buffer_tree = AliasDbCopy(graph);
 
   GetBufferTreeAliasDb(graph, aliasDb_buffer_tree);
 
   auto bufferForest = std::make_shared<BufferForest>();
   auto elementMap = aliasDb_buffer_tree.elementMap();
-  for (auto &elemPtr : elementMap) {
+  for (auto& elemPtr : elementMap) {
     auto value = elemPtr.first;
     auto elem = elemPtr.second;
     for (auto pointToIndex : elem->pointsTo) {
       bufferForest->addEdgeToBufferForest(
-          const_cast<Value *>(value),
-          const_cast<Value *>(
+          const_cast<Value*>(value),
+          const_cast<Value*>(
               *aliasDb_buffer_tree.fromIndex(pointToIndex)->values.begin()));
     }
   }
@@ -122,9 +125,10 @@ TensorSSAGetBufferForest(std::shared_ptr<Graph> graph) { // AliasDb
   return bufferForest;
 }
 
-static void
-TensorSSAAliasRemoval(Block *b, std::shared_ptr<BufferForest> bufferForest,
-                      std::shared_ptr<TensorSSAMutateInfo> mutateInfo) {
+static void TensorSSAAliasRemoval(
+    Block* b,
+    std::shared_ptr<BufferForest> bufferForest,
+    std::shared_ptr<TensorSSAMutateInfo> mutateInfo) {
   auto nodes = b->nodes();
   for (auto node = nodes.front(); node != nodes.back();) {
     auto blocks = node->blocks();
@@ -138,10 +142,10 @@ TensorSSAAliasRemoval(Block *b, std::shared_ptr<BufferForest> bufferForest,
       // TODO: only tensor values are considered...
       // Step 1. Pass Up
       auto interupt = node->next();
-      const Value *points_to;
-      Value *leaf_value = node->output(0);
-      Value *pass_up_value = node->input(0);
-      Node *node_insert = node;
+      const Value* points_to;
+      Value* leaf_value = node->output(0);
+      Value* pass_up_value = node->input(0);
+      Node* node_insert = node;
       do {
         // substitute to buffer node
         auto leaf_buffer_node = bufferForest->getBufferTreeOrNone(leaf_value)
@@ -152,25 +156,28 @@ TensorSSAAliasRemoval(Block *b, std::shared_ptr<BufferForest> bufferForest,
         // the storage.
         if (points_to_node) {
           points_to = points_to_node->bufferNode_->var;
-          Node *pass_up_node;
+          Node* pass_up_node;
           auto leaf_node = leaf_value->node();
 
           if (immutable::reverseVersion.count(leaf_node->kind())) {
             pass_up_node = b->owningGraph()->create(
                 immutable::reverseVersion[leaf_node->kind()],
-                leaf_value->node()->inputs(), 1);
+                leaf_value->node()->inputs(),
+                1);
             if (immutable::Assign != leaf_node->kind())
               pass_up_node->insertInput(1, pass_up_value);
           } else {
-            AT_ASSERT(false, "Unknown alias operator when pass up",
-                      leaf_node->kind().toQualString());
+            AT_ASSERT(
+                false,
+                "Unknown alias operator when pass up",
+                leaf_node->kind().toQualString());
           }
           pass_up_node->output(0)->setType(leaf_value->type());
           pass_up_value = pass_up_node->output(0);
 
           pass_up_node->insertAfter(node_insert);
           node_insert = pass_up_node;
-          leaf_value = const_cast<Value *>(points_to);
+          leaf_value = const_cast<Value*>(points_to);
         } else {
           points_to = nullptr;
         }
@@ -179,20 +186,22 @@ TensorSSAAliasRemoval(Block *b, std::shared_ptr<BufferForest> bufferForest,
       // Step 2. pass down
       // Pass down non recursive implementation
       struct VisitNode {
-        VisitNode(Value *root, Value *pass_down, Node *update)
-            : root_value(root), pass_down_value(pass_down),
+        VisitNode(Value* root, Value* pass_down, Node* update)
+            : root_value(root),
+              pass_down_value(pass_down),
               update_node(update){};
         bool visted{false};
-        Value *root_value;
-        Value *pass_down_value;
-        Node *update_node;
+        Value* root_value;
+        Value* pass_down_value;
+        Node* update_node;
       };
 
-      Value *root_value = leaf_value;
-      Value *pass_down_value = pass_up_value;
+      Value* root_value = leaf_value;
+      Value* pass_down_value = pass_up_value;
 
       auto update_node = b->owningGraph()->create(
-          tensorssa::Update, {pass_down_value->node()->output(), root_value},
+          tensorssa::Update,
+          {pass_down_value->node()->output(), root_value},
           0);
       update_node->insertAfter(node_insert);
       mutateInfo->addMutNodes(update_node);
@@ -216,38 +225,42 @@ TensorSSAAliasRemoval(Block *b, std::shared_ptr<BufferForest> bufferForest,
             auto from_node = from_value->node();
 
             // node is dominated by from_node is nesessary !!!
-            // the variable `copy_` at escaping scope may cause soundness concern !!!
-            // def func(a, b):
+            // the variable `copy_` at escaping scope may cause soundness
+            // concern !!! def func(a, b):
             // // if cond:
             // // // c = a[0]
             // // else:
             // // // pass
             // // c.copy_(b)
-            // a tensor which is not dominated by value try to mutate the value is forbidden in Functionalization
-            // NOTE: this feature is unsupported in TorchScript either.
+            // a tensor which is not dominated by value try to mutate the value
+            // is forbidden in Functionalization NOTE: this feature is
+            // unsupported in TorchScript either.
 
             // For easily comperahension, If from node is node, generate a new
             // immut::assign (this cond can be remove)*/
 
             if ((from_node->isBefore(node) && node->isDominatedBy(from_node)) ||
                 from_node == node) {
-              Node *pass_down_node;
+              Node* pass_down_node;
               if (immutable::reverseVersion.count(from_node->kind())) {
                 pass_down_node = b->owningGraph()->create(
-                    from_node->kind(), const_cast<Node *>(from_node)->inputs(),
+                    from_node->kind(),
+                    const_cast<Node*>(from_node)->inputs(),
                     1);
                 if (immutable::Assign != from_node->kind())
-                  pass_down_node->replaceInput(0,
-                                               visitingNode->pass_down_value);
+                  pass_down_node->replaceInput(
+                      0, visitingNode->pass_down_value);
                 else {
-                  pass_down_node->replaceInput(0,
-                                               visitingNode->pass_down_value);
-                  pass_down_node->replaceInput(1,
-                                               visitingNode->pass_down_value);
+                  pass_down_node->replaceInput(
+                      0, visitingNode->pass_down_value);
+                  pass_down_node->replaceInput(
+                      1, visitingNode->pass_down_value);
                 }
               } else {
-                AT_ASSERT(false, "Unknown alias operator when pass down",
-                          from_node->kind().toQualString());
+                AT_ASSERT(
+                    false,
+                    "Unknown alias operator when pass down",
+                    from_node->kind().toQualString());
               }
               // b->owningGraph()->insertNode(pass_down_node);
               pass_down_node->insertAfter(
@@ -281,8 +294,9 @@ TensorSSAAliasRemoval(Block *b, std::shared_ptr<BufferForest> bufferForest,
   }
 }
 
-void TensorSSAImmutablize(Block *b,
-                          std::shared_ptr<BufferForest> buffer_forest) {
+void TensorSSAImmutablize(
+    Block* b,
+    std::shared_ptr<BufferForest> buffer_forest) {
   auto nodes = b->nodes();
   for (auto node = nodes.front(); node != nodes.back();) {
     auto blocks = node->blocks();
@@ -329,8 +343,11 @@ void DumbRemoveInterPrecedureMutation(std::shared_ptr<Graph> graph) {
 }
 
 static void addMutatedValueToBlock(
-    Value *mutated, Block *block, std::unordered_set<Block *> &visitedBlocks,
-    std::shared_ptr<TensorSSAMutateInfo> mutateInfo, bool handleNode = true) {
+    Value* mutated,
+    Block* block,
+    std::unordered_set<Block*>& visitedBlocks,
+    std::shared_ptr<TensorSSAMutateInfo> mutateInfo,
+    bool handleNode = true) {
   // Skip if this block if visited before
   if (visitedBlocks.count(block))
     return;
@@ -346,34 +363,33 @@ static void addMutatedValueToBlock(
 
   // Handle values that are specific to node kinds
   switch (node->kind()) {
-  case prim::Loop: {
-    // add to block parameter of loop body
-    auto param = block->addInput();
-    mutateInfo->valueToMut.insert({param, mutated});
-    // add to argument of loop node
-    node->addInput(mutated);
-    break;
-  }
+    case prim::Loop: {
+      // add to block parameter of loop body
+      auto param = block->addInput();
+      mutateInfo->valueToMut.insert({param, mutated});
+      // add to argument of loop node
+      node->addInput(mutated);
+      break;
+    }
 
-  case prim::If: {
-    // add to the block of the other branch
-    auto blockId = block == node->blocks()[1];
-    addMutatedValueToBlock(mutated, node->blocks()[!blockId], visitedBlocks,
-                           mutateInfo, false);
-    break;
-  }
+    case prim::If: {
+      // add to the block of the other branch
+      auto blockId = block == node->blocks()[1];
+      addMutatedValueToBlock(
+          mutated, node->blocks()[!blockId], visitedBlocks, mutateInfo, false);
+      break;
+    }
   }
 }
 
-static void
-TensorSSAPropagation(std::shared_ptr<Graph> graph,
-                     std::shared_ptr<TensorSSAMutateInfo> mutateInfo) {
-
-  for (auto &mutated : mutateInfo->mutValues) {
+static void TensorSSAPropagation(
+    std::shared_ptr<Graph> graph,
+    std::shared_ptr<TensorSSAMutateInfo> mutateInfo) {
+  for (auto& mutated : mutateInfo->mutValues) {
     mutateInfo->valueToMut.insert({mutated, mutated});
     auto defBlock = mutated->node()->owningBlock();
-    std::unordered_set<Block *> visitedBlocks;
-    auto &nodes = mutateInfo->mutNodes[mutated];
+    std::unordered_set<Block*> visitedBlocks;
+    auto& nodes = mutateInfo->mutNodes[mutated];
     for (auto node : nodes) {
       for (auto block = node->owningBlock(); block != defBlock;
            block = block->owningNode()->owningBlock()) {
@@ -383,13 +399,14 @@ TensorSSAPropagation(std::shared_ptr<Graph> graph,
   }
 }
 
-static void renameValues(Block *block,
-                         std::shared_ptr<TensorSSAMutateInfo> mutateInfo) {
+static void renameValues(
+    Block* block,
+    std::shared_ptr<TensorSSAMutateInfo> mutateInfo) {
   // Initialize rename counts in current scope
-  std::unordered_map<Value *, size_t> renameCounts;
-  auto updateValue = [&](Value *value) {
+  std::unordered_map<Value*, size_t> renameCounts;
+  auto updateValue = [&](Value* value) {
     // find mutated version of this value
-    Value *mutated = nullptr;
+    Value* mutated = nullptr;
     if (mutateInfo->valueToMut.count(value)) {
       mutated = mutateInfo->valueToMut[value];
     } else {
@@ -411,7 +428,7 @@ static void renameValues(Block *block,
     else
       renameCounts.insert({mutated, 1});
   };
-  auto replaceInputsOf = [&](Node *node) -> void {
+  auto replaceInputsOf = [&](Node* node) -> void {
     if (tensorssa::Update == node->kind())
       return;
     for (auto i = 0u; i < node->inputs().size(); i++) {
@@ -444,25 +461,26 @@ static void renameValues(Block *block,
   replaceInputsOf(block->return_node());
 
   // Restore rename stack
-  for (auto &pair : renameCounts) {
+  for (auto& pair : renameCounts) {
     for (auto i = 0u; i < pair.second; i++)
       mutateInfo->renameStacks[pair.first].pop_back();
   }
 }
 
-static void TensorSSARename(std::shared_ptr<Graph> graph,
-                            std::shared_ptr<TensorSSAMutateInfo> mutateInfo) {
+static void TensorSSARename(
+    std::shared_ptr<Graph> graph,
+    std::shared_ptr<TensorSSAMutateInfo> mutateInfo) {
   for (auto value : mutateInfo->mutValues)
     mutateInfo->renameStacks.insert({value, {}});
   renameValues(graph->block(), mutateInfo);
 }
 
 void TensorSSARemoveUpdate(std::shared_ptr<Graph> graph) {
-  std::function<void(Block *)> removeUpdateImpl;
-  removeUpdateImpl = [&removeUpdateImpl](Block *b) -> void {
+  std::function<void(Block*)> removeUpdateImpl;
+  removeUpdateImpl = [&removeUpdateImpl](Block* b) -> void {
     auto nodes = b->nodes();
     for (auto node = nodes.front(); node != nodes.back();) {
-      for (auto &block : node->blocks()) {
+      for (auto& block : node->blocks()) {
         removeUpdateImpl(block);
       }
       if (tensorssa::Update == node->kind()) {
@@ -482,12 +500,36 @@ void TensorSSARemoveUpdate(std::shared_ptr<Graph> graph) {
   removeUpdateImpl(graph->block());
 }
 
+void indexBoolFallback(std::shared_ptr<Graph> graph) {
+  std::function<void(Block*)> indexBoolFallbackImpl;
+  indexBoolFallbackImpl = [&indexBoolFallbackImpl](Block* b) -> void {
+    auto nodes = b->nodes();
+    for (auto node = nodes.front(); node != nodes.back();) {
+      for (auto& block : node->blocks()) {
+        indexBoolFallbackImpl(block);
+      }
+      if (immutable::Index == node->kind()) {
+        auto indices = node->input(1)->node()->inputs();
+        if (indices.front()->type()->cast<TensorType>()->scalarType() !=
+            c10::kLong) {
+          node->replaceWithNewSymbol(aten::index);
+          node = node->next();
+        }
+      } else {
+        node = node->next();
+      }
+    }
+  };
+  indexBoolFallbackImpl(graph->block());
+}
+
 void ConvertToTensorSSA(std::shared_ptr<Graph> graph) {
   // Preprocess: A dumb pass to eliminate interprecedure view
   // DumbRemoveInterPrecedureMutation(graph);
 
   // Step 0. convert inplace operator (add_, mul_, ...) to copy_
   RemoveInplace(graph);
+  // ReplaceTensorToImmute(graph);
 
   // Step 1. Get Buffer Forest
   auto bufferForest = TensorSSAGetBufferForest(graph);
@@ -507,6 +549,9 @@ void ConvertToTensorSSA(std::shared_ptr<Graph> graph) {
 
   // Step 5. rename stack
   TensorSSARename(graph, mutateInfo);
+
+  // Step 6. fall back
+  indexBoolFallback(graph);
 }
 
 } // namespace jit

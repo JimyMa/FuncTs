@@ -34,24 +34,55 @@ static auto ViewRev = Symbol::fromQualString("immut::view_rev");
 static auto Reshape = Symbol::fromQualString("immut::reshape");
 static auto ReshapeRev = Symbol::fromQualString("immut::reshape_rev");
 
+static auto Permute = Symbol::fromQualString("immut::permute");
+static auto PermuteRev = Symbol::fromQualString("immut::permute_rev");
+
+static auto Expand = Symbol::fromQualString("immut::expand");
+static auto ExpandRev = Symbol::fromQualString("immut::expand_rev");
+
+static auto ExpandAs = Symbol::fromQualString("immut::expand_as");
+static auto ExpandAsRev = Symbol::fromQualString("immut::expand_as_rev");
+
+static auto Repeat = Symbol::fromQualString("immut::repeat");
+static auto RepeatRev = Symbol::fromQualString("immut::repeat_rev");
+
+static auto Index = Symbol::fromQualString("immut::index");
+static auto IndexRev = Symbol::fromQualString("immut::index_rev");
+
+// for fusion immutable operators
+static auto Tensor = Symbol::fromQualString("immut::tensor");
+
 static std::unordered_map<Symbol, Symbol> immutableVersion{
     {aten::copy_, c10::immutable::Assign},
     {aten::select, c10::immutable::Select},
     {aten::slice, c10::immutable::Slice},
-    // {aten::squeeze, c10::immutable::Squeeze},
-    // {aten::unsqueeze, c10::immutable::Unsqueeze},
-    // {aten::view, c10::immutable::View},
-    // {aten::reshape, c10::immutable::Reshape},
+    {aten::permute, c10::immutable::Permute},
+    {aten::squeeze, c10::immutable::Squeeze},
+    {aten::unsqueeze, c10::immutable::Unsqueeze},
+#ifndef DISABLE_NNC_INT_LIST
+    {aten::view, c10::immutable::View},
+    {aten::reshape, c10::immutable::Reshape},
+    {aten::expand, c10::immutable::Expand},
+    {aten::expand_as, c10::immutable::ExpandAs},
+    {aten::repeat, c10::immutable::Repeat},
+    {aten::index, c10::immutable::Index},
+#endif //  ENABLE_NNC_INT_LIST
 };
 
 static std::unordered_map<Symbol, Symbol> reverseVersion{
     {c10::immutable::Assign, c10::immutable::Assign},
     {c10::immutable::Select, c10::immutable::SelectReverse},
     {c10::immutable::Slice, c10::immutable::SliceReverse},
+    {c10::immutable::Permute, c10::immutable::PermuteRev},
     {c10::immutable::Squeeze, c10::immutable::Unsqueeze},
     {c10::immutable::Unsqueeze, c10::immutable::Squeeze},
     {c10::immutable::View, c10::immutable::View},
-    {c10::immutable::Reshape, c10::immutable::View}};
+    {c10::immutable::Reshape, c10::immutable::View},
+    {c10::immutable::Expand, c10::immutable::ExpandRev},
+    {c10::immutable::ExpandAs, c10::immutable::ExpandAsRev},
+    {c10::immutable::Repeat, c10::immutable::RepeatRev},
+    {c10::immutable::Index, c10::immutable::IndexRev},
+};
 
 } // namespace immutable
 } // namespace c10

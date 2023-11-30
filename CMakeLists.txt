@@ -8,6 +8,7 @@ project(functs)
 cmake_policy(SET CMP0074 NEW)
 
 option(ENABLE_FUNCTS_PYTHON "enable functs python wrapper" OFF)
+option(DISABLE_NNC_INT_LIST "need to revise pytorch code to support List[int] in NNC" OFF)
 
 # Packages
 find_package(Torch REQUIRED)
@@ -16,6 +17,10 @@ include_directories(${TORCH_INCLUDE_DIRS})
 find_package(CUDAToolkit REQUIRED)
 
 set(CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS} ${TORCH_CXX_FLAGS})
+
+if(DISABLE_NNC_INT_LIST)
+  add_compile_definitions(-DDISABLE_NNC_INT_LIST)
+endif(DISABLE_NNC_INT_LIST)
 
 include_directories(${PROJECT_SOURCE_DIR})
 
@@ -49,7 +54,7 @@ set(JSON_Install OFF CACHE INTERNAL "")
 set(SOURCES ${SOURCES} ${FAIT_SOURCES})
 
 file(GLOB CUPTI_EXT_SOURCES
-  ${PROJECT_SOURCE_DIR}/util/cupti_ext/*.cpp
+  ${PROJECT_SOURCE_DIR}/fait/util/cupti_ext/*.cpp
 )
 
 file(GLOB PROFILER_SOURCES

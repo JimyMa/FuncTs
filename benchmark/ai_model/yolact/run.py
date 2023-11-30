@@ -1,3 +1,4 @@
+import os
 import time
 
 import torch
@@ -29,7 +30,7 @@ def process_feat_batch(feats):
         new_feats.append(process_feat(feat))
     return new_feats
 
-feats = torch.load("yolact_feat.pt")
+feats = torch.load(os.path.join(os.path.dirname(__file__), "yolact_feat.pt"))
 feats = process_feat_batch(feats)
 num_samples = len(feats)
 
@@ -51,7 +52,7 @@ with torch.no_grad():
     # aot backend
     fait_model = functs.jit.build(functs.jit.script(model, backend="aot"), feats[0]) 
 
-    task = lambda fn: lambda idx: fn(*feats[idx % num_samples])
+    task = lambda fn: lambda _: fn(*feats[0 % num_samples])
 
     functs.utils.evaluate_task(task(model), "eager", run_duration=2.)
     functs.utils.evaluate_task(task(jit_model), "jit", run_duration=2.)
