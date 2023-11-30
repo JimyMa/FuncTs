@@ -24,20 +24,10 @@ class MlvlPointGenerator(torch.nn.Module):
         # assert self.num_levels == len(featmap_sizes)
         multi_level_priors = []
         for i in range(self.num_levels):
-            feat_h, feat_w = featmap_sizes[i]
-            stride_w, stride_h = self.strides[i]
-            shift_x = (torch.arange(0, feat_w, dtype=dtype, device=device) +
-                    self.offset) * stride_w
-            shift_y = (torch.arange(0, feat_h, dtype=dtype, device=device) +
-                    self.offset) * stride_h
-            shifts = torch.zeros(feat_h * feat_w, 2, device="cuda", dtype=torch.float32)
-            shift_xx = shift_x.repeat(feat_h)
-            shift_yy = shift_y.reshape(-1, 1).repeat(1, feat_w).reshape(-1)
-            # shifts = torch.stack([shift_xx, shift_yy, shift_xx, shift_yy], dim=-1)
-            shifts[:, 0].copy_(shift_xx)
-            shifts[:, 1].copy_(shift_yy)
-            priors = shifts
-            multi_level_priors.append(priors)
+            priors = self.single_level_grid_priors(
+                featmap_sizes[i], level_idx=i, dtype=dtype, device=device
+            )
+            multi_level_priors.append(priors.clone())
         return multi_level_priors
 
     def single_level_grid_priors(
@@ -59,8 +49,6 @@ class MlvlPointGenerator(torch.nn.Module):
         # shifts = torch.stack([shift_xx, shift_yy, shift_xx, shift_yy], dim=-1)
         shifts[:, 0].copy_(shift_xx)
         shifts[:, 1].copy_(shift_yy)
-        # shift_xx, shift_yy = self._meshgrid(shift_x, shift_y)
-        # shifts = torch.stack([shift_xx, shift_yy], dim=-1)
         return shifts
 
     def _meshgrid(self, x: Tensor, y: Tensor) -> Tuple[Tensor, Tensor]:
@@ -132,29 +120,16 @@ def distance2bbox(
     y1 = points[..., 1] - distance[..., 1]
     x2 = points[..., 0] + distance[..., 2]
     y2 = points[..., 1] + distance[..., 3]
-
-    bboxes = distance.clone()
-    bboxes[..., 0].copy_(x1)
-    bboxes[..., 1].copy_(y1)
-    bboxes[..., 2].copy_(x2)
-    bboxes[..., 3].copy_(y2)
-    torch.clamp_(bboxes, min=0, max=max_shape[1])
-    # bboxes = torch.stack([x1, y1, x2, y2], -1)
-    # bboxes[:, 0::2].clamp_(min=0, max=max_shape[1])
-    # bboxes[:, 1::2].clamp_(min=0, max=max_shape[0])
-    return bboxes.clone()
+    bboxes = torch.stack([x1, y1, x2, y2], -1)
+    bboxes[:, 0::2].clamp_(min=0, max=max_shape[1])
+    bboxes[:, 1::2].clamp_(min=0, max=max_shape[0])
+    return bboxes
 
 
 class FCOSBBox(torch.nn.Module):
     def __init__(self):
         super().__init__()
         self.prior_generator = MlvlPointGenerator()
-        self.strides = [(8, 8), (16, 16), (32, 32), (64, 64), (128, 128)]
-        self.offset = 0.5
-
-    @property
-    def num_levels(self) -> int:
-        return len(self.strides)
 
     def forward(
         self,
@@ -167,92 +142,9 @@ class FCOSBBox(torch.nn.Module):
         # score_factors: [torch.Size([1, 1, 40, 40]), torch.Size([1, 1, 20, 20]), torch.Size([1, 1, 10, 10]), torch.Size([1, 1, 5, 5]), torch.Size([1, 1, 3, 3])]
         featmap_sizes = [(score.size(-2), score.size(-1))
                          for score in cls_scores]
-        
         mlvl_priors = self.prior_generator(
             featmap_sizes, dtype=cls_scores[0].dtype, device=cls_scores[0].device
         )
-
-        mlvl_priors = []
-        # for i in range(self.num_levels):
-        #     feat_h, feat_w = featmap_sizes[i]
-        #     stride_w, stride_h = self.strides[i]
-        #     shift_x = (torch.arange(0, feat_w, dtype=torch.float32, device="cuda") +
-        #             self.offset) * stride_w
-        #     shift_y = (torch.arange(0, feat_h, dtype=torch.float32, device="cuda") +
-        #             self.offset) * stride_h
-        #     shifts = torch.zeros(feat_h * feat_w, 2, device="cuda", dtype=torch.float32)
-        #     shift_xx = shift_x.repeat(feat_h)
-        #     shift_yy = shift_y.reshape(-1, 1).repeat(1, feat_w).reshape(-1)
-        #     # shifts = torch.stack([shift_xx, shift_yy, shift_xx, shift_yy], dim=-1)
-        #     shifts[:, 0].copy_(shift_xx)
-        #     shifts[:, 1].copy_(shift_yy)
-        #     priors = shifts
-        #     mlvl_priors.append(priors)
-
-        feat_h, feat_w = featmap_sizes[0]
-        stride_w, stride_h = self.strides[0]
-        shift_x = (torch.arange(0, 40, dtype=torch.float32, device="cuda") + self.offset) * stride_w
-        shift_y = (torch.arange(0, 40, dtype=torch.float32, device="cuda") + self.offset) * stride_h
-        shifts = torch.zeros(40 * 40, 2, device="cuda", dtype=torch.float32)
-        shift_xx = shift_x.repeat(40)
-        shift_yy = shift_y.reshape(-1, 1).repeat(1, 40).reshape(-1)
-        # shifts = torch.stack([shift_xx, shift_yy, shift_xx, shift_yy], dim=-1)
-        shifts[:, 0].copy_(shift_xx)
-        shifts[:, 1].copy_(shift_yy)
-        priors = shifts.clone()
-        mlvl_priors.append(priors)
-
-        feat_h, feat_w = featmap_sizes[1]
-        stride_w, stride_h = self.strides[1]
-        shift_x = (torch.arange(0, 20, dtype=torch.float32, device="cuda") + self.offset) * stride_w
-        shift_y = (torch.arange(0, 20, dtype=torch.float32, device="cuda") + self.offset) * stride_h
-        shifts = torch.zeros(20 * 20, 2, device="cuda", dtype=torch.float32)
-        shift_xx = shift_x.repeat(20)
-        shift_yy = shift_y.reshape(-1, 1).repeat(1, 20).reshape(-1)
-        # shifts = torch.stack([shift_xx, shift_yy, shift_xx, shift_yy], dim=-1)
-        shifts[:, 0].copy_(shift_xx)
-        shifts[:, 1].copy_(shift_yy)
-        priors = shifts.clone()
-        mlvl_priors.append(priors)
-
-        feat_h, feat_w = featmap_sizes[2]
-        stride_w, stride_h = self.strides[2]
-        shift_x = (torch.arange(0, 10, dtype=torch.float32, device="cuda") + self.offset) * stride_w
-        shift_y = (torch.arange(0, 10, dtype=torch.float32, device="cuda") + self.offset) * stride_h
-        shifts = torch.zeros(10 * 10, 2, device="cuda", dtype=torch.float32)
-        shift_xx = shift_x.repeat(10)
-        shift_yy = shift_y.reshape(-1, 1).repeat(1, 10).reshape(-1)
-        # shifts = torch.stack([shift_xx, shift_yy, shift_xx, shift_yy], dim=-1)
-        shifts[:, 0].copy_(shift_xx)
-        shifts[:, 1].copy_(shift_yy)
-        priors = shifts.clone()
-        mlvl_priors.append(priors)
-
-        feat_h, feat_w = featmap_sizes[3]
-        stride_w, stride_h = self.strides[3]
-        shift_x = (torch.arange(0, 5, dtype=torch.float32, device="cuda") + self.offset) * stride_w
-        shift_y = (torch.arange(0, 5, dtype=torch.float32, device="cuda") + self.offset) * stride_h
-        shifts = torch.zeros(5 * 5, 2, device="cuda", dtype=torch.float32)
-        shift_xx = shift_x.repeat(5)
-        shift_yy = shift_y.reshape(-1, 1).repeat(1, 5).reshape(-1)
-        # shifts = torch.stack([shift_xx, shift_yy, shift_xx, shift_yy], dim=-1)
-        shifts[:, 0].copy_(shift_xx)
-        shifts[:, 1].copy_(shift_yy)
-        priors = shifts.clone()
-        mlvl_priors.append(priors)
-
-        feat_h, feat_w = featmap_sizes[4]
-        stride_w, stride_h = self.strides[4]
-        shift_x = (torch.arange(0, 3, dtype=torch.float32, device="cuda") + self.offset) * stride_w
-        shift_y = (torch.arange(0, 3, dtype=torch.float32, device="cuda") + self.offset) * stride_h
-        shifts = torch.zeros(3 * 3, 2, device="cuda", dtype=torch.float32)
-        shift_xx = shift_x.repeat(3)
-        shift_yy = shift_y.reshape(-1, 1).repeat(1, 3).reshape(-1)
-        # shifts = torch.stack([shift_xx, shift_yy, shift_xx, shift_yy], dim=-1)
-        shifts[:, 0].copy_(shift_xx)
-        shifts[:, 1].copy_(shift_yy)
-        priors = shifts.clone()
-        mlvl_priors.append(priors)
 
         result_list: List[Tuple[Tensor, Tensor]] = []
         for img_id in range(cls_scores[0].size(0)):
@@ -284,144 +176,28 @@ class FCOSBBox(torch.nn.Module):
         mlvl_scores = []
         mlvl_labels = []
         mlvl_score_factors = []
-        # for cls_score, bbox_pred, score_factor, priors in zip(
-        #     cls_score_list, bbox_pred_list, score_factor_list, mlvl_priors
-        # ):
-        #     # assert cls_score.size()[-2:] == bbox_pred.size()[-2:]
-        #     bbox_pred = bbox_pred.permute(1, 2, 0).reshape(-1, 4)
-        #     score_factor = score_factor.permute(1, 2, 0).reshape(-1).sigmoid()
-        #     cls_score = cls_score.permute(1, 2, 0).reshape(-1, 80)
-        #     scores = cls_score.sigmoid()
+        for cls_score, bbox_pred, score_factor, priors in zip(
+            cls_score_list, bbox_pred_list, score_factor_list, mlvl_priors
+        ):
+            # assert cls_score.size()[-2:] == bbox_pred.size()[-2:]
+            bbox_pred = bbox_pred.permute(1, 2, 0).reshape(-1, 4)
+            score_factor = score_factor.permute(1, 2, 0).reshape(-1).sigmoid()
+            cls_score = cls_score.permute(1, 2, 0).reshape(-1, 80)
+            scores = cls_score.sigmoid()
 
-        #     score_thr = 0.025
-        #     scores, labels, keep_idxs = filter_scores_and_topk(
-        #         scores, score_thr, nms_pre
-        #     )
-        #     bbox_pred = bbox_pred[keep_idxs]
-        #     priors = priors[keep_idxs]
-        #     score_factor = score_factor[keep_idxs]
+            score_thr = 0.025
+            scores, labels, keep_idxs = filter_scores_and_topk(
+                scores, score_thr, nms_pre
+            )
+            bbox_pred = bbox_pred[keep_idxs]
+            priors = priors[keep_idxs]
+            score_factor = score_factor[keep_idxs]
 
-        #     mlvl_bbox_preds.append(bbox_pred)
-        #     mlvl_valid_priors.append(priors)
-        #     mlvl_scores.append(scores)
-        #     mlvl_labels.append(labels)
-        #     mlvl_score_factors.append(score_factor)
-
-        # assert cls_score.size()[-2:] == bbox_pred.size()[-2:]
-        cls_score = cls_score_list[0]
-        bbox_pred = bbox_pred_list[0]
-        score_factor = score_factor_list[0]
-        priors = mlvl_priors[0]
-        bbox_pred = bbox_pred.permute(1, 2, 0).reshape(-1, 4)
-        score_factor = score_factor.permute(1, 2, 0).reshape(-1).sigmoid()
-        cls_score = cls_score.permute(1, 2, 0).reshape(-1, 80)
-        scores = cls_score.sigmoid()
-
-        score_thr = 0.025
-        scores, labels, keep_idxs = filter_scores_and_topk(
-            scores, score_thr, nms_pre
-        )
-        bbox_pred = bbox_pred[keep_idxs]
-        priors = priors[keep_idxs]
-        score_factor = score_factor[keep_idxs]
-
-        mlvl_bbox_preds.append(bbox_pred)
-        mlvl_valid_priors.append(priors)
-        mlvl_scores.append(scores)
-        mlvl_labels.append(labels)
-        mlvl_score_factors.append(score_factor)
-
-        cls_score = cls_score_list[1]
-        bbox_pred = bbox_pred_list[1]
-        score_factor = score_factor_list[1]
-        priors = mlvl_priors[1]
-        bbox_pred = bbox_pred.permute(1, 2, 0).reshape(-1, 4)
-        score_factor = score_factor.permute(1, 2, 0).reshape(-1).sigmoid()
-        cls_score = cls_score.permute(1, 2, 0).reshape(-1, 80)
-        scores = cls_score.sigmoid()
-
-        score_thr = 0.025
-        scores, labels, keep_idxs = filter_scores_and_topk(
-            scores, score_thr, nms_pre
-        )
-        bbox_pred = bbox_pred[keep_idxs]
-        priors = priors[keep_idxs]
-        score_factor = score_factor[keep_idxs]
-
-        mlvl_bbox_preds.append(bbox_pred)
-        mlvl_valid_priors.append(priors)
-        mlvl_scores.append(scores)
-        mlvl_labels.append(labels)
-        mlvl_score_factors.append(score_factor)
-
-        cls_score = cls_score_list[2]
-        bbox_pred = bbox_pred_list[2]
-        score_factor = score_factor_list[2]
-        priors = mlvl_priors[2]
-        bbox_pred = bbox_pred.permute(1, 2, 0).reshape(-1, 4)
-        score_factor = score_factor.permute(1, 2, 0).reshape(-1).sigmoid()
-        cls_score = cls_score.permute(1, 2, 0).reshape(-1, 80)
-        scores = cls_score.sigmoid()
-
-        score_thr = 0.025
-        scores, labels, keep_idxs = filter_scores_and_topk(
-            scores, score_thr, nms_pre
-        )
-        bbox_pred = bbox_pred[keep_idxs]
-        priors = priors[keep_idxs]
-        score_factor = score_factor[keep_idxs]
-
-        mlvl_bbox_preds.append(bbox_pred)
-        mlvl_valid_priors.append(priors)
-        mlvl_scores.append(scores)
-        mlvl_labels.append(labels)
-        mlvl_score_factors.append(score_factor)
-
-        cls_score = cls_score_list[3]
-        bbox_pred = bbox_pred_list[3]
-        score_factor = score_factor_list[3]
-        priors = mlvl_priors[3]
-        bbox_pred = bbox_pred.permute(1, 2, 0).reshape(-1, 4)
-        score_factor = score_factor.permute(1, 2, 0).reshape(-1).sigmoid()
-        cls_score = cls_score.permute(1, 2, 0).reshape(-1, 80)
-        scores = cls_score.sigmoid()
-
-        score_thr = 0.025
-        scores, labels, keep_idxs = filter_scores_and_topk(
-            scores, score_thr, nms_pre
-        )
-        bbox_pred = bbox_pred[keep_idxs]
-        priors = priors[keep_idxs]
-        score_factor = score_factor[keep_idxs]
-
-        mlvl_bbox_preds.append(bbox_pred)
-        mlvl_valid_priors.append(priors)
-        mlvl_scores.append(scores)
-        mlvl_labels.append(labels)
-        mlvl_score_factors.append(score_factor)
-
-        cls_score = cls_score_list[4]
-        bbox_pred = bbox_pred_list[4]
-        score_factor = score_factor_list[4]
-        priors = mlvl_priors[4]
-        bbox_pred = bbox_pred.permute(1, 2, 0).reshape(-1, 4)
-        score_factor = score_factor.permute(1, 2, 0).reshape(-1).sigmoid()
-        cls_score = cls_score.permute(1, 2, 0).reshape(-1, 80)
-        scores = cls_score.sigmoid()
-
-        score_thr = 0.025
-        scores, labels, keep_idxs = filter_scores_and_topk(
-            scores, score_thr, nms_pre
-        )
-        bbox_pred = bbox_pred[keep_idxs]
-        priors = priors[keep_idxs]
-        score_factor = score_factor[keep_idxs]
-
-        mlvl_bbox_preds.append(bbox_pred)
-        mlvl_valid_priors.append(priors)
-        mlvl_scores.append(scores)
-        mlvl_labels.append(labels)
-        mlvl_score_factors.append(score_factor)
+            mlvl_bbox_preds.append(bbox_pred)
+            mlvl_valid_priors.append(priors)
+            mlvl_scores.append(scores)
+            mlvl_labels.append(labels)
+            mlvl_score_factors.append(score_factor)
 
         bbox_pred = torch.cat(mlvl_bbox_preds)
         priors = torch.cat(mlvl_valid_priors)

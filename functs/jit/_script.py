@@ -13,6 +13,10 @@ class AotScriptFunction(object):
     def __init__(self, aot_script_fn, **kwargs):
         self._aot_script_fn = aot_script_fn
     
+    @property
+    def graph(self):
+        return self._aot_script_fn.graph
+
     def __call__(self, *args, **kwargs):
         return self._aot_script_fn("forward", *args, **kwargs)
 

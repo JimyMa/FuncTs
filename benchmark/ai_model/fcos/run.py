@@ -50,7 +50,7 @@ with torch.no_grad():
     functs_model = functs.jit.script(model)
 
     # aot backend
-    # fait_model = functs.jit.build(functs.jit.script(model, backend="aot"), feats[0]) 
+    fait_model = functs.jit.build(functs.jit.script(model, backend="aot"), feats[0]) 
 
     task = lambda fn: lambda _: fn(*feats[0 % num_samples])
 
@@ -58,12 +58,12 @@ with torch.no_grad():
     functs.utils.evaluate_task(task(jit_model), "jit", run_duration=2.)
     functs.utils.evaluate_task(task(functs_model), "functs", run_duration=2.)
     # print(functs_model.graph_for(*feats[0 % num_samples]))
-    # functs.utils.evaluate_task(
-    #     task(dynamo_model), "dynamo+inductor", run_duration=2.)
-    # functs.utils.evaluate_task(task(fait_model), "fait", run_duration=2.)
+    functs.utils.evaluate_task(
+        task(dynamo_model), "dynamo+inductor", run_duration=2.)
+    functs.utils.evaluate_task(task(fait_model), "fait", run_duration=2.)
 
     # nvfuser
-    # torch._C._jit_set_nvfuser_enabled(True)
-    # functs.utils.evaluate_task(task(nvfuser_model), "nvfuser", run_duration=2.)
-    # torch._C._jit_set_nvfuser_enabled(False)
+    torch._C._jit_set_nvfuser_enabled(True)
+    functs.utils.evaluate_task(task(nvfuser_model), "nvfuser", run_duration=2.)
+    torch._C._jit_set_nvfuser_enabled(False)
 
