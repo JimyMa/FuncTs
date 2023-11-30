@@ -59,14 +59,14 @@ static std::unordered_map<Symbol, Symbol> immutableVersion{
     {aten::permute, c10::immutable::Permute},
     {aten::squeeze, c10::immutable::Squeeze},
     {aten::unsqueeze, c10::immutable::Unsqueeze},
-#ifndef DISABLE_NNC_INT_LIST
+    // #ifndef DISABLE_NNC_INT_LIST
     {aten::view, c10::immutable::View},
     {aten::reshape, c10::immutable::Reshape},
     {aten::expand, c10::immutable::Expand},
     {aten::expand_as, c10::immutable::ExpandAs},
     {aten::repeat, c10::immutable::Repeat},
     {aten::index, c10::immutable::Index},
-#endif //  ENABLE_NNC_INT_LIST
+    // #endif //  ENABLE_NNC_INT_LIST
 };
 
 static std::unordered_map<Symbol, Symbol> reverseVersion{

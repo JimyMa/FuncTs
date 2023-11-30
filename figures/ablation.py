@@ -2,12 +2,15 @@ from matplotlib import pyplot as plt
 import numpy as np
 
 
-platforms = ['GTX 1660 Ti', 'RTX 3090',]
-colors = ['lightskyblue', 'lightsalmon']
-models = ['YOLOv3', 'SSD', 'YOLACT', "FCOS", "NASRNN",    "LSTM",    "seq2seq", "Attention"]
+platforms = ['Vertical', 'Vertical + Horizontal',]
+colors = ['lightskyblue', "#ffa13ab4"]
+models = ['YOLOv3', 'SSD', 'YOLACT', "FCOS"]
+
+
+
 data = np.array([
-        [0.35,      0.67,  0.44,     0.14,   293. / 363., 185 / 261., 410 / 570., 130 / 270.9],
-        [0.44,      0.71,  0.59,     0.28,   453. / 504., 310 / 393., 480 / 649., 170 / 331.],
+    [(1.443 + 1.49) / (0.549 + 1.49), (4.092 + 1.52) / (1.491 + 1.52), (4.354 + 1.83) / (1.630 + 1.83),  (2.22 + 8.75) / (1.058 + 8.75)],
+    [(1.443 + 1.49) / (0.480 + 1.49), (4.092 + 1.52) / (1.260 + 1.52), (4.354 + 1.83) / (0.865 + 1.83),  (2.22 + 8.75) / (0.867 + 8.75)],
 ])
 assert len(platforms) == len(colors) == data.shape[0]
 assert len(models) == data.shape[1]
@@ -17,7 +20,7 @@ bar_width = 1 / (len(platforms) + 2)
 plt.rc('font', family='Linux Biolinum O', size=12)
 plt.rc('pdf', fonttype=42)
 
-plt.figure(figsize=(7, 3), constrained_layout=True)
+plt.figure(figsize=(9, 3), constrained_layout=True)
 begin_pos = -(len(platforms) - 1) * bar_width / 2
 for i, (c, h) in enumerate(zip(colors, data)):
     plt.bar(begin_pos + i * bar_width + np.arange(len(models)),
@@ -26,9 +29,9 @@ for i, (c, h) in enumerate(zip(colors, data)):
             )
 plt.legend(labels=platforms, ncol=1, loc='best')
 plt.xticks(range(len(models)), models)
-plt.ylim(top=1)
+# plt.ylim(top=1)
 
-plt.savefig('post_ratio.pdf')
-plt.savefig('post_ratio.jpg')
+plt.savefig('ablation.pdf')
+plt.savefig('ablation.jpg')
 plt.show()
 

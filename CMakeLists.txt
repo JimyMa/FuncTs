@@ -19,7 +19,7 @@ find_package(CUDAToolkit REQUIRED)
 set(CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS} ${TORCH_CXX_FLAGS})
 
 if(DISABLE_NNC_INT_LIST)
-  add_compile_definitions(-DDISABLE_NNC_INT_LIST)
+  add_compile_definitions(DISABLE_NNC_INT_LIST)
 endif(DISABLE_NNC_INT_LIST)
 
 include_directories(${PROJECT_SOURCE_DIR})

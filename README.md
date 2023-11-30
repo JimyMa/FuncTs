@@ -12,6 +12,10 @@ python setup.py develop --user
 
 - Supported PyTorch version: `V2.1.0`
 
+We found that there are many typical workloads are writen by imperative tensor program and cannot perform kernel fusion directly. Most computation-intensive operators are pure function and well supported by compute library developed by hardware vendors. However, many imperative tensor program are full of  control flow, side-effects by tensor-level mutation (view and inplace operators), leading to narraw fusion scope. The time-line proportion of these part in the following eight workloads are shown below:
+
+![proportation](./docs/imgs/post_ratio.jpg)
+
 ## Use FuncTs to perform functionalization
 
 A [simple example](./examples/get_started.py) are shown as follow:
@@ -186,7 +190,25 @@ graph(%a.35 : Tensor,
 
 We construct several test case in [test case](./test/test_basic.py), which shows that our method can perform functionalization beyond the control flow.
 
+We define a series of [Access and Assign Operators](./functs/csrc/jit/ir/symbol_ext.h) which are immutable to perform functionalization as shown in the table below:
+
+| operator            | Access operator      | Assign Operator          |
+| ------------------- | -------------------- | ------------------------ |
+| `aten::copy_`     | `immut::Assign`    | `immut::Assign`        |
+| `aten::select`    | `immut::select`    | `immut::select_rev`    |
+| `aten::slice`     | `immut::slice`     | `immut::slice_rev`     |
+| `aten::squeeze`   | `immut::squeeze`   | `immut::unsqueeze`     |
+| `aten::unsqueeze` | `immut::unsqueeze` | `immut::squeeze`       |
+| `aten::view`      | `immut::view`      | `immut::view`          |
+| `aten::reshape`   | `immut::reshape`   | `immut::reshape`       |
+| `aten::expand`    | `immut::expand`    | `immut::expand_rev`    |
+| `aten::expand_as` | `immut::expand_as` | `immut::expand_as_rev` |
+| `aten::repeat`    | `immut::repeat`    | `immut::repeat_rev`    |
+| `aten::index`     | `immut::index`     | `immut::index_rev`     |
+
 ## Optimization
+
+### Vertical Optimization
 
 We use PyTorch NNC to impelement several view tensor expression, a domain specific language (DSL) which can be scheduled and can be converted to device code including CUDA automaticly. The code generation of these operators are tested in [test tensorexpr](./test/test_immut_tensorexpr.py). An example of converting functionalized program into NNC tensor expression is shown as follow:
 
@@ -194,9 +216,14 @@ We use PyTorch NNC to impelement several view tensor expression, a domain specif
 
 The functional part of the program can be representated as a direct acyclic graph (DAG). As a result, it can be converted to NNC directly.
 
+### Horizontal Parallelization
+
+We extend NNC to support [horizontal parallization](./fait/tensorexpr/functor_parallization.h), pure function inner the loop without loop carried denpendency can be fused to one kernel and run simultaneously.
+
 ## Benchmark
 
 ### Latency Benchmark
+
 - The performance speed up is shown as follow:
 
 ![latency](./docs/imgs/latency.jpg)
@@ -218,6 +245,13 @@ After functionalization, our performance of kernel launch is better than TorchSc
 - in different sequence length
 
 ![seq length](./docs/imgs/scalability_seq_len.jpg)
+
+## Ablation Study
+
+There are two main optimization methods, vertical optimization and horizontal parallelization. For [NASRNN](./benchmark/ai_model/nasrnn/nasrnn.py), [Attention](./benchmark/simple_ops/attention/attention.py), [LSTM](./benchmark/ai_model/lstm/lstm.py) and [seq2seq](./benchmark/ai_model/seq2seq/seq2seq.py), there are only loop carried dependency. For [YOLOV3](./benchmark/ai_model/yolov3/run.py), [SSD](./benchmark/ai_model/ssd/run.py), [YOLACT](./benchmark/ai_model/yolact/run.py), [FCOS](./benchmark/ai_model/fcos/run.py), there are parallelizable loop and we perform horizontal parallelization. We unroll these workloads ([YOLOV3](./benchmark/ai_model/yolov3/yolov3_bbox_unroll.py), [SSD](./benchmark/ai_model/ssd/ssd_bbox_unroll.py), [YOLACT](./benchmark/ai_model/yolact/yolact_mask_unroll.py), [FCOS](./benchmark/ai_model/fcos/fcos_bbox_unroll.py)) and run with native PyTorch NNC without extention, which does nothing but functionalization by TensorSSA. The performance speedup is shown as below.
+
+![ablation](./docs/imgs/ablation.jpg)
+
 
 ## Latency with CUDA Graph
 
