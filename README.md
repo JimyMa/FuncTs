@@ -188,7 +188,11 @@ We construct several test case in [test case](./test/test_basic.py), which shows
 
 ## Optimization
 
-We use PyTorch NNC to impelement several view tensor expression, a domain specific language (DSL) which can be scheduled and be converted to device code including CUDA automaticly. The code generation of these operators are tested in [test tensorexpr](./test/test_immut_tensorexpr.py).
+We use PyTorch NNC to impelement several view tensor expression, a domain specific language (DSL) which can be scheduled and can be converted to device code including CUDA automaticly. The code generation of these operators are tested in [test tensorexpr](./test/test_immut_tensorexpr.py). An example of converting functionalized program into NNC tensor expression is shown as follow:
+
+![normalized](./docs/imgs/functionalization_codegen.png)
+
+The functional part of the program can be representated as a direct acyclic graph (DAG). As a result, it can be converted to NNC directly.
 
 ## Benchmark
 
