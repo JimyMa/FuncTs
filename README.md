@@ -225,6 +225,8 @@ We extend NNC to support [horizontal parallization](./fait/tensorexpr/functor_pa
 ### Speed Up
 
 - The performance speed up is shown as follow:
+- [get_latency.py](./scripts/get_latency.py)
+- [1660ti log](./scripts/latency_log.txt)
 
 ![latency](./docs/imgs/latency.jpg)
 
@@ -238,7 +240,7 @@ After functionalization, our performance of kernel launch is better than TorchSc
 
 ### Ablation Study
 
-There are two main optimization methods, vertical optimization and horizontal parallelization. For [NASRNN](./benchmark/ai_model/nasrnn/nasrnn.py), [Attention](./benchmark/simple_ops/attention/attention.py), [LSTM](./benchmark/ai_model/lstm/lstm.py) and [seq2seq](./benchmark/ai_model/seq2seq/seq2seq.py), there are only loop carried dependency. For [YOLOV3](./benchmark/ai_model/yolov3/run.py), [SSD](./benchmark/ai_model/ssd/run.py), [YOLACT](./benchmark/ai_model/yolact/run.py), [FCOS](./benchmark/ai_model/fcos/run.py), there are parallelizable loop and we perform horizontal parallelization. We unroll these workloads ([YOLOV3](./benchmark/ai_model/yolov3/yolov3_bbox_unroll.py), [SSD](./benchmark/ai_model/ssd/ssd_bbox_unroll.py), [YOLACT](./benchmark/ai_model/yolact/yolact_mask_unroll.py), [FCOS](./benchmark/ai_model/fcos/fcos_bbox_unroll.py)) and run with native PyTorch NNC without horizontal extention. The performance speedup w.r.t. PyTorch eager mode is shown as below.
+There are two main optimization methods, vertical optimization and horizontal parallelization. For [NASRNN](./functs/benchmark/ai_model/nasrnn/nasrnn.py), [Attention](./benchmark/simple_ops/attention/attention.py), [LSTM](./functs/benchmark/ai_model/lstm/lstm.py) and [seq2seq](./functs/benchmark/ai_model/seq2seq/seq2seq.py), there are only loop carried dependency. For [YOLOV3](./functs/benchmark/ai_model/yolov3/run.py), [SSD](./functs/benchmark/ai_model/ssd/run.py), [YOLACT](./functs/benchmark/ai_model/yolact/run.py), [FCOS](./functs/benchmark/ai_model/fcos/run.py), there are parallelizable loop and we perform horizontal parallelization. We unroll these workloads ([YOLOV3](./functs/benchmark/ai_model/yolov3/yolov3_bbox_unroll.py), [SSD](./functs/benchmark/ai_model/ssd/ssd_bbox_unroll.py), [YOLACT](./functs/benchmark/ai_model/yolact/yolact_mask_unroll.py), [FCOS](./functs/benchmark/ai_model/fcos/fcos_bbox_unroll.py)) and run with native PyTorch NNC without horizontal extention. The performance speedup w.r.t. PyTorch eager mode is shown as below.
 
 ![ablation](./docs/imgs/ablation.jpg)
 
