@@ -8,7 +8,7 @@ project(functs)
 cmake_policy(SET CMP0074 NEW)
 
 option(ENABLE_FUNCTS_PYTHON "enable functs python wrapper" OFF)
-option(DISABLE_NNC_INT_LIST "need to revise pytorch code to support List[int] in NNC" OFF)
+option(ENABLE_NNC_INT_LIST "need to revise pytorch code to support List[int] in NNC" OFF)
 
 # Packages
 find_package(Torch REQUIRED)
@@ -17,10 +17,6 @@ include_directories(${TORCH_INCLUDE_DIRS})
 find_package(CUDAToolkit REQUIRED)
 
 set(CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS} ${TORCH_CXX_FLAGS})
-
-if(DISABLE_NNC_INT_LIST)
-  add_compile_definitions(DISABLE_NNC_INT_LIST)
-endif(DISABLE_NNC_INT_LIST)
 
 include_directories(${PROJECT_SOURCE_DIR})
 
@@ -76,6 +72,10 @@ set(FUNCTS_LINK_LIBS
 
 add_library(functs SHARED ${SOURCES})
 target_link_libraries(functs ${FUNCTS_LINK_LIBS})
+
+if(ENABLE_NNC_INT_LIST)
+target_compile_definitions(functs PRIVATE ENABLE_NNC_INT_LIST)
+endif(ENABLE_NNC_INT_LIST)
 
 install(TARGETS functs
   DESTINATION lib

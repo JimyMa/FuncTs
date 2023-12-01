@@ -41,6 +41,10 @@ def build_cmake(build_type="Release", generate_command=1):
     gen_args += ["-DTorch_DIR={}".format(cmake_torch_dir)]
     gen_args += ["-DENABLE_FUNCTS_PYTHON=ON"]
     gen_args += ["-DCMAKE_BUILD_TYPE={}".format(build_type)]
+    enable_nnc_list = os.getenv("ENABLE_NNC_INT_LIST")
+    if enable_nnc_list:
+        gen_args += ["-DENABLE_NNC_INT_LIST={}".format(enable_nnc_list)]
+        print(enable_nnc_list)
 
     # if fait backend is used, cmake version must be >= 3.27.0!!!
     gen_command = [cmake_path] + gen_args

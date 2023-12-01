@@ -9,21 +9,23 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--bs', type=int, default=1)
 parser.add_argument('--maxlength', type=int, default=50)
 parser.add_argument('--tool', type=str, default="all")
-arguments = parser.parse_args()
 
 START_LEN = 32
-SEQ_LEN = arguments.maxlength
 NUM_HEAD = 12
 SIZE_PER_HEAD = 64
-batch_size = arguments.bs
+
 
 class Attention(nn.Module):
-    def __init__(self, num_head, size_per_head):
+    def __init__(self, num_head, size_per_head, seq_len):
         super().__init__()
-        self.weight_q = nn.Parameter(torch.randn(num_head, size_per_head, size_per_head, dtype=torch.float32))
-        self.weight_k = nn.Parameter(torch.randn(num_head, size_per_head, size_per_head, dtype=torch.float32))
-        self.weight_v = nn.Parameter(torch.randn(num_head, size_per_head, size_per_head, dtype=torch.float32))
-        self.weight_o = nn.Parameter(torch.randn(num_head, size_per_head, size_per_head, dtype=torch.float32))
+        self.weight_q = nn.Parameter(torch.randn(
+            num_head, size_per_head, size_per_head, dtype=torch.float32))
+        self.weight_k = nn.Parameter(torch.randn(
+            num_head, size_per_head, size_per_head, dtype=torch.float32))
+        self.weight_v = nn.Parameter(torch.randn(
+            num_head, size_per_head, size_per_head, dtype=torch.float32))
+        self.weight_o = nn.Parameter(torch.randn(
+            num_head, size_per_head, size_per_head, dtype=torch.float32))
         nn.init.xavier_uniform_(self.weight_q)
         nn.init.xavier_uniform_(self.weight_k)
         nn.init.xavier_uniform_(self.weight_v)
@@ -31,18 +33,21 @@ class Attention(nn.Module):
         self.num_head = num_head
         self.size_per_head = size_per_head
         self.start_len = START_LEN
-        self.seq_len = SEQ_LEN
+        self.seq_len = seq_len
 
-    def forward(self, x, k, v): # (batch_size, num_head, 1, size_per_head)
+    def forward(self, x, k, v):  # (batch_size, num_head, 1, size_per_head)
         k = k + 0.0
         v = v + 0.0
         batch_size = x.size()[0]
         gen_id = self.start_len
-        attn = torch.zeros(batch_size, self.num_head, 1, self.seq_len, device='cuda')
+        attn = torch.zeros(batch_size, self.num_head, 1,
+                           self.seq_len, device='cuda')
         for i in range(k.size()[2] - self.start_len):
             q = torch.matmul(x, self.weight_q)
-            k[:, :, gen_id, :] = torch.reshape(torch.matmul(x, self.weight_k), (batch_size, self.num_head, self.size_per_head))
-            v[:, :, gen_id, :] = torch.reshape(torch.matmul(x, self.weight_v), (batch_size, self.num_head, self.size_per_head))
+            k[:, :, gen_id, :] = torch.reshape(torch.matmul(
+                x, self.weight_k), (batch_size, self.num_head, self.size_per_head))
+            v[:, :, gen_id, :] = torch.reshape(torch.matmul(
+                x, self.weight_v), (batch_size, self.num_head, self.size_per_head))
             attn = torch.matmul(k, q.transpose(2, 3)).transpose(2, 3)
             attn = attn * 0.125
             attn = torch.softmax(attn, dim=3)
@@ -51,7 +56,11 @@ class Attention(nn.Module):
             gen_id = gen_id + 1
         return k.clone(), v.clone(), x.clone()
 
+
 if __name__ == "__main__":
+    arguments = parser.parse_args()
+    SEQ_LEN = arguments.maxlength
+    batch_size = arguments.bs
     x = torch.randn(batch_size, NUM_HEAD, 1, SIZE_PER_HEAD).cuda()
     k = torch.zeros(batch_size, NUM_HEAD, SEQ_LEN, SIZE_PER_HEAD,
                     dtype=torch.float32, device='cuda')
@@ -62,26 +71,32 @@ if __name__ == "__main__":
     v[:, :, :START_LEN, :] = torch.randn(
         batch_size, NUM_HEAD, START_LEN, SIZE_PER_HEAD, dtype=torch.float32, device='cuda')
 
-    model = Attention(NUM_HEAD, SIZE_PER_HEAD).cuda().eval()
+    model = Attention(NUM_HEAD, SIZE_PER_HEAD, SEQ_LEN).cuda().eval()
     jit_model = torch.jit.script(model)
     dynamo_model = torch.compile(model, dynamic=True)
     nvfuser_model = torch.jit.freeze(torch.jit.script(model))
 
     functs_model = functs.jit.script(model)
-    fait_model = functs.jit.build(functs.jit.script(torch.jit.freeze(torch.jit.script(model))), [x, k, v])
+    fait_model = functs.jit.build(functs.jit.script(
+        torch.jit.freeze(torch.jit.script(model))), [x, k, v])
 
     print(torch.allclose(model(x, k, v)[0], functs_model(x, k, v)[0]))
     print(torch.allclose(model(x, k, v)[1], functs_model(x, k, v)[1]))
     print(torch.allclose(model(x, k, v)[2], functs_model(x, k, v)[2]))
     with torch.no_grad():
-        timer_eager = functs.utils.evaluate_func(model, [x, k, v], "eager", run_duration=2.)
-        timer_jit = functs.utils.evaluate_func(jit_model, [x, k, v], "jit", run_duration=2.)
-        timer_functs = functs.utils.evaluate_func(functs_model, [x, k, v], "functs", run_duration=2.)
+        timer_eager = functs.utils.evaluate_func(
+            model, [x, k, v], "eager", run_duration=2.)
+        timer_jit = functs.utils.evaluate_func(
+            jit_model, [x, k, v], "jit", run_duration=2.)
+        timer_functs = functs.utils.evaluate_func(
+            functs_model, [x, k, v], "functs", run_duration=2.)
         # timer_fait = functs.utils.evaluate_func(fait_model, [x, k, v], "fait", run_duration=2.)
-        timer_dynamo = functs.utils.evaluate_func(dynamo_model, [x, k, v], "dynamo", run_duration=2.)
+        timer_dynamo = functs.utils.evaluate_func(
+            dynamo_model, [x, k, v], "dynamo", run_duration=2.)
 
         torch._C._jit_set_nvfuser_enabled(True)
-        timer_nvfuser = functs.utils.evaluate_func(nvfuser_model, [x, k, v], "nvfuser", run_duration=2.)
+        timer_nvfuser = functs.utils.evaluate_func(
+            nvfuser_model, [x, k, v], "nvfuser", run_duration=2.)
         torch._C._jit_set_nvfuser_enabled(False)
 
         # print(jit_model.graph_for(x, k, v))

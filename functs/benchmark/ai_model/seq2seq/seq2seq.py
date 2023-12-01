@@ -19,7 +19,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--bs', type=int, default=1)
 parser.add_argument('--maxlength', type=int, default=50)
 parser.add_argument('--tool', type=str, default="all")
-arguments = parser.parse_args()
+
 
 MAX_LENGTH = 50
 OUTPUT_SIZE = 500
@@ -153,17 +153,20 @@ def gen_mask_from_sequence(std):
     mask = mask.transpose(0, 1).contiguous().clone()
     return mask
 
+
 if __name__ == "__main__":
+    arguments = parser.parse_args()
     batch_size = arguments.bs
 
-    model = AttnDecoderRNN(HIDDEN_SIZE, OUTPUT_SIZE, dropout_p=0.1).to(device).eval()
+    model = AttnDecoderRNN(HIDDEN_SIZE, OUTPUT_SIZE,
+                           dropout_p=0.1).to(device).eval()
 
     std = []
     MAX_LENGTH = 50
     h = torch.randn(batch_size, HIDDEN_SIZE, device=device)
     c = torch.randn(batch_size, HIDDEN_SIZE, device=device)
     sos = torch.full((batch_size,), model.SOS_token,
-                    dtype=torch.int64, device='cuda')
+                     dtype=torch.int64, device='cuda')
     for i in range(batch_size):
         l = 10
         lst = list(range(1, l))
@@ -182,7 +185,8 @@ if __name__ == "__main__":
     nvfuser_model = torch.jit.freeze(torch.jit.script(model))
 
     functs_model = functs.jit.script(model)
-    fait_model = functs.jit.build(functs.jit.script(torch.jit.freeze(torch.jit.script(model))), (encoder_output, mask, h, c))
+    fait_model = functs.jit.build(functs.jit.script(torch.jit.freeze(
+        torch.jit.script(model))), (encoder_output, mask, h, c))
 
     functs.utils.evaluate_func(
         model, (encoder_output, mask, h, c), "eager", run_duration=2.)
