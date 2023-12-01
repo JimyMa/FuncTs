@@ -40,13 +40,19 @@ class EvalRecord:
         return self.total / self.count
 
 
-def fmt_duration(dur: float):
+def fmt_duration(dur: float, round_to=None, split=False):
     units = ['s', 'ms', 'us', 'ns']
+    round_to = round_to or "ns"
+    end_idx = units.index(round_to)
     idx = 0
     while idx < len(units) - 1 and dur < 1:
         dur *= 1e3
         idx += 1
-    return '{:.4}{}'.format(dur, units[idx])
+        if idx == end_idx: break
+    if not split:
+        return '{:.4}{}'.format(dur, units[idx])
+    else:
+        return '{:.4}'.format(dur), '{}'.format(units[idx])
 
 class Timer:
     def __init__(self, name="", color=True):
@@ -88,6 +94,9 @@ class Timer:
         self.sum += duration
         self.cnt += 1
         self.observation = new_observation
+
+    def avg(self, round_to=None):
+        return fmt_duration(self.sum / self.cnt, round_to=round_to, split=True)[0]
 
     def report(self, color = None, clear=True):
         if color is None: color = self.color

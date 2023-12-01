@@ -153,65 +153,64 @@ def gen_mask_from_sequence(std):
     mask = mask.transpose(0, 1).contiguous().clone()
     return mask
 
+if __name__ == "__main__":
+    batch_size = arguments.bs
 
-batch_size = 1
+    model = AttnDecoderRNN(HIDDEN_SIZE, OUTPUT_SIZE, dropout_p=0.1).to(device).eval()
 
-model = AttnDecoderRNN(HIDDEN_SIZE, OUTPUT_SIZE,
-                       dropout_p=0.1).to(device).eval()
+    std = []
+    MAX_LENGTH = 50
+    h = torch.randn(batch_size, HIDDEN_SIZE, device=device)
+    c = torch.randn(batch_size, HIDDEN_SIZE, device=device)
+    sos = torch.full((batch_size,), model.SOS_token,
+                    dtype=torch.int64, device='cuda')
+    for i in range(batch_size):
+        l = 10
+        lst = list(range(1, l))
+        lst.append(0)
+        assert (len(lst) <= MAX_LENGTH)
+        # pad to MAX_LENGTH
+        lst = lst + [0] * (MAX_LENGTH - len(lst))
+        std.append(lst)
+    std = torch.tensor(std, device=device)
+    mask = gen_mask_from_sequence(std)
+    encoder_output = torch.randn(
+        MAX_LENGTH, batch_size, HIDDEN_SIZE, device=device)
 
-std = []
-MAX_LENGTH = 50
-h = torch.randn(batch_size, HIDDEN_SIZE, device=device)
-c = torch.randn(batch_size, HIDDEN_SIZE, device=device)
-sos = torch.full((batch_size,), model.SOS_token,
-                 dtype=torch.int64, device='cuda')
-for i in range(batch_size):
-    l = 10
-    lst = list(range(1, l))
-    lst.append(0)
-    assert (len(lst) <= MAX_LENGTH)
-    # pad to MAX_LENGTH
-    lst = lst + [0] * (MAX_LENGTH - len(lst))
-    std.append(lst)
-std = torch.tensor(std, device=device)
-mask = gen_mask_from_sequence(std)
-encoder_output = torch.randn(
-    MAX_LENGTH, batch_size, HIDDEN_SIZE, device=device)
+    jit_model = torch.jit.script(model)
+    dynamo_model = torch.compile(model)
+    nvfuser_model = torch.jit.freeze(torch.jit.script(model))
 
-jit_model = torch.jit.script(model)
-dynamo_model = torch.compile(model)
-nvfuser_model = torch.jit.freeze(torch.jit.script(model))
+    functs_model = functs.jit.script(model)
+    fait_model = functs.jit.build(functs.jit.script(torch.jit.freeze(torch.jit.script(model))), (encoder_output, mask, h, c))
 
-functs_model = functs.jit.script(model)
-fait_model = functs.jit.build(functs.jit.script(torch.jit.freeze(torch.jit.script(model))), (encoder_output, mask, h, c))
+    functs.utils.evaluate_func(
+        model, (encoder_output, mask, h, c), "eager", run_duration=2.)
+    functs.utils.evaluate_func(
+        jit_model, (encoder_output, mask, h, c), "jit", run_duration=2.)
+    functs.utils.evaluate_func(
+        dynamo_model, (encoder_output, mask, h, c), "dynamo", run_duration=2.)
+    functs.utils.evaluate_func(
+        functs_model, (encoder_output, mask, h, c), "functs", run_duration=2.)
+    functs.utils.evaluate_func(
+        fait_model, (encoder_output, mask, h, c), "fait", run_duration=2.)
 
-functs.utils.evaluate_func(
-    model, (encoder_output, mask, h, c), "eager", run_duration=2.)
-functs.utils.evaluate_func(
-    jit_model, (encoder_output, mask, h, c), "jit", run_duration=2.)
-functs.utils.evaluate_func(
-    dynamo_model, (encoder_output, mask, h, c), "dynamo", run_duration=2.)
-functs.utils.evaluate_func(
-    functs_model, (encoder_output, mask, h, c), "functs", run_duration=2.)
-functs.utils.evaluate_func(
-    fait_model, (encoder_output, mask, h, c), "fait", run_duration=2.)
+    torch._C._jit_set_nvfuser_enabled(True)
+    functs.utils.evaluate_func(
+        nvfuser_model, (encoder_output, mask, h, c), "lstm nvfuser", run_duration=2.)
+    torch._C._jit_set_nvfuser_enabled(False)
 
-torch._C._jit_set_nvfuser_enabled(True)
-functs.utils.evaluate_func(
-    nvfuser_model, (encoder_output, mask, h, c), "lstm nvfuser", run_duration=2.)
-torch._C._jit_set_nvfuser_enabled(False)
+    # if arguments.tool in ["all", "eager"]:
+    #     print(functs.utils.proifler_func(model, (encoder_output, mask, h, c), "eager", run_duration=1.0, export_json="eager").key_metrics)
 
-# if arguments.tool in ["all", "eager"]:
-#     print(functs.utils.proifler_func(model, (encoder_output, mask, h, c), "eager", run_duration=1.0, export_json="eager").key_metrics)
+    # if arguments.tool in ["all", "jit"]:
+    #     print(functs.utils.proifler_func(jit_model, (encoder_output, mask, h, c), "jit", run_duration=1.0, export_json="jit").key_metrics)
+    # if arguments.tool in ["all", "dynamo"]:
+    #     print(functs.utils.proifler_func(dynamo_model, (encoder_output, mask, h, c), "dynamo", run_duration=1.0, export_json="dynamo").key_metrics)
+    # if arguments.tool in ["all", "functs"]:
+    #     print(functs.utils.proifler_func(functs_model, (encoder_output, mask, h, c), "functs", run_duration=1.0, export_json="functs").key_metrics)
 
-# if arguments.tool in ["all", "jit"]:
-#     print(functs.utils.proifler_func(jit_model, (encoder_output, mask, h, c), "jit", run_duration=1.0, export_json="jit").key_metrics)
-# if arguments.tool in ["all", "dynamo"]:
-#     print(functs.utils.proifler_func(dynamo_model, (encoder_output, mask, h, c), "dynamo", run_duration=1.0, export_json="dynamo").key_metrics)
-# if arguments.tool in ["all", "functs"]:
-#     print(functs.utils.proifler_func(functs_model, (encoder_output, mask, h, c), "functs", run_duration=1.0, export_json="functs").key_metrics)
-
-# if arguments.tool in ["all", "nvfuser"]:
-#     torch._C._jit_set_nvfuser_enabled(True)
-#     print(functs.utils.evaluate.proifler_func(nvfuser_model, (encoder_output, mask, h, c), "nvfuser", run_duration=1.0, export_json="nvfuser").key_metrics)
-#     torch._C._jit_set_nvfuser_enabled(False)
+    # if arguments.tool in ["all", "nvfuser"]:
+    #     torch._C._jit_set_nvfuser_enabled(True)
+    #     print(functs.utils.evaluate.proifler_func(nvfuser_model, (encoder_output, mask, h, c), "nvfuser", run_duration=1.0, export_json="nvfuser").key_metrics)
+    #     torch._C._jit_set_nvfuser_enabled(False)

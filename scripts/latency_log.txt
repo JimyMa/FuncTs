@@ -1,0 +1,63 @@
+YOLOV3BBox_eager: 6136 iters, min = 1.535ms, max = 3.602ms, avg = 1.63ms
+SSDBBox_eager: 2506 iters, min = 3.274ms, max = 7.306ms, avg = 3.991ms
+YolactBBoxMask_eager: 2143 iters, min = 4.575ms, max = 6.933ms, avg = 4.668ms
+FCOSBBox_eager: 4125 iters, min = 2.142ms, max = 5.006ms, avg = 2.425ms
+YOLOV3BBox_jit: 8986 iters, min = 1.023ms, max = 2.38ms, avg = 1.113ms
+SSDBBox_jit: 3525 iters, min = 2.234ms, max = 4.695ms, avg = 2.838ms
+YolactBBoxMask_jit: 3436 iters, min = 2.824ms, max = 4.838ms, avg = 2.911ms
+FCOSBBox_jit: 5802 iters, min = 1.558ms, max = 3.212ms, avg = 1.724ms
+YOLOV3BBox_functs: 19182 iters, min = 482.1us, max = 841.5us, avg = 521.3us
+SSDBBox_functs: 8335 iters, min = 944.0us, max = 2.772ms, avg = 1.2ms
+YolactBBoxMask_functs: 9586 iters, min = 1.023ms, max = 2.587ms, avg = 1.043ms
+FCOSBBox_functs: 10485 iters, min = 822.2us, max = 2.307ms, avg = 953.8us
+/home/anonymous/src/meta/pytorch/torch/overrides.py:110: UserWarning: 'has_cuda' is deprecated, please use 'torch.backends.cuda.is_built()'
+  torch.has_cuda,
+/home/anonymous/src/meta/pytorch/torch/overrides.py:111: UserWarning: 'has_cudnn' is deprecated, please use 'torch.backends.cudnn.is_available()'
+  torch.has_cudnn,
+/home/anonymous/src/meta/pytorch/torch/overrides.py:117: UserWarning: 'has_mps' is deprecated, please use 'torch.backends.mps.is_built()'
+  torch.has_mps,
+/home/anonymous/src/meta/pytorch/torch/overrides.py:118: UserWarning: 'has_mkldnn' is deprecated, please use 'torch.backends.mkldnn.is_available()'
+  torch.has_mkldnn,
+YOLOV3BBox_dynamo: 5663 iters, min = 1.639ms, max = 315.3ms, avg = 1.766ms
+SSDBBox_dynamo: 2097 iters, min = 3.304ms, max = 872.2ms, avg = 4.769ms
+YolactBBoxMask_dynamo: 2632 iters, min = 3.549ms, max = 6.583ms, avg = 3.801ms
+FCOSBBox_dynamo: 3659 iters, min = 2.336ms, max = 5.495ms, avg = 2.734ms
+/home/anonymous/src/meta/pytorch/torch/nn/modules/module.py:1527: UserWarning: nvfuser integration in TorchScript is deprecated. (Triggered internally at /home/anonymous/src/meta/pytorch/torch/csrc/jit/codegen/cuda/interface.cpp:235.)
+  return forward_call(*args, **kwargs)
+YOLOV3BBox_nvfuser: 7831 iters, min = 1.071ms, max = 3.132ms, avg = 1.277ms
+SSDBBox_nvfuser: 916 iters, min = 2.503ms, max = 29.87ms, avg = 10.93ms
+YolactBBoxMask_nvfuser: 3053 iters, min = 3.004ms, max = 6.248ms, avg = 3.276ms
+FCOSBBox_nvfuser: 4808 iters, min = 1.691ms, max = 4.692ms, avg = 2.08ms
+[[ 3.17    5.341   8.078   7.561 ]
+ [ 3.306   6.119   7.211   7.87  ]
+ [ 2.817  12.28    6.686   7.216 ]
+ [ 2.653   4.188   6.321   6.86  ]
+ [ 2.0613  2.55    4.453   6.0898]]
+NasRNN_eager: 826 iters, min = 11.75ms, max = 20.85ms, avg = 12.12ms
+LSTM_eager: 118 iters, min = 82.72ms, max = 115.5ms, avg = 85.17ms
+AttnDecoderRNN_eager: 2853 iters, min = 3.22ms, max = 6.344ms, avg = 3.506ms
+Attention_eager: 3205 iters, min = 2.995ms, max = 5.453ms, avg = 3.121ms
+NasRNN_jit: 3240 iters, min = 3.012ms, max = 6.363ms, avg = 3.086ms
+LSTM_jit: 240 iters, min = 39.76ms, max = 58.54ms, avg = 41.75ms
+AttnDecoderRNN_jit: 6876 iters, min = 1.35ms, max = 3.103ms, avg = 1.455ms
+Attention_jit: 4400 iters, min = 2.164ms, max = 4.838ms, avg = 2.273ms
+NasRNN_functs: 4504 iters, min = 2.148ms, max = 4.028ms, avg = 2.221ms
+LSTM_functs: 460 iters, min = 21.11ms, max = 37.26ms, avg = 21.78ms
+AttnDecoderRNN_functs: 7350 iters, min = 1.267ms, max = 3.125ms, avg = 1.361ms
+Attention_functs: 4978 iters, min = 1.908ms, max = 4.313ms, avg = 2.009ms
+NasRNN_dynamo: 2948 iters, min = 3.277ms, max = 6.996ms, avg = 3.393ms
+LSTM_dynamo: 234 iters, min = 40.59ms, max = 70.89ms, avg = 42.76ms
+AttnDecoderRNN_dynamo: 2689 iters, min = 3.42ms, max = 14.66ms, avg = 3.72ms
+Attention_dynamo: 3385 iters, min = 2.784ms, max = 5.546ms, avg = 2.955ms
+NasRNN_nvfuser: 2485 iters, min = 3.865ms, max = 8.51ms, avg = 4.024ms
+LSTM_nvfuser: 208 iters, min = 46.53ms, max = 59.65ms, avg = 48.2ms
+AttnDecoderRNN_nvfuser: 5968 iters, min = 1.562ms, max = 3.355ms, avg = 1.676ms
+Attention_nvfuser: 4257 iters, min = 2.262ms, max = 4.725ms, avg = 2.349ms
+[[12.12  85.17   3.506  3.121]
+ [ 3.393 42.76   3.72   2.955]
+ [ 4.024 48.2    1.676  2.349]
+ [ 3.086 41.75   1.455  2.273]
+ [ 2.221 21.78   1.361  2.009]]
+
+
+

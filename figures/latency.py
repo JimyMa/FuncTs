@@ -28,7 +28,6 @@ data_1660ti = np.stack([latency_eager_normal,
                         latency_jit_normal,
                         latency_functs_normal])
 
-
 # 3090
 models =                        ["YOLOV3",     "SSD",        "YOLACT",      "FCOS",                 "NASRNN", "LSTM", "seq2seq", "Attention"]
 latency_eager =    1 / np.array([1.443 + 1.49, 4.092 + 1.52, 4.354 + 1.83,  2.77 + 8.75,            13.23,    105.2,  19.13,     3.241,     ])
@@ -56,7 +55,6 @@ data = {
     "(b) RTX 3090": data_3090,
     "(a) RTX 1660Ti": data_1660ti,
 }
-
 
 # average outperform
 # outperf_nnc = data[-1] / data[-2]
@@ -116,9 +114,9 @@ for plat, ax in zip(platforms, axes):
     ax.set_xlabel(plat, fontsize=13, weight="bold")
     max_ylim = max(max_ylim, float(np.ceil(np.max(perf))))
     plt.setp(axes, ylim=(0, max_ylim))
-    ax.axhline(y = 1.0, 
-            color = "#cbcbcbff", 
-            linestyle = ':') 
+    # ax.axhline(y = 1.0, 
+    #         color = "#cbcbcbff", 
+    #         linestyle = ':') 
 # fig.legend(labels=tools, ncol=len(tools), loc="outside upper center")
 fig.supylabel("Speed Up", weight='bold')
 
