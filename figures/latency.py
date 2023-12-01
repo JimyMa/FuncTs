@@ -100,7 +100,7 @@ for plat, ax in zip(platforms, axes):
             h,
             width=bar_width,
             color=c,
-            edgecolor="black",
+            # edgecolor="black",
         )
     for m in range(len(models)):
         model_perf = perf[:, m]
@@ -116,6 +116,9 @@ for plat, ax in zip(platforms, axes):
     ax.set_xlabel(plat, fontsize=13, weight="bold")
     max_ylim = max(max_ylim, float(np.ceil(np.max(perf))))
     plt.setp(axes, ylim=(0, max_ylim))
+    ax.axhline(y = 1.0, 
+            color = "#cbcbcbff", 
+            linestyle = ':') 
 # fig.legend(labels=tools, ncol=len(tools), loc="outside upper center")
 fig.supylabel("Speed Up", weight='bold')
 

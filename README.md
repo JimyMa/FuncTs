@@ -220,21 +220,33 @@ The functional part of the program can be representated as a direct acyclic grap
 
 We extend NNC to support [horizontal parallization](./fait/tensorexpr/functor_parallization.h), pure function inner the loop without loop carried denpendency can be fused to one kernel and run simultaneously.
 
-## Benchmark
+## Evaluation
 
-### Latency Benchmark
+### Speed Up
 
 - The performance speed up is shown as follow:
 
 ![latency](./docs/imgs/latency.jpg)
 
-## Kernel launch counts
+### Kernel launch counts
 
 The kernel counts perfomance is shown as follow:
 
 ![kernel launch](./docs/imgs/kernel_launch.jpg)
 
 After functionalization, our performance of kernel launch is better than TorchScript + NNC without Tensor in all workloads. Specificly, compared with TorchDynamo + TorchInductor, the performance boost of kernel launch in NASRNN, seq2seq and Attention is not obviously because TorchDynamo is a tracing-based jit and expand the control flow by unrolling, which have more fusion scope than TorchScipt frontend. However, loop unrolling by tracing may not be the silver bullet, as it may cause cache miss in runtime, which may lead to degradation of performance. In addition, the quantity of code after loop unrolling may get much larger than before, which leads to non-negligible time cost.
+
+### Ablation Study
+
+There are two main optimization methods, vertical optimization and horizontal parallelization. For [NASRNN](./benchmark/ai_model/nasrnn/nasrnn.py), [Attention](./benchmark/simple_ops/attention/attention.py), [LSTM](./benchmark/ai_model/lstm/lstm.py) and [seq2seq](./benchmark/ai_model/seq2seq/seq2seq.py), there are only loop carried dependency. For [YOLOV3](./benchmark/ai_model/yolov3/run.py), [SSD](./benchmark/ai_model/ssd/run.py), [YOLACT](./benchmark/ai_model/yolact/run.py), [FCOS](./benchmark/ai_model/fcos/run.py), there are parallelizable loop and we perform horizontal parallelization. We unroll these workloads ([YOLOV3](./benchmark/ai_model/yolov3/yolov3_bbox_unroll.py), [SSD](./benchmark/ai_model/ssd/ssd_bbox_unroll.py), [YOLACT](./benchmark/ai_model/yolact/yolact_mask_unroll.py), [FCOS](./benchmark/ai_model/fcos/fcos_bbox_unroll.py)) and run with native PyTorch NNC without horizontal extention. The performance speedup w.r.t. PyTorch eager mode is shown as below.
+
+![ablation](./docs/imgs/ablation.jpg)
+
+As NNC does not support symbolic shape inference at compile time, as a result, we use a single feature map obtained from coco dataset. The figure shows that  we can still achieve considerable speedup by performing TensorSSA at native TorchScript + NNC pipeline.
+
+### Compilation Time
+
+TBD
 
 ### Scalability
 
@@ -246,14 +258,7 @@ After functionalization, our performance of kernel launch is better than TorchSc
 
 ![seq length](./docs/imgs/scalability_seq_len.jpg)
 
-## Ablation Study
-
-There are two main optimization methods, vertical optimization and horizontal parallelization. For [NASRNN](./benchmark/ai_model/nasrnn/nasrnn.py), [Attention](./benchmark/simple_ops/attention/attention.py), [LSTM](./benchmark/ai_model/lstm/lstm.py) and [seq2seq](./benchmark/ai_model/seq2seq/seq2seq.py), there are only loop carried dependency. For [YOLOV3](./benchmark/ai_model/yolov3/run.py), [SSD](./benchmark/ai_model/ssd/run.py), [YOLACT](./benchmark/ai_model/yolact/run.py), [FCOS](./benchmark/ai_model/fcos/run.py), there are parallelizable loop and we perform horizontal parallelization. We unroll these workloads ([YOLOV3](./benchmark/ai_model/yolov3/yolov3_bbox_unroll.py), [SSD](./benchmark/ai_model/ssd/ssd_bbox_unroll.py), [YOLACT](./benchmark/ai_model/yolact/yolact_mask_unroll.py), [FCOS](./benchmark/ai_model/fcos/fcos_bbox_unroll.py)) and run with native PyTorch NNC without extention, which does nothing but functionalization by TensorSSA. The performance speedup is shown as below.
-
-![ablation](./docs/imgs/ablation.jpg)
-
-
-## Latency with CUDA Graph
+### Latency with CUDA Graph
 
 ![kernel launch](./docs/imgs/latency_cudagraph.jpg)
 
