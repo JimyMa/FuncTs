@@ -635,17 +635,17 @@ void GraphBuilder::compile() {
     auto input = FunctorInputArgs[i];
     bool is_parallel_args = is_parallelled_args_[i];
     if (is_parallel_args) {
-      if (auto buf_input = c10::get_if<BufHandle>(&input)) {
+      if (auto buf_input = std::get_if<BufHandle>(&input)) {
         auto par_inputs = LoadBufParallelFunctorMap[buf_input->AsNode<Buf>()];
         for (auto par_input : par_inputs) {
           ParallelBufferArgs_.push_back(par_input);
         }
-      } else if (auto var_input = c10::get_if<VarHandle>(&input)) {
+      } else if (auto var_input = std::get_if<VarHandle>(&input)) {
         auto par_inputs = LoadVarParallelFunctorMap[var_input->AsNode<Var>()];
         for (auto par_input : par_inputs) {
           ParallelBufferArgs_.push_back(par_input);
         }
-      } else if (auto var_list_input = c10::get_if<VarList>(&input)) {
+      } else if (auto var_list_input = std::get_if<VarList>(&input)) {
         for (auto var_input : *var_list_input) {
           auto par_inputs = LoadVarParallelFunctorMap[var_input.AsNode<Var>()];
           for (auto par_input : par_inputs) {
@@ -656,11 +656,11 @@ void GraphBuilder::compile() {
         throw unsupported_dtype();
       }
     } else {
-      if (auto buf_input = c10::get_if<BufHandle>(&input)) {
+      if (auto buf_input = std::get_if<BufHandle>(&input)) {
         ParallelBufferArgs_.push_back(*buf_input);
-      } else if (auto var_input = c10::get_if<VarHandle>(&input)) {
+      } else if (auto var_input = std::get_if<VarHandle>(&input)) {
         ParallelBufferArgs_.push_back(*var_input);
-      } else if (auto var_list_input = c10::get_if<VarList>(&input)) {
+      } else if (auto var_list_input = std::get_if<VarList>(&input)) {
         for (auto var_input : *var_list_input) {
           ParallelBufferArgs_.push_back(var_input);
         }
@@ -771,7 +771,7 @@ std::vector<CodeGen::CallArg> GraphBuilder::prepareRunArgs(
       }
     } else if (input.isIntList()) {
       auto list_input = input.toIntList();
-      auto functor_input_var = *c10::get_if<VarHandle>(&functor_input);
+      auto functor_input_var = *std::get_if<VarHandle>(&functor_input);
       for (int i = 0; i < degree_; i++) {
         auto value = list_input[i].get().toInt();
         runArgs.emplace_back(value);
@@ -786,7 +786,7 @@ std::vector<CodeGen::CallArg> GraphBuilder::prepareRunArgs(
       }
     } else if (input.isBoolList()) {
       auto list_input = input.toBoolList();
-      auto functor_input_var = *c10::get_if<VarHandle>(&functor_input);
+      auto functor_input_var = *std::get_if<VarHandle>(&functor_input);
       for (int i = 0; i < degree_; i++) {
         auto value = list_input[i].get().toBool();
         runArgs.emplace_back(value);
@@ -797,7 +797,7 @@ std::vector<CodeGen::CallArg> GraphBuilder::prepareRunArgs(
       auto degree = degree_;
       auto tuple_lens =
           input_value->type()->cast<TupleType>()->elements().size();
-      auto functor_input_var_list = *c10::get_if<VarList>(&functor_input);
+      auto functor_input_var_list = *std::get_if<VarList>(&functor_input);
       for (int i = 0; i < tuple_lens; i++) {
         for (int j = 0; j < degree_; j++) {
           auto value =
@@ -812,7 +812,7 @@ std::vector<CodeGen::CallArg> GraphBuilder::prepareRunArgs(
       auto degree = degree_;
       auto tuple_lens =
           refined_types_[functor_idx]->cast<TupleType>()->elements().size();
-      auto functor_input_var_list = *c10::get_if<VarList>(&functor_input);
+      auto functor_input_var_list = *std::get_if<VarList>(&functor_input);
       for (int i = 0; i < tuple_lens; i++) {
         for (int j = 0; j < degree_; j++) {
           auto value = input.toList()[j].get().toListRef()[i].toInt();

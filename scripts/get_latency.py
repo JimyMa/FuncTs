@@ -39,7 +39,7 @@ with torch.no_grad():
 
     example_in = [feats[0] for feats in feats]
     cv_jit_model = [torch.jit.freeze(torch.jit.script(model)) for model in cv_model]
-    cv_dynamo_model = [torch.compile(model, dynamic=True) for model in cv_model]
+    cv_dynamo_model = [torch.compile(model, dynamic=None) for model in cv_model]
     cv_nvfuser_model = [torch.jit.freeze(torch.jit.script(model)) for model in cv_model]
     cv_functs_model = [functs.jit.build(functs.jit.script(model, backend="aot"), example_in) for model, example_in in zip(cv_model, example_in)]
 
@@ -137,7 +137,7 @@ with torch.no_grad():
               generate_attention_input()]
 
     nlp_jit_model = [torch.jit.freeze(torch.jit.script(model)) for model in nlp_model]
-    nlp_dynamo_model = [torch.compile(model, dynamic=True) for model in nlp_model]
+    nlp_dynamo_model = [torch.compile(model, dynamic=None) for model in nlp_model]
     nlp_nvfuser_model = [torch.jit.freeze(torch.jit.script(model)) for model in nlp_model]
     nlp_functs_model = [functs.jit.script(model) for model in nlp_model]
 

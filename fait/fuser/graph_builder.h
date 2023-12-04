@@ -42,7 +42,7 @@ namespace jit {
 using VarList = std::vector<tensorexpr::VarHandle>;
 
 using FunctorInputValue =
-    c10::variant<tensorexpr::BufHandle, tensorexpr::VarHandle, VarList>;
+    std::variant<tensorexpr::BufHandle, tensorexpr::VarHandle, VarList>;
 
 using NNCShapeFunction =
     std::function<std::vector<ExprHandle>(std::vector<ArgValue>)>;

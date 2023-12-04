@@ -324,7 +324,7 @@ private:
   void recordMutableAttrs(std::shared_ptr<Graph> &graph) {
     std::stack<Block *> blocks({graph->block()});
     std::unique_ptr<AliasDb> aliasDb =
-        torch::make_unique<AliasDb>(graph, /* isFrozen */ true);
+        std::make_unique<AliasDb>(graph, /* isFrozen */ true);
     while (!blocks.empty()) {
       Block *block = blocks.top();
       blocks.pop();
