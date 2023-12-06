@@ -1,5 +1,8 @@
 # FuncTs：TorchScript Functionalization
 
+- ***paper correction***
+  - [Figure 2](./docs/imgs/ControlDependencyMemoryDependency.png): `%b.5`->`%b.1.`
+
 ## Bulid from source
 
 - PyTorch is all you need to compile `functs`:
@@ -121,7 +124,7 @@ torch._C._jit_pass_constant_propagation(g)
 
 Functionalization of a more complicated case is shown as follow:
 
-![img](./docs/imgs/ControlDependencyMemoryDepency.png "Control dependency &amp; Memory dependency")
+![ControlDependency](./docs/imgs/ControlDependencyMemoryDepency.png "Control dependency &amp; Memory dependency")
 
 - Before functionalization
 
