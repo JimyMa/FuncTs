@@ -3,6 +3,21 @@
 - ***paper correction***
   - [Figure 2](./docs/imgs/ControlDependencyMemoryDependency.png): `%b.5`->`%b.1.`
 
+Kernel fusion is a widely used optimization technique in deep learning compilers, **but the effectiveness is limited due to the challenges posed by the inherent side effects in these imperative programs**, especially tensor-level mutations. Accordingly, we design an algorithm to solve this problem.
+<br />
+We split the algorithm into two steps: **Rewrite Mutation**, **Block Propagation**. The **Rewrite Mutation** step includes two key steps: **pass-up** and **pass-down**. 
+<br />
+In the **pass-up** step, suppose v is a view of t, the algorithm traverses the view path from v to t. When each variable is visited, an x ′ = Assign(x, v ′ , [·]) operator is inserted into the program.
+<br />
+In the **pass-down** step, we traverse from the root node v to other branch which hasn't traversed by the pass-up step, while each variable is firstly visited, an v ′ = Access(x ′ , [·]) operator is inserted.
+<br />
+To annotate the tensor version for subsequent block propagation, an Update(v ′ , v) statement is generated at the same time.
+<br />
+In the **Block Propagation** step, this step visits all generated Update(x ′ , x), propagates the tensor mutation beyond the control flow. 
+<br />
+By these steps, we generate a new graph. Accordingly, **we can explore a larger kernel fusion optimization space
+than the previous methods**.
+
 ## Bulid from source
 
 - PyTorch is all you need to compile `functs`:
