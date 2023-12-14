@@ -27,8 +27,10 @@ compile_commands.json
 
 # figure
 *.pdf
-figures/*.jpg
-figures/*.png
+*.jpg
+*.png
+!docs/imgs/*.jpg
+!docs/imgs/*.png
 
 
 
