@@ -153,7 +153,6 @@ def gen_mask_from_sequence(std):
     mask = mask.transpose(0, 1).contiguous().clone()
     return mask
 
-<<<<<<< HEAD:functs/benchmark/ai_model/seq2seq/seq2seq.py
 
 if __name__ == "__main__":
     arguments = parser.parse_args()
@@ -161,23 +160,13 @@ if __name__ == "__main__":
 
     model = AttnDecoderRNN(HIDDEN_SIZE, OUTPUT_SIZE,
                            dropout_p=0.1).to(device).eval()
-=======
-if __name__ == "__main__":
-    batch_size = arguments.bs
-
-    model = AttnDecoderRNN(HIDDEN_SIZE, OUTPUT_SIZE, dropout_p=0.1).to(device).eval()
->>>>>>> 45225190966ef74b4186581e40d32a6d0584a5e5:benchmark/ai_model/seq2seq/seq2seq.py
 
     std = []
     MAX_LENGTH = 50
     h = torch.randn(batch_size, HIDDEN_SIZE, device=device)
     c = torch.randn(batch_size, HIDDEN_SIZE, device=device)
     sos = torch.full((batch_size,), model.SOS_token,
-<<<<<<< HEAD:functs/benchmark/ai_model/seq2seq/seq2seq.py
                      dtype=torch.int64, device='cuda')
-=======
-                    dtype=torch.int64, device='cuda')
->>>>>>> 45225190966ef74b4186581e40d32a6d0584a5e5:benchmark/ai_model/seq2seq/seq2seq.py
     for i in range(batch_size):
         l = 10
         lst = list(range(1, l))
@@ -196,12 +185,8 @@ if __name__ == "__main__":
     nvfuser_model = torch.jit.freeze(torch.jit.script(model))
 
     functs_model = functs.jit.script(model)
-<<<<<<< HEAD:functs/benchmark/ai_model/seq2seq/seq2seq.py
     fait_model = functs.jit.build(functs.jit.script(torch.jit.freeze(
         torch.jit.script(model))), (encoder_output, mask, h, c))
-=======
-    fait_model = functs.jit.build(functs.jit.script(torch.jit.freeze(torch.jit.script(model))), (encoder_output, mask, h, c))
->>>>>>> 45225190966ef74b4186581e40d32a6d0584a5e5:benchmark/ai_model/seq2seq/seq2seq.py
 
     functs.utils.evaluate_func(
         model, (encoder_output, mask, h, c), "eager", run_duration=2.)

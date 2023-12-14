@@ -24,29 +24,6 @@ using namespace c10;
 namespace torch {
 namespace jit {
 
-struct TensorSSAMutateInfo {
-  std::vector<Value*> mutValues{};
-  std::unordered_map<Value*, std::vector<Node*>> mutNodes{};
-  std::unordered_map<Value*, Value*> valueToMut{};
-  std::unordered_map<Value*, std::vector<Value*>> renameStacks{};
-
-  void addMutNodes(Node* updateNode) {
-    AT_ASSERT(
-        tensorssa::Update == updateNode->kind(),
-        "don't forget we use update node to annotate mutation");
-
-    auto mutated = updateNode->input(1);
-    auto mutatee = updateNode->input(0);
-
-    if (!mutNodes.count(mutated)) {
-      mutValues.push_back(mutated);
-      mutNodes.insert({mutated, std::vector<Node*>()});
-    }
-    valueToMut.insert({mutatee, mutated});
-    mutNodes[mutated].push_back(updateNode);
-  }
-};
-
 static void GetBufferTreeAliasDb(
     std::shared_ptr<Graph> g,
     AliasDbCopy& aliasDb_buffer_tree) {
@@ -358,7 +335,8 @@ static void addMutatedValueToBlock(
   auto node = block->owningNode();
   if (handleNode) {
     auto nodeRet = node->addOutput();
-    mutateInfo->valueToMut.insert({nodeRet, mutated});
+    auto output_update = node->owningGraph()->create(tensorssa::Update, {nodeRet, mutated}, 0);
+    output_update->insertAfter(node);
   }
 
   // Handle values that are specific to node kinds
@@ -366,9 +344,10 @@ static void addMutatedValueToBlock(
     case prim::Loop: {
       // add to block parameter of loop body
       auto param = block->addInput();
-      mutateInfo->valueToMut.insert({param, mutated});
+      auto input_update = node->owningGraph()->create(tensorssa::Update, {param, mutated}, 0);
+      input_update->insertBefore(block->nodes().front());
       // add to argument of loop node
-      node->addInput(mutated);
+      node->addInput(mutated); 
       break;
     }
 
@@ -382,11 +361,10 @@ static void addMutatedValueToBlock(
   }
 }
 
-static void TensorSSAPropagation(
+void TensorSSAPropagation(
     std::shared_ptr<Graph> graph,
     std::shared_ptr<TensorSSAMutateInfo> mutateInfo) {
   for (auto& mutated : mutateInfo->mutValues) {
-    mutateInfo->valueToMut.insert({mutated, mutated});
     auto defBlock = mutated->node()->owningBlock();
     std::unordered_set<Block*> visitedBlocks;
     auto& nodes = mutateInfo->mutNodes[mutated];
@@ -400,79 +378,21 @@ static void TensorSSAPropagation(
 }
 
 static void renameValues(
-    Block* block,
-    std::shared_ptr<TensorSSAMutateInfo> mutateInfo) {
-  // Initialize rename counts in current scope
-  std::unordered_map<Value*, size_t> renameCounts;
-  auto updateValue = [&](Value* value) {
-    // find mutated version of this value
-    Value* mutated = nullptr;
-    if (mutateInfo->valueToMut.count(value)) {
-      mutated = mutateInfo->valueToMut[value];
-    } else {
-      auto defNode = value->node();
-      auto kind = defNode->kind();
-      if (kind == tensorssa::Update) {
-        mutated = mutateInfo->valueToMut[defNode->input(0)];
-        mutateInfo->valueToMut.insert({value, mutated});
-      }
-    }
-    if (!mutated)
-      return;
-
-    // add to rename stack
-    mutateInfo->renameStacks[mutated].push_back(value);
-    // add to rename counts
-    if (renameCounts.count(mutated))
-      renameCounts[mutated]++;
-    else
-      renameCounts.insert({mutated, 1});
-  };
-  auto replaceInputsOf = [&](Node* node) -> void {
-    if (tensorssa::Update == node->kind())
-      return;
-    for (auto i = 0u; i < node->inputs().size(); i++) {
-      auto input = node->input(i);
-      if (!mutateInfo->valueToMut.count(input))
-        continue;
-      auto mutated = mutateInfo->valueToMut[input];
-      auto latest = mutateInfo->renameStacks[mutated].back();
-      node->replaceInput(i, latest);
-    }
-  };
-
-  // Add parameters to rename stack
-  for (auto param : block->inputs())
-    updateValue(param);
-
-  // Process each node
+  Block* block
+) {
   for (auto node : block->nodes()) {
-    // replace inputs
-    replaceInputsOf(node);
-    // visit owned blocks
-    for (auto nested : node->blocks())
-      renameValues(nested, mutateInfo);
-    // update outputs
-    for (auto output : node->outputs())
-      updateValue(output);
-  }
-
-  // Process return node
-  replaceInputsOf(block->return_node());
-
-  // Restore rename stack
-  for (auto& pair : renameCounts) {
-    for (auto i = 0u; i < pair.second; i++)
-      mutateInfo->renameStacks[pair.first].pop_back();
+    if (tensorssa::Update == node->kind())
+      node->input(1)-> replaceAllUsesAfterNodeWith(node, node->input(0));
+    for (auto &b : node->blocks())
+      renameValues(b);
   }
 }
 
-static void TensorSSARename(
-    std::shared_ptr<Graph> graph,
-    std::shared_ptr<TensorSSAMutateInfo> mutateInfo) {
-  for (auto value : mutateInfo->mutValues)
-    mutateInfo->renameStacks.insert({value, {}});
-  renameValues(graph->block(), mutateInfo);
+void TensorSSARename(
+    std::shared_ptr<Graph> graph) {
+  // for (auto value : mutateInfo->mutValues)
+  // mutateInfo->renameStacks.insert({value, {}});
+  renameValues(graph->block());
 }
 
 void TensorSSARemoveUpdate(std::shared_ptr<Graph> graph) {
@@ -523,7 +443,8 @@ void indexBoolFallback(std::shared_ptr<Graph> graph) {
   indexBoolFallbackImpl(graph->block());
 }
 
-void ConvertToTensorSSA(std::shared_ptr<Graph> graph) {
+void TensorSSARewriteMutation(std::shared_ptr<Graph> graph,
+                              std::shared_ptr<TensorSSAMutateInfo> mutateInfo) {
   // Preprocess: A dumb pass to eliminate interprecedure view
   // DumbRemoveInterPrecedureMutation(graph);
 
@@ -538,17 +459,22 @@ void ConvertToTensorSSA(std::shared_ptr<Graph> graph) {
   // `immut::access`, `immut::assign`
   TensorSSAImmutablize(graph->block(), bufferForest);
 
+  // Step 3. Convert to TensorSSA
+  TensorSSAAliasRemoval(graph->block(), bufferForest, mutateInfo);
+}
+
+void ConvertToTensorSSA(std::shared_ptr<Graph> graph) {
   auto mutateInfo = std::make_shared<TensorSSAMutateInfo>();
 
   // Step 3. Convert to TensorSSA
-  TensorSSAAliasRemoval(graph->block(), bufferForest, mutateInfo);
+  TensorSSARewriteMutation(graph, mutateInfo);
 
   // Step 4. block propogation
   // add alias block arguments
   TensorSSAPropagation(graph, mutateInfo);
 
   // Step 5. rename stack
-  TensorSSARename(graph, mutateInfo);
+  TensorSSARename(graph);
 
   // Step 6. fall back
   indexBoolFallback(graph);

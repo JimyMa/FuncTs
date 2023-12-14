@@ -18,10 +18,6 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--bs', type=int, default=1)
 parser.add_argument('--maxlength', type=int, default=50)
 parser.add_argument('--tool', type=str, default="all")
-<<<<<<< HEAD
-=======
-arguments = parser.parse_args()
->>>>>>> 45225190966ef74b4186581e40d32a6d0584a5e5
 
 cuda_device = torch.device("cuda:0")
 n_warmup = 100
@@ -103,10 +99,7 @@ class NasRNN(nn.Module):
 
 # import tsd
 if __name__ == "__main__":
-<<<<<<< HEAD
     arguments = parser.parse_args()
-=======
->>>>>>> 45225190966ef74b4186581e40d32a6d0584a5e5
     INPUT_SIZE = 256
     HIDDEN_SIZE = 256
     SEQ_LEN = arguments.maxlength
@@ -119,21 +112,13 @@ if __name__ == "__main__":
     # print(nasrnn_jit_fn.graph)
 
     nasrnn_nvfuser_fn = torch.jit.freeze(torch.jit.script(nasrnn))
-<<<<<<< HEAD
     nasrnn_dynamo_fn = torch.compile(nasrnn, dynamic=True)
-=======
-    nasrnn_dynamo_fn = torch.compile(nasrnn, dynamic=None)
->>>>>>> 45225190966ef74b4186581e40d32a6d0584a5e5
     torch._dynamo.config.suppress_errors = True
 
     nasrnn_functs_fn = functs.jit.script(nasrnn)
     # print(nasrnn_functs_fn.graph)
-<<<<<<< HEAD
     nasrnn_fait_fn = functs.jit.build(functs.jit.script(
         torch.jit.freeze(torch.jit.script(nasrnn))), [inp])
-=======
-    nasrnn_fait_fn = functs.jit.build(functs.jit.script(torch.jit.freeze(torch.jit.script(nasrnn))), [inp])
->>>>>>> 45225190966ef74b4186581e40d32a6d0584a5e5
     with torch.no_grad():
         if arguments.tool in ["all", "eager"]:
             functs.utils.evaluate.evaluate_func(
@@ -147,11 +132,6 @@ if __name__ == "__main__":
         if arguments.tool in ["all", "functs"]:
             functs.utils.evaluate.evaluate_func(
                 nasrnn_functs_fn, [inp], "nasrnn functs", run_duration=2.0)
-<<<<<<< HEAD
-
-=======
-        
->>>>>>> 45225190966ef74b4186581e40d32a6d0584a5e5
         if arguments.tool in ["all", "fait"]:
             functs.utils.evaluate.evaluate_func(
                 nasrnn_fait_fn, [inp], "nasrnn fait", run_duration=2.0)

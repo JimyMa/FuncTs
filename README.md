@@ -2,21 +2,8 @@
 
 - ***paper correction***
   - [Figure 2](./docs/imgs/ControlDependencyMemoryDependency.png): `%b.5`->`%b.1.`
-
-Kernel fusion is a widely used optimization technique in deep learning compilers, **but the effectiveness is limited due to the challenges posed by the inherent side effects in these imperative programs**, especially tensor-level mutations. Accordingly, we design an algorithm to solve this problem.
-<br />
-We split the algorithm into two steps: **Rewrite Mutation**, **Block Propagation**. The **Rewrite Mutation** step includes two key steps: **pass-up** and **pass-down**. 
-<br />
-In the **pass-up** step, suppose v is a view of t, the algorithm traverses the view path from v to t. When each variable is visited, an x ′ = Assign(x, v ′ , [·]) operator is inserted into the program.
-<br />
-In the **pass-down** step, we traverse from the root node v to other branch which hasn't traversed by the pass-up step, while each variable is firstly visited, an v ′ = Access(x ′ , [·]) operator is inserted.
-<br />
-To annotate the tensor version for subsequent block propagation, an Update(v ′ , v) statement is generated at the same time.
-<br />
-In the **Block Propagation** step, this step visits all generated Update(x ′ , x), propagates the tensor mutation beyond the control flow. 
-<br />
-By these steps, we generate a new graph. Accordingly, **we can explore a larger kernel fusion optimization space
-than the previous methods**.
+- ***paper notation***
+  - [Figure 3](./docs/imgs/TensorSSAExample.png): In (c), the number before `immut::Access`, `immut::Assign` and `tensorssa::Update` is the line number in (d). And we illustrate more details of [Figure 3](./docs/imgs/TensorSSAExample.png) in this README file.
 
 ## Bulid from source
 
@@ -37,104 +24,291 @@ kernel fusion. While the compute library developed by hardware vendors adequatel
 
 ## Use FuncTs to perform functionalization
 
-A [simple example](./examples/get_started.py) are shown as follow:
+A [simple example](./examples/get_started.py) of functionalization beyond control flow is depicted as follow:
+
+![T](docs/imgs/TensorSSAExample.png)
+
+We split the algorithm into two steps:
+
+- **Rewrite Mutation** (c). The **Rewrite Mutation** step includes two key steps:
+  - **Pass Up**. In the **pass-up** step, suppose `v` is a view of `t`, the algorithm traverses the view path from `v` to `t`. When each variable is visited, an `x′ = immut::Assign(x, v′, [·])` operator is inserted into the program.
+  - **Pass Down**. In the **pass-down** step, we traverse from the root node `v` to other branch which hasn't traversed by the pass-up step, while each variable is firstly visited, an `v′ = immgt::Access(x′, [·])` operator is inserted. To annotate the tensor version for subsequent block propagation, an `tensorssa::Update(v′, v)` statement is generated at the same time.
+- **Block Propagation** (d). In the **Block Propagation** step, this step visits all generated `tensorssa::Update(x′ ,x)`, propagates the tensor mutation beyond the control flow.
+
+By these steps, we generate a new graph. Accordingly, **we can explore a larger kernel fusion optimization space than the previous methods**.
+
+### Tensor `Access` and Tensor `Assign`
+
+As mentioned above, we generate `Access` and `Assign` operators during transformation. The `Access` operator is the immutable version of the `view` operator. The `Assign` operator is for generating immutable equivalent substitution of `view` and `mutation` combining with the `Access` operator. The figure below depicts the execution process of `aten::view`, `immut::Access` and `immut::Assign` operator.
+
+![view_access_assign](./docs/imgs/VIEW_ACCESS_ASSIGN.png)
+
+The `Access` and `Assign` operators  are two abstraction of a series of [operator instances](./functs/csrc/jit/ir/symbol_ext.h), which are shown in the table below.
+
+| operator            | Access operator      | Assign Operator          |
+| ------------------- | -------------------- | ------------------------ |
+| `aten::copy_`     | `immut::Assign`    | `immut::Assign`        |
+| `aten::select`    | `immut::select`    | `immut::select_rev`    |
+| `aten::slice`     | `immut::slice`     | `immut::slice_rev`     |
+| `aten::squeeze`   | `immut::squeeze`   | `immut::unsqueeze`     |
+| `aten::unsqueeze` | `immut::unsqueeze` | `immut::squeeze`       |
+| `aten::view`      | `immut::view`      | `immut::view`          |
+| `aten::reshape`   | `immut::reshape`   | `immut::reshape`       |
+| `aten::expand`    | `immut::expand`    | `immut::expand_rev`    |
+| `aten::expand_as` | `immut::expand_as` | `immut::expand_as_rev` |
+| `aten::repeat`    | `immut::repeat`    | `immut::repeat_rev`    |
+| `aten::index`     | `immut::index`     | `immut::index_rev`     |
+
+### More Details
+
+For learning or using `FuncTs`, you can functionalize the program step by step with our pass. the original python code is:
 
 ```python
-import torch
-import torch._C._te as te
-import functs._C
-
-# substitute your own function here~
 def func(a: torch.Tensor, b: torch.Tensor, n: int):
   a = a.clone()
   b = b.clone()
   for i in range(n):
     b[i] = b[i] + 1
   return b
-
-# func = func_data_control_flow_dependency
-func = func
-
-# torchscript
-jit_func = torch.jit.script(func)
-print("graph before functionalization")
-jit_func.graph.alias_db().dump()
-
-# functs
-functs_func = functs.jit.script(func)
-print("graph after functionalization")
-functs_func.graph.alias_db().dump()
-
-# check equal
-a: torch.Tensor = torch.randn([1024, 1024])
-b: torch.Tensor = torch.randn([1024, 1024])
-n = 3
-
-print(torch.allclose(jit_func(a, b, 3), func(a, b, 3)))
-# >>> True
-
 ```
 
-After running the script above, the graph-level IR before and after functionalization are printed as follow:
-
-- Before functionalization:
+We can dump the `torch.Graph` IR generated by `torch.jit.script` here.
 
 ```ruby
-# before functionalization
 graph(%a.1 : Tensor,
       %b.1 : Tensor,
       %n.1 : int):
   %28 : bool = prim::Constant[value=0]()
-  %18 : int = prim::Constant[value=0]()
-  %12 : bool = prim::Constant[value=1]()
+  %18 : int = prim::Constant[value=0]() # examples/get_started.py:14:11
+  %12 : bool = prim::Constant[value=1]() # examples/get_started.py:13:2
   %7 : NoneType = prim::Constant()
-  %20 : int = prim::Constant[value=1]()
-  %b.5 : Tensor = aten::clone(%b.1, %7)
-   = prim::Loop(%n.1, %12)
+  %20 : int = prim::Constant[value=1]() # examples/get_started.py:14:18
+  %b.5 : Tensor = aten::clone(%b.1, %7) # examples/get_started.py:12:6
+   = prim::Loop(%n.1, %12) # examples/get_started.py:13:2
     block0(%i.1 : int):
-      %19 : Tensor = aten::select(%b.5, %18, %i.1)
-      %22 : Tensor = aten::add(%19, %20, %20)
-      %27 : Tensor = aten::select(%b.5, %18, %i.1)
-      %29 : Tensor = aten::copy_(%27, %22, %28)
+      %19 : Tensor = aten::select(%b.5, %18, %i.1) # examples/get_started.py:14:11
+      %22 : Tensor = aten::add(%19, %20, %20) # examples/get_started.py:14:11
+      %27 : Tensor = aten::select(%b.5, %18, %i.1) # examples/get_started.py:14:4
+      %29 : Tensor = aten::copy_(%27, %22, %28) # examples/get_started.py:14:4
       -> (%12)
   return (%b.5)
 ```
 
-- After functionalization:
-
-```ruby
-graph(%a.5 : Tensor,
-      %b.11 : Tensor,
-      %n.1 : int):
-  %42 : NoneType = prim::Constant()
-  %b.1 : Tensor = aten::clone(%b.11, %42)
-  %18 : int = prim::Constant[value=0]()
-  %12 : bool = prim::Constant[value=1]()
-  %20 : int = prim::Constant[value=1]()
-  %b.5 : Tensor = aten::clone(%b.1, %42)
-  %52 : Tensor = prim::Loop(%n.1, %12, %b.5)
-    block0(%i.1 : int, %53 : Tensor):
-      %44 : Tensor = immut::select(%53, %18, %i.1)
-      %22 : Tensor = aten::add(%44, %20, %20)
-      %48 : Tensor = immut::select_rev(%53, %22, %18, %i.1)
-      -> (%12, %48)
-  return (%52)
-```
-
-You can also run the pass step by step and print the mid result ([Convert to TensorSSA](./functs/csrc/jit/passes/convert_to_tensorssa.cpp) -> Remove Update -> DCE & CSE)
+The first step is write mutation, which convert `View` and `Mutation` to equivalent `Access` and `Assign` operators.
 
 ```python
-import functs
-g = fn.graph
-functs._C._jit_pass_convert_to_tensorssa(g)
-print(g)
-functs._C._jit_pass_remove_update(g)
-pring(g)
-# FuncTs ConvertToTensorSSA is completely compatible with other torchscript passes 
-# such as DCE, CES, Constant propagation, kernel fusion, diff graph generation ...
-torch._C._jit_pass_dce(g)
-torch._C._jit_pass_cse(g)
-torch._C._jit_pass_constant_propagation(g)
+# step 1: rewrite mutation
+mutate_info = functs._C.TensorSSAMutateInfo()
+functs._C._jit_pass_rewrite_mutation(jit_func.graph, mutate_info)
+print("graph after rewrite mutation")
+print(jit_func.graph)
+print("mutated values: ") 
+print(mutate_info.mutValues)
+print("mutated nodes: ")
+print(mutate_info.mutNodes)
+```
+
+We define an object of `TensorSSAMutateInfo` to collect the mutated values and mutated nodes after `functs._C._jit_pass_rewrite_mutation`. The output is
+
+```ruby
+graph after rewrite mutation
+graph(%a.1 : Tensor,
+      %b.1 : Tensor,
+      %n.1 : int):
+  %28 : bool = prim::Constant[value=0]()
+  %18 : int = prim::Constant[value=0]() # examples/get_started.py:14:11
+  %12 : bool = prim::Constant[value=1]() # examples/get_started.py:13:2
+  %7 : NoneType = prim::Constant()
+  %20 : int = prim::Constant[value=1]() # examples/get_started.py:14:18
+  %b.5 : Tensor = aten::clone(%b.1, %7) # examples/get_started.py:12:6
+   = prim::Loop(%n.1, %12) # examples/get_started.py:13:2
+    block0(%i.1 : int):
+      %40 : Tensor = immut::select(%b.5, %18, %i.1)
+      %22 : Tensor = aten::add(%40, %20, %20) # examples/get_started.py:14:11
+      %41 : Tensor = immut::select(%b.5, %18, %i.1)
+      %42 : Tensor = immut::assign(%41, %22, %28)
+      %43 : Tensor = immut::assign(%41, %22, %28)
+      %44 : Tensor = immut::select_rev(%b.5, %43, %18, %i.1)
+      %46 : Tensor = immut::select(%44, %18, %i.1)
+      %45 : Tensor = immut::select(%44, %18, %i.1)
+      %47 : Tensor = immut::assign(%45, %45, %28)
+       = tssa::update(%44, %b.5)
+       = tssa::update(%46, %40)
+       = tssa::update(%45, %41)
+       = tssa::update(%47, %42)
+      -> (%12)
+  return (%b.5)
+
+mutated values: 
+[b.5 defined in (%b.5 : Tensor = aten::clone(%b.1, %7) # examples/get_started.py:12:6
+), 41 defined in (%41 : Tensor = immut::select(%b.5, %18, %i.1)
+), 40 defined in (%40 : Tensor = immut::select(%b.5, %18, %i.1)
+), 42 defined in (%42 : Tensor = immut::assign(%41, %22, %28)
+)]
+mutated nodes: 
+{40 defined in (%40 : Tensor = immut::select(%b.5, %18, %i.1)
+): [ = tssa::update(%46, %40)
+], 42 defined in (%42 : Tensor = immut::assign(%41, %22, %28)
+): [ = tssa::update(%47, %42)
+], 41 defined in (%41 : Tensor = immut::select(%b.5, %18, %i.1)
+): [ = tssa::update(%45, %41)
+], b.5 defined in (%b.5 : Tensor = aten::clone(%b.1, %7) # examples/get_started.py:12:6
+): [ = tssa::update(%44, %b.5)
+]}
+```
+
+The next pass is `functs._C.jit_pass_block_propagation`:
+
+```python
+# step 2: block propagation
+functs._C._jit_pass_block_propagation(jit_func.graph, mutate_info)
+print("graph after block propagation")
+print(jit_func.graph)
+```
+
+We insert more `tensorssa::Update` nodes for functionalization beyond the control flow. (Line 13 and Line 28)
+
+```ruby
+graph after block propagation
+graph(%a.1 : Tensor,
+      %b.1 : Tensor,
+      %n.1 : int):
+  %28 : bool = prim::Constant[value=0]()
+  %18 : int = prim::Constant[value=0]() # examples/get_started.py:14:11
+  %12 : bool = prim::Constant[value=1]() # examples/get_started.py:13:2
+  %7 : NoneType = prim::Constant()
+  %20 : int = prim::Constant[value=1]() # examples/get_started.py:14:18
+  %b.5 : Tensor = aten::clone(%b.1, %7) # examples/get_started.py:12:6
+  %48 : Tensor = prim::Loop(%n.1, %12, %b.5) # examples/get_started.py:13:2
+    block0(%i.1 : int, %49 : Tensor):
+       = tssa::update(%49, %b.5)
+      %40 : Tensor = immut::select(%b.5, %18, %i.1)
+      %22 : Tensor = aten::add(%40, %20, %20) # examples/get_started.py:14:11
+      %41 : Tensor = immut::select(%b.5, %18, %i.1)
+      %42 : Tensor = immut::assign(%41, %22, %28)
+      %43 : Tensor = immut::assign(%41, %22, %28)
+      %44 : Tensor = immut::select_rev(%b.5, %43, %18, %i.1)
+      %46 : Tensor = immut::select(%44, %18, %i.1)
+      %45 : Tensor = immut::select(%44, %18, %i.1)
+      %47 : Tensor = immut::assign(%45, %45, %28)
+       = tssa::update(%44, %b.5)
+       = tssa::update(%46, %40)
+       = tssa::update(%45, %41)
+       = tssa::update(%47, %42)
+      -> (%12, %b.5)
+   = tssa::update(%48, %b.5)
+  return (%b.5)
+```
+
+The `tensorssa::Update` indicates the version of version need to update. `functs._C._jit_pass_rename` substitutes the origin version of the value (`UpdateNode.input(1)`) to the new version (`UpdateNode.input(0)`) after this update node (`UpdateNode`).
+
+```python
+# step 3: rename
+functs._C._jit_pass_rename(jit_func.graph)
+print("graph after rename according tensorssa::Update")
+print(jit_func.graph)
+```
+
+```ruby
+graph after rename according tensorssa::Update
+graph(%a.1 : Tensor,
+      %b.1 : Tensor,
+      %n.1 : int):
+  %28 : bool = prim::Constant[value=0]()
+  %18 : int = prim::Constant[value=0]() # examples/get_started.py:14:11
+  %12 : bool = prim::Constant[value=1]() # examples/get_started.py:13:2
+  %7 : NoneType = prim::Constant()
+  %20 : int = prim::Constant[value=1]() # examples/get_started.py:14:18
+  %b.5 : Tensor = aten::clone(%b.1, %7) # examples/get_started.py:12:6
+  %48 : Tensor = prim::Loop(%n.1, %12, %b.5) # examples/get_started.py:13:2
+    block0(%i.1 : int, %49 : Tensor):
+       = tssa::update(%49, %b.5)
+      %40 : Tensor = immut::select(%49, %18, %i.1)
+      %22 : Tensor = aten::add(%40, %20, %20) # examples/get_started.py:14:11
+      %41 : Tensor = immut::select(%49, %18, %i.1)
+      %42 : Tensor = immut::assign(%41, %22, %28)
+      %43 : Tensor = immut::assign(%41, %22, %28)
+      %44 : Tensor = immut::select_rev(%49, %43, %18, %i.1)
+      %46 : Tensor = immut::select(%44, %18, %i.1)
+      %45 : Tensor = immut::select(%44, %18, %i.1)
+      %47 : Tensor = immut::assign(%45, %45, %28)
+       = tssa::update(%44, %49)
+       = tssa::update(%46, %40)
+       = tssa::update(%45, %41)
+       = tssa::update(%47, %42)
+      -> (%12, %44)
+   = tssa::update(%48, %44)
+  return (%48)
+```
+
+After `functs._C._jit_pass_rename`, `tensorssa::Update` can be removed safely by `functs._C._jit_pass_remove_update`.
+
+```python
+# step 4: remove update
+functs._C._jit_pass_tensorssa_remove_update(jit_func.graph)
+print("graph after remove update")
+print(jit_func.graph)
+```
+
+```ruby
+graph after remove update
+graph(%a.1 : Tensor,
+      %b.1 : Tensor,
+      %n.1 : int):
+  %28 : bool = prim::Constant[value=0]()
+  %18 : int = prim::Constant[value=0]() # examples/get_started.py:14:11
+  %12 : bool = prim::Constant[value=1]() # examples/get_started.py:13:2
+  %7 : NoneType = prim::Constant()
+  %20 : int = prim::Constant[value=1]() # examples/get_started.py:14:18
+  %b.5 : Tensor = aten::clone(%b.1, %7) # examples/get_started.py:12:6
+  %48 : Tensor = prim::Loop(%n.1, %12, %b.5) # examples/get_started.py:13:2
+    block0(%i.1 : int, %49 : Tensor):
+      %40 : Tensor = immut::select(%49, %18, %i.1)
+      %22 : Tensor = aten::add(%40, %20, %20) # examples/get_started.py:14:11
+      %41 : Tensor = immut::select(%49, %18, %i.1)
+      %44 : Tensor = immut::select_rev(%49, %22, %18, %i.1)
+      %46 : Tensor = immut::select(%44, %18, %i.1)
+      %45 : Tensor = immut::select(%44, %18, %i.1)
+      -> (%12, %44)
+  return (%48)
+```
+
+`FuncTs` `ConvertToTensorSSA` is completely compatible with other `torchscript` passes such as `DCE`, `CES`, `Constant propagation`, `fusion`, `diff_graph_generation`.
+
+```python
+# step 5: cse, dce, constant_propagation
+torch._C._jit_pass_cse(jit_func.graph)
+torch._C._jit_pass_dce(jit_func.graph)
+torch._C._jit_pass_constant_propagation(jit_func.graph)
+print("after csd, dce and constant propagation")
+jit_func.graph.alias_db().dump()
+```
+
+```ruby
+===1. GRAPH===
+graph(%a.1 : Tensor,
+      %b.1 : Tensor,
+      %n.1 : int):
+  %18 : int = prim::Constant[value=0]() # examples/get_started.py:14:11
+  %12 : bool = prim::Constant[value=1]() # examples/get_started.py:13:2
+  %7 : NoneType = prim::Constant()
+  %20 : int = prim::Constant[value=1]() # examples/get_started.py:14:18
+  %b.5 : Tensor = aten::clone(%b.1, %7) # examples/get_started.py:12:6
+  %48 : Tensor = prim::Loop(%n.1, %12, %b.5) # examples/get_started.py:13:2
+    block0(%i.1 : int, %49 : Tensor):
+      %40 : Tensor = immut::select(%49, %18, %i.1)
+      %22 : Tensor = aten::add(%40, %20, %20) # examples/get_started.py:14:11
+      %44 : Tensor = immut::select_rev(%49, %22, %18, %i.1)
+      -> (%12, %44)
+  return (%48)
+
+===2. ALIAS DB===
+%49 points to: %b.5
+%a.1 points to: WILDCARD for type Tensor
+%48 points to: %44
+%b.1 points to: WILDCARD for type Tensor
+
+===3. Writes===
 ```
 
 Functionalization of a more complicated case is shown as follow:
@@ -207,21 +381,7 @@ graph(%a.35 : Tensor,
 > **_NOTE:_**  For illustration, we canonicalize the code in *Figure* by adjusting the variable name by hand. 
 ```
 
-We construct several [test cases](./test/test_basic.py), which shows that our method can perform functionalization beyond the control flow. We define a series of [Access and Assign Operators](./functs/csrc/jit/ir/symbol_ext.h) which are immutable to perform functionalization as shown in the table below:
-
-| operator            | Access operator      | Assign Operator          |
-| ------------------- | -------------------- | ------------------------ |
-| `aten::copy_`     | `immut::Assign`    | `immut::Assign`        |
-| `aten::select`    | `immut::select`    | `immut::select_rev`    |
-| `aten::slice`     | `immut::slice`     | `immut::slice_rev`     |
-| `aten::squeeze`   | `immut::squeeze`   | `immut::unsqueeze`     |
-| `aten::unsqueeze` | `immut::unsqueeze` | `immut::squeeze`       |
-| `aten::view`      | `immut::view`      | `immut::view`          |
-| `aten::reshape`   | `immut::reshape`   | `immut::reshape`       |
-| `aten::expand`    | `immut::expand`    | `immut::expand_rev`    |
-| `aten::expand_as` | `immut::expand_as` | `immut::expand_as_rev` |
-| `aten::repeat`    | `immut::repeat`    | `immut::repeat_rev`    |
-| `aten::index`     | `immut::index`     | `immut::index_rev`     |
+We construct several [test cases](./test/test_basic.py), which shows that our method can perform functionalization beyond the control flow.
 
 ## Optimization
 

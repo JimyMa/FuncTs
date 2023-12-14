@@ -38,9 +38,16 @@ void initJITFuncTsBindings(PyObject *module) {
   m.def("_jit_pass_fait_shape_infer", FaitGetRefineType);
   m.def("_jit_pass_freeze", Freeze);
   m.def("_jit_pass_clone", Clone);
-  m.def("_jit_get_code", [](std::shared_ptr<Graph> g) -> Code {
-    return Code(g, "<func on demand>");
-  });
+  // m.def("_jit_get_code", [](std::shared_ptr<Graph> g) -> Code {
+  //   return Code(g, "<func on demand>");
+  // });
+  py::class_<TensorSSAMutateInfo, std::shared_ptr<TensorSSAMutateInfo>>(m, "TensorSSAMutateInfo")
+    .def(py::init<>())
+    .def_property_readonly("mutNodes", [](TensorSSAMutateInfo& self) { return self.mutNodes; })
+    .def_property_readonly("mutValues", [](TensorSSAMutateInfo& self) { return self.mutValues; });
+  m.def("_jit_pass_rewrite_mutation", TensorSSARewriteMutation);
+  m.def("_jit_pass_block_propagation", TensorSSAPropagation);
+  m.def("_jit_pass_rename", TensorSSARename);
   // m.def("_jit_run_code", [](Code code, const py::tuple &inputs) {
   //   PyGILState_STATE gstate;
   //   gstate = PyGILState_Ensure();
