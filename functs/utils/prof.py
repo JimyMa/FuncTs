@@ -14,7 +14,7 @@ _enabled = False
 
 
 def metrics_enabled():
-    return os.getenv('ENABLE_METRICS') is not None
+    return os.getenv("ENABLE_METRICS") is not None
 
 
 def initialize_metrics():
@@ -31,6 +31,7 @@ def begin_profiler_pass():
 
 def end_profiler_pass():
     _lib.endProfilerPass()
+
 
 def all_passes_submitted():
     return _lib.allPassesSubmitted()
@@ -51,7 +52,7 @@ def disable_profiling():
 @dataclass
 class Record:
     total: float = 0
-    min: float = float('inf')
+    min: float = float("inf")
     max: float = 0
     count: int = 0
     begin: Optional[float] = None
@@ -84,29 +85,33 @@ def prof_end(label: str):
 
 
 def fmt_duration(dur: float):
-    units = ['s', 'ms', 'us', 'ns']
+    units = ["s", "ms", "us", "ns"]
     idx = 0
     while idx < len(units) - 1 and dur < 1:
         dur *= 1e3
         idx += 1
-    return '{:.4}{}'.format(dur, units[idx])
+    return "{:.4}{}".format(dur, units[idx])
 
 
-_record_fmt = '{:<16}{:>10}{:>10}{:>10}{:>10}{:>10}'
+_record_fmt = "{:<16}{:>10}{:>10}{:>10}{:>10}{:>10}"
 
 
 def print_profiling_results(count: int):
     _lib.printProfilingResults(ctypes.c_size_t(int(count)))
     if len(_records) == 0:
         return
-    print('\nRanges:')
-    print(_record_fmt.format(
-        'Label', 'Count', 'Total', 'Mean', 'Min', 'Max'))
+    print("\nRanges:")
+    print(_record_fmt.format("Label", "Count", "Total", "Mean", "Min", "Max"))
     for label, record in _records.items():
-        print(_record_fmt.format(
-            label, record.count, fmt_duration(
-                record.total), fmt_duration(record.total / record.count),
-            fmt_duration(record.min), fmt_duration(record.max))
+        print(
+            _record_fmt.format(
+                label,
+                record.count,
+                fmt_duration(record.total),
+                fmt_duration(record.total / record.count),
+                fmt_duration(record.min),
+                fmt_duration(record.max),
+            )
         )
 
 
@@ -119,7 +124,7 @@ class ProfileRewriter(ast.NodeTransformer):
         func = node.func
         if not isinstance(func, ast.Name):
             return node
-        if func.id != 'print':
+        if func.id != "print":
             return node
         if len(node.args) != 2:
             return node
@@ -135,7 +140,8 @@ class ProfileRewriter(ast.NodeTransformer):
             prof_func_id = prof_begin.__name__
         else:
             prof_func_id = prof_end.__name__
-        new_node = ast.Call(func=ast.Name(
-            id=prof_func_id, ctx=ast.Load()), args=[label], keywords=[])
+        new_node = ast.Call(
+            func=ast.Name(id=prof_func_id, ctx=ast.Load()), args=[label], keywords=[]
+        )
 
         return ast.fix_missing_locations(new_node)

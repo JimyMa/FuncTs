@@ -10,9 +10,10 @@ class AotScriptFunction(object):
     """
     Interface of *Aot Graph Runtime*
     """
+
     def __init__(self, aot_script_fn, **kwargs):
         self._aot_script_fn = aot_script_fn
-    
+
     @property
     def graph(self):
         return self._aot_script_fn.graph
@@ -27,6 +28,7 @@ def build(fn, example_input):
     """
     if not isinstance(fn, torch.jit._script.ScriptModule):
         raise AttributeError("{} only functionalized jit ScriptModule can be built")
+
     def extract_type_hint_from_tensor(input_):
         if isinstance(input_, bool):
             return torch.BoolType.get()
@@ -35,11 +37,20 @@ def build(fn, example_input):
         elif isinstance(input_, float):
             return torch.FloatType.get()
         elif isinstance(input_, torch.Tensor):
-            return torch.TensorType.get().with_dtype(input_.dtype).with_sizes(input_.shape).with_device(input_.device)
+            return (
+                torch.TensorType.get()
+                .with_dtype(input_.dtype)
+                .with_sizes(input_.shape)
+                .with_device(input_.device)
+            )
         elif isinstance(input_, list) or isinstance(input_, tuple):
-            return torch.TupleType([extract_type_hint_from_tensor(elem) for elem in input_])
+            return torch.TupleType(
+                [extract_type_hint_from_tensor(elem) for elem in input_]
+            )
         else:
-            raise TypeError("unsupported type {} when build aot graph at the type hint stage")
+            raise TypeError(
+                "unsupported type {} when build aot graph at the type hint stage"
+            )
 
     type_hint = [extract_type_hint_from_tensor(input_) for input_ in example_input]
 
@@ -50,9 +61,9 @@ def build(fn, example_input):
 
 
 def script(fn, backend="jit", remove_update=True, enable_dce_cse=True):
-    """ 
+    """
     convert PyTorch Program to Ts Graph IR and perform functionalization
-    backend ["ts_jit", "fait"]: 
+    backend ["ts_jit", "fait"]:
     """
     JIT = "jit"
     AOT = "aot"
@@ -67,7 +78,7 @@ def script(fn, backend="jit", remove_update=True, enable_dce_cse=True):
             functs._C._jit_pass_freeze(torch.jit.script(fn).cuda().eval()._c)
         else:
             raise AttributeError("No backend named {}".format(backend))
-    
+
     g = jit_fn.graph
     functs._C._jit_pass_dumb_remove_inter_precedure_mutation(g)
     # functs pass

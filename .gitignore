@@ -1,5 +1,6 @@
-.vscode
+.vscode/settings.json
 .idea
+
 cmake-build-debug
 build
 *.pt
@@ -31,6 +32,3 @@ compile_commands.json
 *.png
 !docs/imgs/*.jpg
 !docs/imgs/*.png
-
-
-

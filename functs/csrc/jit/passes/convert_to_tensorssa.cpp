@@ -335,7 +335,8 @@ static void addMutatedValueToBlock(
   auto node = block->owningNode();
   if (handleNode) {
     auto nodeRet = node->addOutput();
-    auto output_update = node->owningGraph()->create(tensorssa::Update, {nodeRet, mutated}, 0);
+    auto output_update =
+        node->owningGraph()->create(tensorssa::Update, {nodeRet, mutated}, 0);
     output_update->insertAfter(node);
   }
 
@@ -344,10 +345,11 @@ static void addMutatedValueToBlock(
     case prim::Loop: {
       // add to block parameter of loop body
       auto param = block->addInput();
-      auto input_update = node->owningGraph()->create(tensorssa::Update, {param, mutated}, 0);
+      auto input_update =
+          node->owningGraph()->create(tensorssa::Update, {param, mutated}, 0);
       input_update->insertBefore(block->nodes().front());
       // add to argument of loop node
-      node->addInput(mutated); 
+      node->addInput(mutated);
       break;
     }
 
@@ -377,19 +379,16 @@ void TensorSSAPropagation(
   }
 }
 
-static void renameValues(
-  Block* block
-) {
+static void renameValues(Block* block) {
   for (auto node : block->nodes()) {
     if (tensorssa::Update == node->kind())
-      node->input(1)-> replaceAllUsesAfterNodeWith(node, node->input(0));
-    for (auto &b : node->blocks())
+      node->input(1)->replaceAllUsesAfterNodeWith(node, node->input(0));
+    for (auto& b : node->blocks())
       renameValues(b);
   }
 }
 
-void TensorSSARename(
-    std::shared_ptr<Graph> graph) {
+void TensorSSARename(std::shared_ptr<Graph> graph) {
   // for (auto value : mutateInfo->mutValues)
   // mutateInfo->renameStacks.insert({value, {}});
   renameValues(graph->block());
@@ -443,8 +442,9 @@ void indexBoolFallback(std::shared_ptr<Graph> graph) {
   indexBoolFallbackImpl(graph->block());
 }
 
-void TensorSSARewriteMutation(std::shared_ptr<Graph> graph,
-                              std::shared_ptr<TensorSSAMutateInfo> mutateInfo) {
+void TensorSSARewriteMutation(
+    std::shared_ptr<Graph> graph,
+    std::shared_ptr<TensorSSAMutateInfo> mutateInfo) {
   // Preprocess: A dumb pass to eliminate interprecedure view
   // DumbRemoveInterPrecedureMutation(graph);
 

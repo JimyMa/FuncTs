@@ -26,11 +26,12 @@
 namespace torch {
 namespace jit {
 
-void initJITFuncTsBindings(PyObject *module) {
+void initJITFuncTsBindings(PyObject* module) {
   auto m = py::handle(module).cast<py::module>();
   auto jit = m.def_submodule("_jit");
-  m.def("_jit_pass_dumb_remove_inter_precedure_mutation",
-        DumbRemoveInterPrecedureMutation);
+  m.def(
+      "_jit_pass_dumb_remove_inter_precedure_mutation",
+      DumbRemoveInterPrecedureMutation);
   m.def("_jit_pass_remove_inplace", RemoveInplace);
   m.def("_jit_pass_convert_to_tensorssa", ConvertToTensorSSA);
   m.def("_jit_pass_tensorssa_remove_update", TensorSSARemoveUpdate);
@@ -41,10 +42,14 @@ void initJITFuncTsBindings(PyObject *module) {
   // m.def("_jit_get_code", [](std::shared_ptr<Graph> g) -> Code {
   //   return Code(g, "<func on demand>");
   // });
-  py::class_<TensorSSAMutateInfo, std::shared_ptr<TensorSSAMutateInfo>>(m, "TensorSSAMutateInfo")
-    .def(py::init<>())
-    .def_property_readonly("mutNodes", [](TensorSSAMutateInfo& self) { return self.mutNodes; })
-    .def_property_readonly("mutValues", [](TensorSSAMutateInfo& self) { return self.mutValues; });
+  py::class_<TensorSSAMutateInfo, std::shared_ptr<TensorSSAMutateInfo>>(
+      m, "TensorSSAMutateInfo")
+      .def(py::init<>())
+      .def_property_readonly(
+          "mutNodes", [](TensorSSAMutateInfo& self) { return self.mutNodes; })
+      .def_property_readonly("mutValues", [](TensorSSAMutateInfo& self) {
+        return self.mutValues;
+      });
   m.def("_jit_pass_rewrite_mutation", TensorSSARewriteMutation);
   m.def("_jit_pass_block_propagation", TensorSSAPropagation);
   m.def("_jit_pass_rename", TensorSSARename);
