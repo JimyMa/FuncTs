@@ -3,7 +3,7 @@
 - ***paper correction***
   - [Figure 2](./docs/imgs/ControlDependencyMemoryDependency.png): `%b.5`->`%b.1.`
 - ***paper notation***
-  - [Figure 3](./docs/imgs/TensorSSAExample.png): In (c), the number before `immut::Access`, `immut::Assign` and `tensorssa::Update` is the line number in (d). And we illustrate more details of [Figure 3](./docs/imgs/TensorSSAExample.png) in this README file.
+  - [Figure 3](./docs/imgs/TensorSSAExample.png): In (c), the number before `immut::Access`, `immut::Assign` and `tensorssa::Update` is the line number in (d). We illustrate more details of [Figure 3](./docs/imgs/TensorSSAExample.png) in this README file.
 
 ## Bulid from source
 
@@ -18,13 +18,13 @@ python setup.py develop --user
 - Supported PyTorch version: `V2.1.0`
 
 We have discovered that numerous standard workloads are written using imperative tensor programs, which do not lend themselves well to direct
-kernel fusion. While the compute library developed by hardware vendors adequately supports pure function computation-intensive operators, imperative tensor programs often contain excessive control flow and side-effects due to tensor-level mutation (such as view and inplace operators), resulting in limited fusion scope. The following timeline illustrates the proportion of time dedicated to these aspects in eight different workloads:
+kernel fusion. While the compute library developed by hardware vendors adequately supports pure function, computation-intensive operators, imperative tensor programs often contain excessive control flow and side effects due to tensor-level mutation (such as view and in-place operators), resulting in limited fusion scope. The following timeline illustrates the proportion of time dedicated to these aspects in eight different workloads:
 
 ![proportation](./docs/imgs/post_ratio.jpg)
 
 ## Use FuncTs to perform functionalization
 
-A [simple example](./examples/get_started.py) of functionalization beyond control flow is depicted as follow:
+A [simple example](./examples/get_started.py) of functionalization beyond control flow is depicted as follows:
 
 ![T](docs/imgs/TensorSSAExample.png)
 
@@ -32,18 +32,18 @@ We split the algorithm into two steps:
 
 - **Rewrite Mutation** (c). The **Rewrite Mutation** step includes two key steps:
   - **Pass Up**. In the **pass-up** step, suppose `v` is a view of `t`, the algorithm traverses the view path from `v` to `t`. When each variable is visited, an `x′ = immut::Assign(x, v′, [·])` operator is inserted into the program.
-  - **Pass Down**. In the **pass-down** step, we traverse from the root node `v` to other branch which hasn't traversed by the pass-up step, while each variable is firstly visited, an `v′ = immgt::Access(x′, [·])` operator is inserted. To annotate the tensor version for subsequent block propagation, an `tensorssa::Update(v′, v)` statement is generated at the same time.
-- **Block Propagation** (d). In the **Block Propagation** step, this step visits all generated `tensorssa::Update(x′ ,x)`, propagates the tensor mutation beyond the control flow.
+  - **Pass Down**. In the **pass-down** step, we traverse from the root node `v` to another branch that hasn't traversed by the pass-up step, while each variable is firstly visited, a `v′ = immgt::Access(x′, [·])` operator is inserted. To annotate the tensor version for subsequent block propagation, a `tensorssa::Update(v′, v)` statement is generated at the same time.
+- **Block Propagation** (d). The **Block Propagation** step visits all generated `tensorssa::Update(x′,x)`, propagating the tensor mutation beyond the control flow.
 
 By these steps, we generate a new graph. Accordingly, **we can explore a larger kernel fusion optimization space than the previous methods**.
 
 ### Tensor `Access` and Tensor `Assign`
 
-As mentioned above, we generate `Access` and `Assign` operators during transformation. The `Access` operator is the immutable version of the `view` operator. The `Assign` operator is for generating immutable equivalent substitution of `view` and `mutation` combining with the `Access` operator. The figure below depicts the execution process of `aten::view`, `immut::Access` and `immut::Assign` operator.
+As mentioned above, we generate `Access` and `Assign` operators during transformation. The `Access` operator is the immutable version of the `view` operator. The `Assign` operator is for generating immutable equivalent substitution of `view` and `mutation` combining with the `Access` operator. The figure below depicts the execution process of `aten::view`, `immut::Access` and `immut::Assign` operators.
 
 ![view_access_assign](./docs/imgs/VIEW_ACCESS_ASSIGN.png)
 
-The `Access` and `Assign` operators  are two abstraction of a series of [operator instances](./functs/csrc/jit/ir/symbol_ext.h), which are shown in the table below.
+The `Access` and `Assign` operators  are two abstractions of a series of [operator instances](./functs/csrc/jit/ir/symbol_ext.h), which are shown in the table below.
 
 | operator            | Access operator      | Assign Operator          |
 | ------------------- | -------------------- | ------------------------ |
@@ -61,7 +61,7 @@ The `Access` and `Assign` operators  are two abstraction of a series of [operato
 
 ### More Details
 
-For learning or using `FuncTs`, you can functionalize the program step by step with our pass. the original python code is:
+For learning or using `FuncTs`, you can functionalize the program step by step with our pass. The original python code is:
 
 ```python
 def func(a: torch.Tensor, b: torch.Tensor, n: int):
@@ -94,7 +94,7 @@ graph(%a.1 : Tensor,
   return (%b.5)
 ```
 
-The first step is write mutation, which convert `View` and `Mutation` to equivalent `Access` and `Assign` operators.
+The first step is *Rewrite Mutation*, which converts `View` and `Mutation` to equivalent `Access` and `Assign` operators.
 
 ```python
 # step 1: rewrite mutation
@@ -102,16 +102,15 @@ mutate_info = functs._C.TensorSSAMutateInfo()
 functs._C._jit_pass_rewrite_mutation(jit_func.graph, mutate_info)
 print("graph after rewrite mutation")
 print(jit_func.graph)
-print("mutated values: ") 
+print("mutated values: ")
 print(mutate_info.mutValues)
 print("mutated nodes: ")
 print(mutate_info.mutNodes)
 ```
 
-We define an object of `TensorSSAMutateInfo` to collect the mutated values and mutated nodes after `functs._C._jit_pass_rewrite_mutation`. The output is
+We define an object of `TensorSSAMutateInfo` to collect the mutated values and mutated nodes after `functs._C._jit_pass_rewrite_mutation`. The output isgraph after rewrite mutation
 
 ```ruby
-graph after rewrite mutation
 graph(%a.1 : Tensor,
       %b.1 : Tensor,
       %n.1 : int):
@@ -138,23 +137,20 @@ graph(%a.1 : Tensor,
        = tssa::update(%47, %42)
       -> (%12)
   return (%b.5)
+```
 
+```python
 mutated values: 
-[b.5 defined in (%b.5 : Tensor = aten::clone(%b.1, %7) # examples/get_started.py:12:6
-), 41 defined in (%41 : Tensor = immut::select(%b.5, %18, %i.1)
-), 40 defined in (%40 : Tensor = immut::select(%b.5, %18, %i.1)
-), 42 defined in (%42 : Tensor = immut::assign(%41, %22, %28)
-)]
+[b.5 defined in (%b.5 : Tensor = aten::clone(%b.1, %7)), 
+ 41 defined in (%41 : Tensor = immut::select(%b.5, %18, %i.1)), 
+ 40 defined in (%40 : Tensor = immut::select(%b.5, %18, %i.1)), 
+ 42 defined in (%42 : Tensor = immut::assign(%41, %22, %28))]
+
 mutated nodes: 
-{40 defined in (%40 : Tensor = immut::select(%b.5, %18, %i.1)
-): [ = tssa::update(%46, %40)
-], 42 defined in (%42 : Tensor = immut::assign(%41, %22, %28)
-): [ = tssa::update(%47, %42)
-], 41 defined in (%41 : Tensor = immut::select(%b.5, %18, %i.1)
-): [ = tssa::update(%45, %41)
-], b.5 defined in (%b.5 : Tensor = aten::clone(%b.1, %7) # examples/get_started.py:12:6
-): [ = tssa::update(%44, %b.5)
-]}
+{40 defined in (%40 : Tensor = immut::select(%b.5, %18, %i.1)): [ = tssa::update(%46, %40)], 
+ 42 defined in (%42 : Tensor = immut::assign(%41, %22, %28)): [ = tssa::update(%47, %42)], 
+ 41 defined in (%41 : Tensor = immut::select(%b.5, %18, %i.1)): [ = tssa::update(%45, %41)], 
+ b.5 defined in (%b.5 : Tensor = aten::clone(%b.1, %7)): [ = tssa::update(%44, %b.5)]}
 ```
 
 The next pass is `functs._C.jit_pass_block_propagation`:
@@ -166,7 +162,7 @@ print("graph after block propagation")
 print(jit_func.graph)
 ```
 
-We insert more `tensorssa::Update` nodes for functionalization beyond the control flow. (Line 13 and Line 28)
+We insert more `tensorssa::Update` nodes for functionalization beyond the control flow. (`= tssa::update(%49, %b.5)` and `= tssa::update(%48, %b.5)`)
 
 ```ruby
 graph after block propagation
@@ -200,7 +196,7 @@ graph(%a.1 : Tensor,
   return (%b.5)
 ```
 
-The `tensorssa::Update` indicates the version of version need to update. `functs._C._jit_pass_rename` substitutes the origin version of the value (`UpdateNode.input(1)`) to the new version (`UpdateNode.input(0)`) after this update node (`UpdateNode`).
+The `tensorssa::Update` indicates the version of values which need to be updated. `functs._C._jit_pass_rename` substitutes the origin version of the value (`UpdateNode.input(1)`) to the new version (`UpdateNode.input(0)`) after this update node (`UpdateNode`).
 
 ```python
 # step 3: rename
@@ -273,7 +269,7 @@ graph(%a.1 : Tensor,
   return (%48)
 ```
 
-`FuncTs` `ConvertToTensorSSA` is completely compatible with other `torchscript` passes such as `DCE`, `CES`, `Constant propagation`, `fusion`, `diff_graph_generation`.
+`FuncTs` `ConvertToTensorSSA` is completely compatible with other `torchscript` passes such as `DCE`, `CES`, `Constant propagation`, `fusion`, `create autodiff subgraphs`.
 
 ```python
 # step 5: cse, dce, constant_propagation
@@ -311,7 +307,7 @@ graph(%a.1 : Tensor,
 ===3. Writes===
 ```
 
-Functionalization of a more complicated case is shown as follow:
+Functionalization of a more complicated case is shown as follows:
 
 ![ControlDependency](./docs/imgs/ControlDependencyMemoryDependency.png "Control dependency &amp; Memory dependency")
 
@@ -381,7 +377,7 @@ graph(%a.35 : Tensor,
 > **_NOTE:_**  For illustration, we canonicalize the code in *Figure* by adjusting the variable name by hand. 
 ```
 
-We construct several [test cases](./test/test_basic.py), which shows that our method can perform functionalization beyond the control flow.
+We construct several [test cases](./test/test_basic.py), which show that our method can perform functionalization beyond the control flow.
 
 ## Optimization
 
@@ -392,17 +388,18 @@ We utilize PyTorch NNC to implement several view tensor expressions, which are p
 
 ![normalized](./docs/imgs/functionalization_codegen.png)
 
-The functional part of the program can be representated as a direct acyclic graph (DAG). As a result, it can be converted to NNC directly.
+The functional part of the program can be represented as a direct acyclic graph (DAG). As a result, it can be converted to NNC directly.
 
 ### Horizontal Parallelization
 
-We extend NNC to support [horizontal parallization](./fait/tensorexpr/functor_parallization.h), pure function inner the loop without loop carried dependency can be fused to one kernel and run simultaneously.
+We extend NNC to support [horizontal parallelization](./fait/tensorexpr/functor_parallization.h), pure function inner the loop without loop-carried dependency can be fused to one kernel and run simultaneously.
 
 ## Evaluation
 
 ### Speed Up
 
-- The performance speed up is shown as follow:
+The performance speed-up is shown as follows:
+
 - [get_latency.py](./scripts/get_latency.py)
 - [1660ti log](./scripts/latency_log.txt)
 
@@ -410,11 +407,11 @@ We extend NNC to support [horizontal parallization](./fait/tensorexpr/functor_pa
 
 ### Kernel launch counts
 
-The kernel counts perfomance is shown as follow:
+The kernel counts performance is shown as follows:
 
 ![kernel launch](./docs/imgs/kernel_launch.jpg)
 
-After functionalization, our performance of kernel launch is better than TorchScript + NNC without Tensor in all workloads. Specificly, compared with TorchDynamo + TorchInductor, the performance boost of kernel launch in NASRNN, seq2seq and Attention is not obviously because TorchDynamo is a tracing-based jit and expand the control flow by unrolling, which have more fusion scope than TorchScipt frontend.
+After functionalization, our performance of kernel launch is better than TorchScript + NNC without Tensor in all workloads. Specifically, compared with TorchDynamo + TorchInductor, the performance boost of kernel launch in NASRNN, seq2seq and Attention is not obvious because TorchDynamo is a tracing-based jit and expands the control flow by unrolling, which has more fusion scope than TorchScipt frontend.
 
 ### Scalability
 
@@ -430,4 +427,4 @@ After functionalization, our performance of kernel launch is better than TorchSc
 
 ![kernel launch](./docs/imgs/latency_cudagraph.jpg)
 
-[CUDA Graphs](https://developer.nvidia.com/blog/cuda-10-features-revealed/), which made its debut in CUDA 10, let a series of CUDA kernels to be defined and encapsulated as a single unit, i.e., a graph of operations, rather than a sequence of individually-launched operations. We profile the speedup w.r.t. PyTorch Eager in different iters per graph capture. We select NASRNN, Attention and LSTM because other workloads cannot be captured as a whole graph because of unsupported operators and structures. The figure above shows that all compilation pipeline can equally speedup by CUDA Graph.
+[CUDA Graphs](https://developer.nvidia.com/blog/cuda-10-features-revealed/), which made its debut in CUDA 10, let a series of CUDA kernels be defined and encapsulated as a single unit, i.e., a graph of operations, rather than a sequence of individually-launched operations. We profile the speedup w.r.t. PyTorch Eager in different iters per graph capture. We select NASRNN, Attention and LSTM because other workloads cannot be captured as a whole graph because of unsupported operators and structures. The figure above shows that all compilation pipelines can equally speed up by CUDA Graph.
