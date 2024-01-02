@@ -39,6 +39,7 @@ void initJITFuncTsBindings(PyObject* module) {
   m.def("_jit_pass_fuse_tensorexpr", [](std::shared_ptr<Graph> g) {
     return FuncTsFuseTensorExprs(g, 1, true, true);
   });
+
   m.def("_jit_pass_fait_pipeline", FaitPipeline);
   m.def("_jit_pass_fait_shape_infer", FaitGetRefineType);
   m.def("_jit_pass_freeze", Freeze);

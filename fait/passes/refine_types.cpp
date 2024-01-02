@@ -3,6 +3,9 @@
 #include <fstream>
 #include <iostream>
 
+#include <ATen/core/jit_type.h>
+#include <c10/core/ScalarType.h>
+#include <c10/util/Exception.h>
 #include <torch/csrc/jit/ir/ir_views.h>
 
 #include <nlohmann/json.hpp>
@@ -227,12 +230,8 @@ static void propagateConstant(TYPE_PROP_PARAMS) {
   if (ty->kind() == TypeKind::TensorType) {
     auto val = toIValue(node->output(0)).value();
     auto tensor_val = val.toTensor();
-    ShapeVec tensorShape;
     auto constShape = tensor_val.sizes().vec();
-    for (auto dim : constShape) {
-      tensorShape.push_back(dim);
-    }
-    setShape(node->output(0), tensorShape);
+    node->output(0)->type()->cast<TensorType>()->withSizes(constShape);
     setDtype(node->output(0), tensor_val.dtype().toScalarType());
   }
 }
@@ -652,10 +651,18 @@ static void inferShapeIn(Block* block, ValueTypeMap& refinedTypes) {
             continue;
           if (!shape.rank().has_value())
             continue;
+
           output->setType(
               output->type()->cast<TensorType>()->withSymbolicShapes(shape));
+          node->output()->setType(TensorType::createContiguous(
+              output->type()->cast<TensorType>()->scalarType().value(),
+              output->type()->cast<TensorType>()->device().value(),
+              output->type()
+                  ->cast<TensorType>()
+                  ->sizes()
+                  .concrete_sizes()
+                  .value()));
         }
-
       } break;
     }
   }

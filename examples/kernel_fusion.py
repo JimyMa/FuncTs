@@ -1,5 +1,6 @@
 import torch
 import functs
+import torch._C._te as te
 
 
 class Normalize(torch.nn.Module):
@@ -18,6 +19,8 @@ class Normalize(torch.nn.Module):
 jit_fn = torch.jit.script(Normalize().eval().cuda())
 functs_fn = functs.jit.script(Normalize().eval().cuda())
 
+functs.jit.shape_infer(jit_fn, [torch.rand(800, 1333, 3).cuda(), 0.0, 1.0])
+functs.jit.shape_infer(functs_fn, [torch.rand(800, 1333, 3).cuda(), 0.0, 1.0])
 
 # jit function
 jit_g = jit_fn.graph
@@ -26,10 +29,12 @@ print(f"jit graph:\n{jit_g}")
 functs._C._jit_pass_fuse_tensorexpr(jit_g)
 print(f"torch.jit.script fused graph:\n{jit_g}")
 
-
 # functs function
 functs_g = functs_fn.graph
 print(f"functs graph:\n{functs_g}")
 
 functs._C._jit_pass_fuse_tensorexpr(functs_g)
 print(f"functs.jit.script fused graph:\n{functs_g}")
+
+fusion_subgraph = list(functs_g.nodes())[0].g("Subgraph")
+print(te.TensorExprKernel(fusion_subgraph).get_code_text())

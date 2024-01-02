@@ -3,6 +3,8 @@
 #include <iostream>
 
 #include <ATen/core/jit_type.h>
+#include <c10/util/ArrayRef.h>
+#include <c10/util/strides.h>
 #include <torch/csrc/jit/ir/ir.h>
 
 #include "refine_types.h"

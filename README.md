@@ -430,8 +430,8 @@ graph(%self : __torch__.Normalize,
 If we perform kernel fusion directly:
 
 ```python
-# similar to `torch._C._jit_pass_fuse_tensorexprs`
-# but without consideration of shape and device for illustration.
+# a copy of `torch._C._jit_pass_fuse_tensorexprs`
+# but decoupled with TorchScript profiler guided optimization
 functs._C._jit_pass_fuse_tensorexpr(jit_g)
 print(f"torch.jit.script fused graph:\n{jit_g}")
 ```
@@ -439,34 +439,26 @@ print(f"torch.jit.script fused graph:\n{jit_g}")
 ```ruby
 torch.jit.script fused graph:
 graph(%self : __torch__.Normalize,
-      %src.1 : Tensor,
+      %src.1 : Float(800, 1333, 3, device=cuda:0),
       %mean.1 : float,
       %scale.1 : float):
+  %30 : int = prim::Constant[value=1]()
   %18 : bool = prim::Constant[value=0]()
-  %12 : int = prim::Constant[value=-1]() # examples/kernel_fusion.py:13:22
-  %11 : int = prim::Constant[value=2]() # examples/kernel_fusion.py:13:31
-  %15 : int = prim::Constant[value=0]() # examples/kernel_fusion.py:13:17
-  %dup.7 : Tensor, %src.11 : Tensor = prim::TensorExprGroup_0(%src.1)
-  %13 : Tensor = aten::select(%src.11, %12, %11) # examples/kernel_fusion.py:13:22
-  %17 : Tensor = aten::select(%dup.7, %12, %15) # examples/kernel_fusion.py:13:8
-  %19 : Tensor = aten::copy_(%17, %13, %18) # examples/kernel_fusion.py:13:8
-  %22 : Tensor = aten::select(%src.11, %12, %15) # examples/kernel_fusion.py:14:22
-  %25 : Tensor = aten::select(%dup.7, %12, %11) # examples/kernel_fusion.py:14:8
-  %27 : Tensor = aten::copy_(%25, %22, %18) # examples/kernel_fusion.py:14:8
-  %44 : Tensor = prim::TensorExprGroup_1(%scale.1, %dup.7, %mean.1)
-  return (%44)
-with prim::TensorExprGroup_0 = graph(%src.1 : Tensor):
-  %4 : NoneType = prim::Constant()
-  %src.11 : Tensor = aten::clone(%src.1, %4) # examples/kernel_fusion.py:10:14
-  %dup.7 : Tensor = aten::clone(%src.11, %4) # examples/kernel_fusion.py:12:14
-  return (%dup.7, %src.11)
-with prim::TensorExprGroup_1 = graph(%scale.1 : float,
-      %dup.1 : Tensor,
-      %mean.1 : float):
-  %5 : int = prim::Constant[value=1]()
-  %6 : Tensor = aten::sub(%dup.1, %mean.1, %5) # examples/kernel_fusion.py:15:16
-  %2 : Tensor = aten::mul(%6, %scale.1) # examples/kernel_fusion.py:15:16
-  return (%2)
+  %12 : int = prim::Constant[value=-1]() # examples/kernel_fusion.py:14:22
+  %5 : NoneType = prim::Constant()
+  %11 : int = prim::Constant[value=2]() # examples/kernel_fusion.py:14:31
+  %15 : int = prim::Constant[value=0]() # examples/kernel_fusion.py:14:17
+  %src.5 : Float(800, 1333, 3, strides=[3999, 3, 1], device=cuda:0) = aten::clone(%src.1, %5) # examples/kernel_fusion.py:11:14
+  %dup.1 : Float(800, 1333, 3, strides=[3999, 3, 1], device=cuda:0) = aten::clone(%src.5, %5) # examples/kernel_fusion.py:13:14
+  %13 : Float(800, 1333, strides=[1333, 1], device=cuda:0) = aten::select(%src.5, %12, %11) # examples/kernel_fusion.py:14:22
+  %17 : Float(800, 1333, strides=[1333, 1], device=cuda:0) = aten::select(%dup.1, %12, %15) # examples/kernel_fusion.py:14:8
+  %19 : FloatTensor(device=cuda:0) = aten::copy_(%17, %13, %18) # examples/kernel_fusion.py:14:8
+  %22 : Float(800, 1333, strides=[1333, 1], device=cuda:0) = aten::select(%src.5, %12, %15) # examples/kernel_fusion.py:15:22
+  %25 : Float(800, 1333, strides=[1333, 1], device=cuda:0) = aten::select(%dup.1, %12, %11) # examples/kernel_fusion.py:15:8
+  %27 : FloatTensor(device=cuda:0) = aten::copy_(%25, %22, %18) # examples/kernel_fusion.py:15:8
+  %31 : Float(800, 1333, 3, strides=[3999, 3, 1], device=cuda:0) = aten::sub(%dup.1, %mean.1, %30) # examples/kernel_fusion.py:16:16
+  %33 : Float(800, 1333, 3, strides=[3999, 3, 1], device=cuda:0) = aten::mul(%31, %scale.1) # examples/kernel_fusion.py:16:16
+  return (%33)
 ```
 
 As a result of implicit tensor mutation, the `aten::copy_` and `aten::select` operators cannot be fused to `TensorExprGroup`, which increase the task latency. If we perform `TensorSSA` and then kernel fusion, the `aten::copy_` and `aten::select` can be converted to fusible and immutable operators.
@@ -479,32 +471,67 @@ print(f"functs.jit.script fused graph:\n{functs_g}")
 
 ```ruby
 graph(%self : __torch__.___torch_mangle_0.Normalize,
-      %src.1 : Tensor,
+      %src.1 : Float(800, 1333, 3, device=cuda:0),
       %mean.1 : float,
       %scale.1 : float):
-  %37 : Tensor = prim::TensorExprGroup_0(%scale.1, %mean.1, %src.1)
+  %37 : Float(800, 1333, 3, strides=[3999, 3, 1], device=cuda:0) = prim::TensorExprGroup_0(%scale.1, %mean.1, %src.1)
   return (%37)
 with prim::TensorExprGroup_0 = graph(%scale.1 : float,
       %mean.1 : float,
-      %src.1 : Tensor):
+      %src.1 : Float(800, 1333, 3, strides=[3999, 3, 1], device=cuda:0)):
   %5 : int = prim::Constant[value=1]()
   %27 : int = prim::Constant[value=0]()
   %34 : int = prim::Constant[value=2]()
   %35 : int = prim::Constant[value=-1]()
   %46 : NoneType = prim::Constant()
-  %src.6 : Tensor = aten::clone(%src.1, %46) # examples/kernel_fusion.py:10:14
-  %dup.2 : Tensor = aten::clone(%src.6, %46) # examples/kernel_fusion.py:12:14
-  %31 : Tensor = immut::select(%src.6, %35, %34)
-  %24 : Tensor = immut::select_rev(%dup.2, %31, %35, %27)
-  %17 : Tensor = immut::select(%src.6, %35, %27)
-  %11 : Tensor = immut::select_rev(%24, %17, %35, %34)
-  %6 : Tensor = aten::sub(%11, %mean.1, %5) # examples/kernel_fusion.py:15:16
-  %2 : Tensor = aten::mul(%6, %scale.1) # examples/kernel_fusion.py:15:16
+  %src.6 : Float(800, 1333, 3, strides=[3999, 3, 1], device=cuda:0) = aten::clone(%src.1, %46) # examples/kernel_fusion.py:11:14
+  %dup.2 : Float(800, 1333, 3, strides=[3999, 3, 1], device=cuda:0) = aten::clone(%src.6, %46) # examples/kernel_fusion.py:13:14
+  %31 : Float(800, 1333, strides=[1333, 1], device=cuda:0) = immut::select(%src.6, %35, %34)
+  %24 : Float(800, 1333, 3, strides=[3999, 3, 1], device=cuda:0) = immut::select_rev(%dup.2, %31, %35, %27)
+  %17 : Float(800, 1333, strides=[1333, 1], device=cuda:0) = immut::select(%src.6, %35, %27)
+  %11 : Float(800, 1333, 3, strides=[3999, 3, 1], device=cuda:0) = immut::select_rev(%24, %17, %35, %34)
+  %6 : Float(800, 1333, 3, strides=[3999, 3, 1], device=cuda:0) = aten::sub(%11, %mean.1, %5) # examples/kernel_fusion.py:16:16
+  %2 : Float(800, 1333, 3, strides=[3999, 3, 1], device=cuda:0) = aten::mul(%6, %scale.1) # examples/kernel_fusion.py:16:16
   return (%2)
 ```
 The functional part of the program can be represented as a direct acyclic graph (DAG). As a result, it can be converted to NNC directly. The figure below depicts the procedure of code generation:
 
 ![normalized](./docs/imgs/functionalization_codegen.png)
+
+The code can be generated by TorchScript NNC:
+
+```python
+fusion_subgraph = list(functs_g.nodes())[0].g("Subgraph")
+print(te.TensorExprKernel(fusion_subgraph).get_code_text())
+```
+
+```c
+#define NAN __int_as_float(0x7fffffff)
+#define POS_INFINITY __int_as_float(0x7f800000)
+#define NEG_INFINITY __int_as_float(0xff800000)
+
+
+template<typename T>
+__device__ T maximum(T a, T b) {
+  return isnan(a) ? a : (a > b ? a : b);
+}
+
+template<typename T>
+__device__ T minimum(T a, T b) {
+  return isnan(a) ? a : (a < b ? a : b);
+}
+
+extern "C" __global__
+void fused_clone_clone_sub_mul(double vscale_1, double vmean_1, float* tsrc_1, float* aten_mul) {
+{
+if ((long long)(threadIdx.x) + 512ll * (long long)(blockIdx.x)<3199200ll ? 1 : 0) {
+    float v = __ldg(tsrc_1 + (((long long)(threadIdx.x) + 512ll * (long long)(blockIdx.x)) / 3999ll) * 3999ll + 3ll * ((((long long)(threadIdx.x) + 512ll * (long long)(blockIdx.x)) / 3ll) % 1333ll));
+    float v_1 = __ldg(tsrc_1 + ((((long long)(threadIdx.x) + 512ll * (long long)(blockIdx.x)) / 3999ll) * 3999ll + 3ll * ((((long long)(threadIdx.x) + 512ll * (long long)(blockIdx.x)) / 3ll) % 1333ll)) + 2ll);
+    float v_2 = __ldg(tsrc_1 + (long long)(threadIdx.x) + 512ll * (long long)(blockIdx.x));
+    aten_mul[(long long)(threadIdx.x) + 512ll * (long long)(blockIdx.x)] = ((((long long)(threadIdx.x) + 512ll * (long long)(blockIdx.x)) % 3ll==2ll ? v : (((long long)(threadIdx.x) + 512ll * (long long)(blockIdx.x)) % 3ll==0ll ? v_1 : v_2)) - (float)(vmean_1)) * (float)(vscale_1);
+  }}
+}
+```
 
 ### Horizontal Parallelization
 
