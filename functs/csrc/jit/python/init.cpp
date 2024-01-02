@@ -30,12 +30,15 @@ namespace jit {
 void initJITFuncTsBindings(PyObject* module) {
   auto m = py::handle(module).cast<py::module>();
   auto jit = m.def_submodule("_jit");
-  m.def("_jit_pass_dumb_remove_inter_precedure_mutation",
-        DumbRemoveInterPrecedureMutation);
+  m.def(
+      "_jit_pass_dumb_remove_inter_precedure_mutation",
+      DumbRemoveInterPrecedureMutation);
   m.def("_jit_pass_remove_inplace", RemoveInplace);
   m.def("_jit_pass_convert_to_tensorssa", ConvertToTensorSSA);
   m.def("_jit_pass_tensorssa_remove_update", TensorSSARemoveUpdate);
-  m.def("_jit_pass_fuse_tensorexpr", FuncTsFuseTensorExprs);
+  m.def("_jit_pass_fuse_tensorexpr", [](std::shared_ptr<Graph> g) {
+    return FuncTsFuseTensorExprs(g, 1, true, true);
+  });
   m.def("_jit_pass_fait_pipeline", FaitPipeline);
   m.def("_jit_pass_fait_shape_infer", FaitGetRefineType);
   m.def("_jit_pass_freeze", Freeze);
@@ -68,5 +71,5 @@ void initJITFuncTsBindings(PyObject* module) {
   //   return return_stack;
   // });
 }
-}  // namespace jit
-}  // namespace torch
+} // namespace jit
+} // namespace torch

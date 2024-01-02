@@ -60,7 +60,7 @@ def build(fn, example_input):
     return AotScriptFunction(aot_script_fn=aot_script_fn)
 
 
-def script(fn, backend="jit", remove_update=True, enable_dce_cse=True):
+def script(fn, backend="jit", remove_update=True, enable_dce_cse=True, add_clone=False):
     """
     convert PyTorch Program to Ts Graph IR and perform functionalization
     backend ["ts_jit", "fait"]:
@@ -80,7 +80,8 @@ def script(fn, backend="jit", remove_update=True, enable_dce_cse=True):
             raise AttributeError("No backend named {}".format(backend))
 
     g = jit_fn.graph
-    functs._C._jit_pass_dumb_remove_inter_precedure_mutation(g)
+    if add_clone:
+        functs._C._jit_pass_dumb_remove_inter_precedure_mutation(g)
     # functs pass
     torch._C._jit_pass_inline(g)
     functs._C._jit_pass_convert_to_tensorssa(g)
