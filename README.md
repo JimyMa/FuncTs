@@ -140,16 +140,16 @@ graph(%a.1 : Tensor,
 ```
 
 ```python
-mutated values: 
-[b.5 defined in (%b.5 : Tensor = aten::clone(%b.1, %7)), 
- 41 defined in (%41 : Tensor = immut::select(%b.5, %18, %i.1)), 
- 40 defined in (%40 : Tensor = immut::select(%b.5, %18, %i.1)), 
+mutated values:
+[b.5 defined in (%b.5 : Tensor = aten::clone(%b.1, %7)),
+ 41 defined in (%41 : Tensor = immut::select(%b.5, %18, %i.1)),
+ 40 defined in (%40 : Tensor = immut::select(%b.5, %18, %i.1)),
  42 defined in (%42 : Tensor = immut::assign(%41, %22, %28))]
 
-mutated nodes: 
-{40 defined in (%40 : Tensor = immut::select(%b.5, %18, %i.1)): [ = tssa::update(%46, %40)], 
- 42 defined in (%42 : Tensor = immut::assign(%41, %22, %28)): [ = tssa::update(%47, %42)], 
- 41 defined in (%41 : Tensor = immut::select(%b.5, %18, %i.1)): [ = tssa::update(%45, %41)], 
+mutated nodes:
+{40 defined in (%40 : Tensor = immut::select(%b.5, %18, %i.1)): [ = tssa::update(%46, %40)],
+ 42 defined in (%42 : Tensor = immut::assign(%41, %22, %28)): [ = tssa::update(%47, %42)],
+ 41 defined in (%41 : Tensor = immut::select(%b.5, %18, %i.1)): [ = tssa::update(%45, %41)],
  b.5 defined in (%b.5 : Tensor = aten::clone(%b.1, %7)): [ = tssa::update(%44, %b.5)]}
 ```
 
@@ -374,7 +374,7 @@ graph(%a.35 : Tensor,
 ```
 
 ```
-> **_NOTE:_**  For illustration, we canonicalize the code in *Figure* by adjusting the variable name by hand. 
+> **_NOTE:_**  For illustration, we canonicalize the code in *Figure* by adjusting the variable name by hand.
 ```
 
 We construct several [test cases](./test/test_basic.py), which show that our method can perform functionalization beyond the control flow.
@@ -384,11 +384,127 @@ We construct several [test cases](./test/test_basic.py), which show that our met
 ### Vertical Optimization
 
 We utilize PyTorch NNC to implement several view tensor expressions, which are part of a domain-specific language (DSL) that can be scheduled
- and automatically converted to device code, including CUDA. The code generation for these operators has been tested in [test tensorexpr](./test/test_immut_tensorexpr.py). An example of converting a  functionalized program into an NNC tensor expression is illustrated below:
+ and automatically converted to device code, including CUDA. The code generation for these operators has been tested in [test tensorexpr](./test/test_immut_tensorexpr.py).
+Take a python code snippet as an [example](./examples/kernel_fusion.py), the `torch.nn.Module` is
+
+```python
+class Normalize(torch.nn.Module):
+    def forward(self,
+                src: torch.Tensor,
+                mean: float, scale: float):
+        # only inner-procedure is supported bynow.
+        src = src.clone()
+        # RGB to BGR
+        dup = src.clone()
+        dup[..., 0] = src[..., 2]
+        dup[..., 2] = src[..., 0]
+        return (dup - mean) * scale
+```
+
+and the `torch.jit.script` is
+
+```ruby
+graph(%self : __torch__.Normalize,
+      %src.1 : Tensor,
+      %mean.1 : float,
+      %scale.1 : float):
+  %30 : int = prim::Constant[value=1]()
+  %18 : bool = prim::Constant[value=0]()
+  %12 : int = prim::Constant[value=-1]() # examples/kernel_fusion.py:13:22
+  %5 : NoneType = prim::Constant()
+  %11 : int = prim::Constant[value=2]() # examples/kernel_fusion.py:13:31
+  %15 : int = prim::Constant[value=0]() # examples/kernel_fusion.py:13:17
+  %src.5 : Tensor = aten::clone(%src.1, %5) # examples/kernel_fusion.py:10:14
+  %dup.1 : Tensor = aten::clone(%src.5, %5) # examples/kernel_fusion.py:12:14
+  %13 : Tensor = aten::select(%src.5, %12, %11) # examples/kernel_fusion.py:13:22
+  %17 : Tensor = aten::select(%dup.1, %12, %15) # examples/kernel_fusion.py:13:8
+  %19 : Tensor = aten::copy_(%17, %13, %18) # examples/kernel_fusion.py:13:8
+  %22 : Tensor = aten::select(%src.5, %12, %15) # examples/kernel_fusion.py:14:22
+  %25 : Tensor = aten::select(%dup.1, %12, %11) # examples/kernel_fusion.py:14:8
+  %27 : Tensor = aten::copy_(%25, %22, %18) # examples/kernel_fusion.py:14:8
+  %31 : Tensor = aten::sub(%dup.1, %mean.1, %30) # examples/kernel_fusion.py:15:16
+  %33 : Tensor = aten::mul(%31, %scale.1) # examples/kernel_fusion.py:15:16
+  return (%33)
+```
+
+If we perform kernel fusion directly:
+
+```python
+# similar to `torch._C._jit_pass_fuse_tensorexprs`
+# but without consideration of shape and device for illustration.
+functs._C._jit_pass_fuse_tensorexpr(jit_g)
+print(f"torch.jit.script fused graph:\n{jit_g}")
+```
+
+```ruby
+torch.jit.script fused graph:
+graph(%self : __torch__.Normalize,
+      %src.1 : Tensor,
+      %mean.1 : float,
+      %scale.1 : float):
+  %18 : bool = prim::Constant[value=0]()
+  %12 : int = prim::Constant[value=-1]() # examples/kernel_fusion.py:13:22
+  %11 : int = prim::Constant[value=2]() # examples/kernel_fusion.py:13:31
+  %15 : int = prim::Constant[value=0]() # examples/kernel_fusion.py:13:17
+  %dup.7 : Tensor, %src.11 : Tensor = prim::TensorExprGroup_0(%src.1)
+  %13 : Tensor = aten::select(%src.11, %12, %11) # examples/kernel_fusion.py:13:22
+  %17 : Tensor = aten::select(%dup.7, %12, %15) # examples/kernel_fusion.py:13:8
+  %19 : Tensor = aten::copy_(%17, %13, %18) # examples/kernel_fusion.py:13:8
+  %22 : Tensor = aten::select(%src.11, %12, %15) # examples/kernel_fusion.py:14:22
+  %25 : Tensor = aten::select(%dup.7, %12, %11) # examples/kernel_fusion.py:14:8
+  %27 : Tensor = aten::copy_(%25, %22, %18) # examples/kernel_fusion.py:14:8
+  %44 : Tensor = prim::TensorExprGroup_1(%scale.1, %dup.7, %mean.1)
+  return (%44)
+with prim::TensorExprGroup_0 = graph(%src.1 : Tensor):
+  %4 : NoneType = prim::Constant()
+  %src.11 : Tensor = aten::clone(%src.1, %4) # examples/kernel_fusion.py:10:14
+  %dup.7 : Tensor = aten::clone(%src.11, %4) # examples/kernel_fusion.py:12:14
+  return (%dup.7, %src.11)
+with prim::TensorExprGroup_1 = graph(%scale.1 : float,
+      %dup.1 : Tensor,
+      %mean.1 : float):
+  %5 : int = prim::Constant[value=1]()
+  %6 : Tensor = aten::sub(%dup.1, %mean.1, %5) # examples/kernel_fusion.py:15:16
+  %2 : Tensor = aten::mul(%6, %scale.1) # examples/kernel_fusion.py:15:16
+  return (%2)
+```
+
+As a result of implicit tensor mutation, the `aten::copy_` and `aten::select` operators cannot be fused to `TensorExprGroup`, which increase the task latency. If we perform `TensorSSA` and then kernel fusion, the `aten::copy_` and `aten::select` can be converted to fusible and immutable operators.
+
+```python
+functs_fn = functs.jit.script(Normalize().eval().cuda())
+functs._C._jit_pass_fuse_tensorexpr(functs_g)
+print(f"functs.jit.script fused graph:\n{functs_g}")
+```
+
+```ruby
+graph(%self : __torch__.___torch_mangle_0.Normalize,
+      %src.1 : Tensor,
+      %mean.1 : float,
+      %scale.1 : float):
+  %37 : Tensor = prim::TensorExprGroup_0(%scale.1, %mean.1, %src.1)
+  return (%37)
+with prim::TensorExprGroup_0 = graph(%scale.1 : float,
+      %mean.1 : float,
+      %src.1 : Tensor):
+  %5 : int = prim::Constant[value=1]()
+  %27 : int = prim::Constant[value=0]()
+  %34 : int = prim::Constant[value=2]()
+  %35 : int = prim::Constant[value=-1]()
+  %46 : NoneType = prim::Constant()
+  %src.6 : Tensor = aten::clone(%src.1, %46) # examples/kernel_fusion.py:10:14
+  %dup.2 : Tensor = aten::clone(%src.6, %46) # examples/kernel_fusion.py:12:14
+  %31 : Tensor = immut::select(%src.6, %35, %34)
+  %24 : Tensor = immut::select_rev(%dup.2, %31, %35, %27)
+  %17 : Tensor = immut::select(%src.6, %35, %27)
+  %11 : Tensor = immut::select_rev(%24, %17, %35, %34)
+  %6 : Tensor = aten::sub(%11, %mean.1, %5) # examples/kernel_fusion.py:15:16
+  %2 : Tensor = aten::mul(%6, %scale.1) # examples/kernel_fusion.py:15:16
+  return (%2)
+```
+The functional part of the program can be represented as a direct acyclic graph (DAG). As a result, it can be converted to NNC directly. The figure below depicts the procedure of code generation:
 
 ![normalized](./docs/imgs/functionalization_codegen.png)
-
-The functional part of the program can be represented as a direct acyclic graph (DAG). As a result, it can be converted to NNC directly.
 
 ### Horizontal Parallelization
 
