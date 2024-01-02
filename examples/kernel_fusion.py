@@ -16,7 +16,7 @@ class Normalize(torch.nn.Module):
         return (dup - mean) * scale
 
 
-jit_fn = torch.jit.script(Normalize().eval().cuda())
+jit_fn = torch.jit.freeze(torch.jit.script(Normalize().eval().cuda()))
 functs_fn = functs.jit.script(Normalize().eval().cuda())
 
 functs.jit.shape_infer(jit_fn, [torch.rand(800, 1333, 3).cuda(), 0.0, 1.0])
@@ -37,4 +37,20 @@ functs._C._jit_pass_fuse_tensorexpr(functs_g)
 print(f"functs.jit.script fused graph:\n{functs_g}")
 
 fusion_subgraph = list(functs_g.nodes())[0].g("Subgraph")
-print(te.TensorExprKernel(fusion_subgraph).get_code_text())
+kernel = te.TensorExprKernel(fusion_subgraph)
+print(kernel.get_code_text())
+
+functs.utils.evaluate_func(Normalize(),
+                           [torch.rand(800, 1333, 3).cuda(), 0.0, 1.0],
+                           name="eager",
+                           run_duration=2.)
+
+functs.utils.evaluate_func(torch.jit.script(Normalize()),
+                           [torch.rand(800, 1333, 3).cuda(), 0.0, 1.0],
+                           name="jit",
+                           run_duration=2.)
+
+functs.utils.evaluate_func(functs.jit.script(Normalize()),
+                           [torch.rand(800, 1333, 3).cuda(), 0.0, 1.0],
+                           name="functs",
+                           run_duration=2.)
