@@ -1,12 +1,14 @@
 #pragma once
 
 #include <ATen/Context.h>
+#include <ATen/core/jit_type.h>
 #include <ATen/core/jit_type_base.h>
 #include <ATen/ops/allclose.h>
 #include <torch/csrc/jit/ir/ir.h>
 #include <torch/csrc/jit/serialization/import.h>
 #include <torch/serialize.h>
 #include <memory>
+#include <unordered_map>
 
 #include "passes/canonicalize.h"
 #include "passes/common_passes.h"
@@ -28,6 +30,10 @@ namespace torch {
 namespace jit {
 
 void FaitPipeline(std::shared_ptr<Graph>, std::vector<c10::TypePtr>);
-void FaitGetRefineType(std::shared_ptr<Graph>, std::vector<c10::TypePtr>);
+void FaitGetRefineType(
+    std::shared_ptr<Graph>,
+    std::vector<c10::TypePtr>,
+    std::unordered_map<Value*, TypePtr>& refinedTypes);
+
 } // namespace jit
 } // namespace torch

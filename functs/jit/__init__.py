@@ -1,1 +1,7 @@
-from ._script import script, build, AotScriptFunction, shape_infer
+from ._script import (
+    AotScriptFunction,
+    build,
+    extract_type_hint_from_tensor,
+    script,
+    shape_infer,
+)

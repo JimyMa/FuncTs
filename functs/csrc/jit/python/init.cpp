@@ -9,6 +9,7 @@
 #include <passes/freeze_module.h>
 
 #include <memory>
+#include "passes/fuse_ops.h"
 
 // #include <torch/csrc/Dtype.h>
 // #include <torch/csrc/jit/api/function_impl.h>
@@ -42,6 +43,7 @@ void initJITFuncTsBindings(PyObject* module) {
 
   m.def("_jit_pass_fait_pipeline", FaitPipeline);
   m.def("_jit_pass_fait_shape_infer", FaitGetRefineType);
+  m.def("_jit_pass_fait_fuse_ops", FuseOps);
   m.def("_jit_pass_freeze", Freeze);
   m.def("_jit_pass_clone", Clone);
   // m.def("_jit_get_code", [](std::shared_ptr<Graph> g) -> Code {

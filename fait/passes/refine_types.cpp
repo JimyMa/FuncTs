@@ -283,6 +283,8 @@ static void propagateGetItem(TYPE_PROP_PARAMS) {
     node->output(0)->setType(elems.at(idxCnst));
   } else {
     auto elemTy = list->type()->cast<ListType>()->getElementType();
+    std::cout << "elemTy" << std::endl;
+    elemTy->cast<TensorType>()->symbolic_sizes().dump();
     node->output(0)->setType(elemTy);
   }
 }
@@ -618,12 +620,10 @@ static void inferShapeIn(Block* block, ValueTypeMap& refinedTypes) {
           symbolPropagators[kind](node, refinedTypes, inferShapeIn);
           continue;
         }
-
         // Skip if there is no tensor in the output
         auto outputs = node->outputs();
         if (std::none_of(outputs.begin(), outputs.end(), isTensor))
           continue;
-
         // Use special shape handlers
         auto op = node->maybeOperator();
         if (!op)
@@ -632,7 +632,6 @@ static void inferShapeIn(Block* block, ValueTypeMap& refinedTypes) {
           (*specialShapeHandlers.find(*op))(node, refinedTypes);
           continue;
         }
-
         // Use per-operator shape function to infer shape
         c10::SymbolicShape shape;
         if (shapeFuncSymbolString.count(kind.toQualString())) {
@@ -645,23 +644,23 @@ static void inferShapeIn(Block* block, ValueTypeMap& refinedTypes) {
         } else {
           shape = (*shapeFuncs.find(*op))(node, refinedTypes);
         }
-
         for (auto output : outputs) {
           if (!isTensor(output))
             continue;
           if (!shape.rank().has_value())
             continue;
-
           output->setType(
               output->type()->cast<TensorType>()->withSymbolicShapes(shape));
-          node->output()->setType(TensorType::createContiguous(
-              output->type()->cast<TensorType>()->scalarType().value(),
-              output->type()->cast<TensorType>()->device().value(),
-              output->type()
-                  ->cast<TensorType>()
-                  ->sizes()
-                  .concrete_sizes()
-                  .value()));
+          if (shape.isComplete()) {
+            node->output()->setType(TensorType::createContiguous(
+                output->type()->cast<TensorType>()->scalarType().value(),
+                output->type()->cast<TensorType>()->device().value(),
+                output->type()
+                    ->cast<TensorType>()
+                    ->sizes()
+                    .concrete_sizes()
+                    .value()));
+          }
         }
       } break;
     }

@@ -570,6 +570,99 @@ functs.utils.evaluate_func(functs.jit.script(Normalize()),
 ### Horizontal Parallelization
 
 We extend NNC to support [horizontal parallelization](./fait/tensorexpr/functor_parallization.h), pure function inner the loop without loop-carried dependency can be fused to one kernel and run simultaneously.
+Taking a snippet in the actual scenario as an example, this code appears in the post-processing stage of computer vision detection networks.
+It involves numerous `tensor view` and `tensor copy` operations.
+```python
+class MultiScaleBboxProcess(torch.nn.Module):
+    def decode_bboxes(self, bboxes, pred_bboxes, stride: float):
+        # assert pred_bboxes.size(-1) == bboxes.size(-1) == 4
+        xy_centers = (bboxes[..., :2] + bboxes[..., 2:]) * 0.5 + (
+            pred_bboxes[..., :2] - 0.5
+        ) * stride
+        whs = (bboxes[..., 2:] - bboxes[..., :2]) * 0.5 * pred_bboxes[..., 2:].exp()
+        decoded_bboxes = torch.stack(
+            (
+                xy_centers[..., 0] - whs[..., 0],
+                xy_centers[..., 1] - whs[..., 1],
+                xy_centers[..., 0] + whs[..., 0],
+                xy_centers[..., 1] + whs[..., 1],
+            ),
+            dim=-1,
+        )
+        return decoded_bboxes.clone()
+
+    def forward(
+        self,
+        bboxes_list: List[torch.Tensor],
+        pred_bboxes_list: List[torch.Tensor],
+        stride_list: List[float],
+    ):
+        outs = []
+        for bboxes, pred_bboxes, stride in zip(
+            bboxes_list, pred_bboxes_list, stride_list
+        ):
+            out = self.decode_bboxes(bboxes, pred_bboxes, stride)
+            outs.append(out)
+        return outs
+```
+Since the loops are independent of each other, after eliminating the side effects caused by tensor mutation, it can be further parallelized at the graph-IR level in a horizontal direction.
+
+```ruby
+graph(%self : __torch__.MultiScaleBboxProcess,
+      %bboxes_list.1 : Tensor[],
+      %pred_bboxes_list.1 : Tensor[],
+      %stride_list.1 : float[]):
+  %120 : int = prim::Constant[value=3]()
+  %77 : int = prim::Constant[value=1]() # pmap.py:91:32
+  %78 : int = prim::Constant[value=0]() # pmap.py:90:32
+  %79 : float = prim::Constant[value=0.5]() # pmap.py:84:59
+  %80 : int = prim::Constant[value=2]() # pmap.py:84:35
+  %81 : int = prim::Constant[value=-1]() # pmap.py:84:22
+  %82 : NoneType = prim::Constant()
+  %150 : Float(*, 4, device=cuda:0)[] = tssa::ParallelFunctor_0[parallel_degree=3, is_parallel_map=1, is_parallel_args=[1, 1, 1], input_refine_types=[Float(*, 4, device=cuda:0), Float(*, 4, device=cuda:0), float]](%bboxes_list.1, %pred_bboxes_list.1, %stride_list.1)
+  return (%150)
+with tssa::ParallelFunctor_0 = graph(%0 : int,
+      %1 : Float(*, 4, device=cuda:0),
+      %2 : Float(*, 4, device=cuda:0),
+      %3 : float):
+  %32 : float = prim::Constant[value=0.5]() # pmap.py:84:59
+  %35 : int = prim::Constant[value=2]() # pmap.py:84:35
+  %45 : int = prim::Constant[value=0]() # pmap.py:90:32
+  %59 : int = prim::Constant[value=1]() # pmap.py:91:32
+  %62 : int = prim::Constant[value=-1]() # pmap.py:84:22
+  %64 : NoneType = prim::Constant()
+  %4 : Float(*, 2, device=cuda:0) = aten::slice(%1, %62, %64, %35, %59) # pmap.py:84:22
+  %9 : Float(*, 2, device=cuda:0) = aten::slice(%1, %62, %35, %64, %59) # pmap.py:84:40
+  %14 : Float(*, 2, device=cuda:0) = aten::add(%4, %9, %59) # pmap.py:84:22
+  %16 : Float(*, 2, device=cuda:0) = aten::mul(%14, %32) # pmap.py:84:22
+  %18 : Float(*, 2, device=cuda:0) = aten::slice(%2, %62, %64, %35, %59) # pmap.py:85:12
+  %23 : Float(*, 2, device=cuda:0) = aten::sub(%18, %32, %59) # pmap.py:85:12
+  %26 : Float(*, 2, device=cuda:0) = aten::mul(%23, %3) # pmap.py:85:12
+  %xy_centers.2 : Float(*, 2, device=cuda:0) = aten::add(%16, %26, %59) # pmap.py:84:22
+  %29 : Float(*, 2, device=cuda:0) = aten::sub(%9, %4, %59) # pmap.py:87:15
+  %31 : Float(*, 2, device=cuda:0) = aten::mul(%29, %32) # pmap.py:87:15
+  %33 : Float(*, 2, device=cuda:0) = aten::slice(%2, %62, %35, %64, %59) # pmap.py:87:58
+  %38 : Float(*, 2, device=cuda:0) = aten::exp(%33) # pmap.py:87:58
+  %whs.2 : Float(*, 2, device=cuda:0) = aten::mul(%31, %38) # pmap.py:87:15
+  %40 : Float(*, device=cuda:0) = immut::select(%xy_centers.2, %62, %45)
+  %43 : Float(*, device=cuda:0) = immut::select(%whs.2, %62, %45)
+  %46 : Float(*, device=cuda:0) = aten::sub(%40, %43, %59) # pmap.py:90:16
+  %48 : Float(*, device=cuda:0) = immut::select(%xy_centers.2, %62, %59)
+  %51 : Float(*, device=cuda:0) = immut::select(%whs.2, %62, %59)
+  %54 : Float(*, device=cuda:0) = aten::sub(%48, %51, %59) # pmap.py:91:16
+  %56 : Float(*, device=cuda:0) = aten::add(%40, %43, %59) # pmap.py:92:16
+  %58 : Float(*, device=cuda:0) = aten::add(%48, %51, %59) # pmap.py:93:16
+  %60 : Tensor[] = prim::ListConstruct(%46, %54, %56, %58)
+  %decoded_bboxes.2 : Float(*, 4, device=cuda:0) = aten::stack(%60, %62) # pmap.py:88:25
+  %out.5 : Float(*, 4, device=cuda:0) = aten::clone(%decoded_bboxes.2, %64) # pmap.py:97:15
+  return (%out.5)
+```
+```python
+jit: 5276 iters, min = 351.6us, max = 2.426ms, avg = 379.1us
+functs unroll: 75260 iters, min = 24.88us, max = 3.258ms, avg = 26.57us
+functs pmap: 106829 iters, min = 17.59us, max = 3.266ms, avg = 18.72us
+```
+
 
 ## Evaluation
 
