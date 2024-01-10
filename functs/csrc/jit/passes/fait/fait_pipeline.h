@@ -10,6 +10,7 @@
 #include <memory>
 #include <unordered_map>
 
+#include "functs/csrc/utils/logging.h"
 #include "passes/canonicalize.h"
 #include "passes/common_passes.h"
 #include "passes/freeze_module.h"
@@ -23,17 +24,25 @@
 #include "passes/unroll_loops.h"
 #include "passes/validate_graph.h"
 #include "run_utils.h"
-#include "util/logging.h"
 #include "util/rand.h"
 
 namespace torch {
 namespace jit {
 
 void FaitPipeline(std::shared_ptr<Graph>, std::vector<c10::TypePtr>);
+
 void FaitGetRefineType(
     std::shared_ptr<Graph>,
     std::vector<c10::TypePtr>,
     std::unordered_map<Value*, TypePtr>& refinedTypes);
+
+void FaitGenHomoConv(
+    const std::shared_ptr<Graph> graph,
+    std::vector<c10::TypePtr> type_hint);
+
+void FaitGenParallelMap(
+    const std::shared_ptr<Graph> graph,
+    std::vector<c10::TypePtr> type_hint);
 
 } // namespace jit
 } // namespace torch

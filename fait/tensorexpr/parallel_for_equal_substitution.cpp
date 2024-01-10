@@ -3,7 +3,7 @@
 #include <torch/csrc/jit/tensorexpr/fwd_decls.h>
 #include <torch/csrc/jit/tensorexpr/ir.h>
 
-#include "util/logging.h"
+#include "functs/csrc/utils/logging.h"
 
 using namespace torch::jit::tensorexpr;
 
@@ -34,8 +34,8 @@ ExprPtr ParallelForEqualSubstitutionMutator::mutate(CompareSelectPtr v) {
   if (mutate_state_) {
     return alloc<Max>(ret_1, ret_2, false);
   } else {
-    return alloc<CompareSelect>(v->lhs(), v->rhs(), ret_1, ret_2,
-                                v->compare_select_op());
+    return alloc<CompareSelect>(
+        v->lhs(), v->rhs(), ret_1, ret_2, v->compare_select_op());
   }
 }
 

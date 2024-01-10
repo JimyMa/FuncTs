@@ -2,18 +2,18 @@
 
 #include <torch/csrc/jit/ir/ir_views.h>
 
+#include "functs/csrc/jit/utils/ir.h"
 #include "parallelize_loops.h"
-#include "util/ir.h"
 
 namespace torch {
 namespace jit {
 
-static void unrollLoop(Node *loop, ValueTypeMap &refinedTypes) {
+static void unrollLoop(Node* loop, ValueTypeMap& refinedTypes) {
   // Prepare for unrolling
   LoopView view(loop);
   auto tripCount = *constant_as<int64_t>(view.maxTripCount());
   auto carriedValues = view.carriedInputs().vec();
-  std::unordered_map<Value *, Value *> valueMap;
+  std::unordered_map<Value*, Value*> valueMap;
 
   // Inline loop body
   auto graph = loop->owningGraph();
@@ -33,11 +33,15 @@ static void unrollLoop(Node *loop, ValueTypeMap &refinedTypes) {
     }
 
     // Clone body out of the loop
-    cloneNodesTo(body->nodes().front(), body->nodes().back(), loop, valueMap,
-                 &refinedTypes);
+    cloneNodesTo(
+        body->nodes().front(),
+        body->nodes().back(),
+        loop,
+        valueMap,
+        &refinedTypes);
 
     // Retrieve carried outputs
-    std::vector<Value *> newCarried;
+    std::vector<Value*> newCarried;
     for (auto ret : view.bodyCarriedOutputs())
       newCarried.push_back(valueMap.at(ret));
     carriedValues.swap(newCarried);
@@ -54,27 +58,37 @@ static void unrollLoop(Node *loop, ValueTypeMap &refinedTypes) {
 }
 
 static std::unordered_set<Symbol> forbidUnrollSymbols{
-    prim::Loop, prim::If, prim::FusionGroup, prim::ParallelMap};
+    prim::Loop,
+    prim::If,
+    prim::FusionGroup,
+    prim::ParallelMap};
 
-static bool shouldUnroll(Node *loop) {
+static bool shouldUnroll(Node* loop) {
   LoopView view(loop);
-  if (view.carriedInputs().empty()) return false;
-  if (view.maxTripCount()->node()->kind() != prim::Constant) return false;
-  if (containsAnySymbol(view.bodyBlock(), forbidUnrollSymbols)) return false;
+  if (view.carriedInputs().empty())
+    return false;
+  if (view.maxTripCount()->node()->kind() != prim::Constant)
+    return false;
+  if (containsAnySymbol(view.bodyBlock(), forbidUnrollSymbols))
+    return false;
   return true;
 }
 
-void UnrollLoopsWithDeps(const std::shared_ptr<Graph> &graph,
-                         ValueTypeMap &refinedTypes) {
-  std::vector<Node *> loops;
-  traversePostOrder(graph->block(), [&](Node *loop) {
-    if (loop->kind() != prim::Loop) return true;
-    if (shouldUnroll(loop)) loops.push_back(loop);
+void UnrollLoopsWithDeps(
+    const std::shared_ptr<Graph>& graph,
+    ValueTypeMap& refinedTypes) {
+  std::vector<Node*> loops;
+  traversePostOrder(graph->block(), [&](Node* loop) {
+    if (loop->kind() != prim::Loop)
+      return true;
+    if (shouldUnroll(loop))
+      loops.push_back(loop);
     return true;
   });
 
-  for (auto loop : loops) unrollLoop(loop, refinedTypes);
+  for (auto loop : loops)
+    unrollLoop(loop, refinedTypes);
 }
 
-}  // namespace jit
-}  // namespace torch
+} // namespace jit
+} // namespace torch

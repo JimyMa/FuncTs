@@ -2,8 +2,8 @@
 
 #include <iostream>
 
+#include "functs/csrc/jit/utils/ir.h"
 #include "parallelize_loops.h"
-#include "util/ir.h"
 
 namespace torch {
 namespace jit {

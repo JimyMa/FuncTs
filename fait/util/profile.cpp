@@ -9,7 +9,7 @@
 #include <iostream>
 
 #include "util/common.h"
-#include "util/ir.h"
+#include "functs/csrc/jit/utils/ir.h"
 
 namespace torch {
 namespace jit {

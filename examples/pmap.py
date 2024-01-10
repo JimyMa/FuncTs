@@ -155,6 +155,7 @@ functs.utils.evaluate_func(
     [bboxes_list, pred_bboxes_list, stride_list],
     run_duration=2.0,
     name="jit",
+    warmup_runs=1000,
 )
 
 functs.utils.evaluate_func(
@@ -162,6 +163,7 @@ functs.utils.evaluate_func(
     [*bboxes_list, *pred_bboxes_list, *stride_list],
     run_duration=2.0,
     name="functs unroll",
+    warmup_runs=1000,
 )
 
 functs.utils.evaluate_func(
@@ -169,4 +171,5 @@ functs.utils.evaluate_func(
     [bboxes_list, pred_bboxes_list, stride_list],
     run_duration=2.0,
     name="functs pmap",
+    warmup_runs=1000,
 )

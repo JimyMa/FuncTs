@@ -12,10 +12,10 @@
 
 #include "canonicalize.h"
 #include "common_passes.h"
+#include "functs/csrc/jit/utils/ir.h"
 #include "parallelize_loops.h"
 #include "tensor_ssa.h"
 #include "type_utils.h"
-#include "util/ir.h"
 #include "util/types.h"
 
 namespace torch {

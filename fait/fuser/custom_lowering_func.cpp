@@ -5,10 +5,10 @@
 #include <utility>
 
 #include "functs/csrc/jit/ir/symbol_ext.h"
+#include "functs/csrc/utils/logging.h"
 #include "fuser/nnc_func.h"
 #include "lowering_utils.h"
 #include "tssa_set_ops.h"
-#include "util/logging.h"
 
 namespace torch {
 namespace jit {

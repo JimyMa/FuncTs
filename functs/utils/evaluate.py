@@ -182,10 +182,12 @@ def evaluate_func(
 ) -> Timer:
     for _ in range(warmup_runs):
         func(*args)
+    for _ in range(warmup_runs):
+        func(*args)
     torch.cuda.synchronize()
+    enable_profiling()
     timer = Timer(name)
     begin = timer.start()
-    enable_profiling()
     while timer.time() - begin < run_duration:
         if not enable_cudagraph:
             func(*args)

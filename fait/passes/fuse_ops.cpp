@@ -4,11 +4,11 @@
 #include <torch/csrc/jit/tensorexpr/operators/operators.h>
 
 #include "functs/csrc/jit/ir/symbol_ext.h"
+#include "functs/csrc/jit/utils/ir.h"
 #include "parallelize_loops.h"
 #include "tensor_ssa.h"
 #include "type_utils.h"
 #include "util/disjoint_set.h"
-#include "util/ir.h"
 #include "util/traits.h"
 
 namespace torch {

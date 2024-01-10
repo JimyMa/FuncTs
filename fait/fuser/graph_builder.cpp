@@ -9,6 +9,7 @@
 #include <torch/csrc/jit/tensorexpr/loopnest.h>
 #include <torch/csrc/jit/tensorexpr/lowerings.h>
 
+#include "functs/csrc/utils/logging.h"
 #include "fuser/codegen.h"
 #include "passes/te_op.h"
 #include "passes/tensor_ssa.h"
@@ -19,7 +20,6 @@
 #include "tensorexpr/interm_bufs.h"
 #include "tensorexpr/parallel_for_equal_substitution.h"
 #include "tensorexpr/tuple_expr.h"
-#include "util/logging.h"
 #include "util/name.h"
 
 using namespace torch::jit::tensorexpr;

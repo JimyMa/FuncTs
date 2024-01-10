@@ -2,20 +2,20 @@
 // Created by jimy on 3/13/22.
 //
 
-#ifndef LONG_TAIL_LOGGING_H
-#define LONG_TAIL_LOGGING_H
+#pragma once
 
 #include <cstdlib>
 #include <fstream>
 #include <iostream>
 #include <string>
 
-inline std::string get_env_variable(char const *env_var_name) {
+inline std::string get_env_variable(char const* env_var_name) {
   if (!env_var_name) {
     return "";
   }
-  char *lvl = getenv(env_var_name);
-  if (lvl) return std::string(lvl);
+  char* lvl = getenv(env_var_name);
+  if (lvl)
+    return std::string(lvl);
   return "";
 }
 
@@ -66,5 +66,3 @@ inline int get_log_level() {
                 << __LINE__ << ": " << Msg << std::endl;                     \
     }                                                                        \
   }
-
-#endif  // LONG_TAIL_LOGGING_H

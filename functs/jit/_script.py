@@ -1,10 +1,23 @@
 import inspect
 from copy import deepcopy
-from typing import List
+from typing import List, Optional
 
 import torch
+from torch.jit._script import RecursiveScriptModule
 
 import functs._C
+
+
+def freeze(
+    mod,
+    preserved_attrs: Optional[List[str]] = None,
+):
+    # mute optimization
+    preserved_attrs = preserved_attrs if preserved_attrs is not None else []
+
+    out = RecursiveScriptModule(torch._C._freeze_module(mod._c, preserved_attrs))
+    RecursiveScriptModule._finalize_scriptmodule(out)
+    return out
 
 
 class AotScriptFunction(object):
@@ -43,6 +56,10 @@ def extract_type_hint_from_tensor(input_):
         raise TypeError(
             "unsupported type {} when build aot graph at the type hint stage"
         )
+
+
+def extract_type_hint(inputs):
+    return [extract_type_hint_from_tensor(input_) for input_ in inputs]
 
 
 def shape_infer(fn, example_input, refined_types={}) -> None:

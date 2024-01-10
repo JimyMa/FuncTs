@@ -7,32 +7,33 @@
 
 #include <memory>
 
+#include "functs/csrc/jit/utils/ir.h"
 #include "fuser/graph_builder.h"
 #include "fuser/solve_update.h"
 #include "passes/common_passes.h"
 #include "passes/parallelize_loops.h"
 #include "passes/type_utils.h"
 #include "torch/csrc/jit/runtime/custom_operator.h"
-#include "util/ir.h"
 
 namespace torch {
 namespace jit {
 
 struct ParallelFunctor {
-  ParallelFunctor(Node *functor_op, Value *idx)
+  ParallelFunctor(Node* functor_op, Value* idx)
       : functor_op_(functor_op), idx_(idx) {}
-  Node *functor_op_;
-  Value *idx_;
+  Node* functor_op_;
+  Value* idx_;
 };
 
-void runPasses(const std::shared_ptr<Graph> &graph) {
+void runPasses(const std::shared_ptr<Graph>& graph) {
   // SolveUpdate(graph);
   EliminateDeadCodeTSSA(graph);
   ConstantPooling(graph);
 }
 
-static Node *GetParallelFunctorByParallelMap(
-    Node *node, std::unordered_map<Value *, TypePtr> &refine_types) {
+static Node* GetParallelFunctorByParallelMap(
+    Node* node,
+    std::unordered_map<Value*, TypePtr>& refine_types) {
   // Construct an op
   auto functor_op =
       node->owningGraph()->createWithSubgraph(tssa::ParallelFunctor);
@@ -48,13 +49,17 @@ static Node *GetParallelFunctorByParallelMap(
     // get list size
     if (refine_types.count(input_)) {
       auto type = refine_types[input_];
-      AT_ASSERT(type->kind() == c10::TypeKind::TupleType, "ParallelMap input(,",
-                input_->debugName(), ") must be union type by now, but get ",
-                type->annotation_str());
+      AT_ASSERT(
+          type->kind() == c10::TypeKind::TupleType,
+          "ParallelMap input(,",
+          input_->debugName(),
+          ") must be union type by now, but get ",
+          type->annotation_str());
       auto union_type = getUnifiedElementType(type);
       input_refine_types.push_back(union_type);
-      AT_ASSERT(input_degree == type->cast<c10::TupleType>()->elements().size(),
-                "Input List in ParallelMap must have same input_degree!");
+      AT_ASSERT(
+          input_degree == type->cast<c10::TupleType>()->elements().size(),
+          "Input List in ParallelMap must have same input_degree!");
     }
   }
 
@@ -67,9 +72,9 @@ static Node *GetParallelFunctorByParallelMap(
     transferRefinedType(output, functor_op_output, refine_types);
   }
 
-  std::unordered_map<Value *, Value *> values_map;
+  std::unordered_map<Value*, Value*> values_map;
 
-  std::unordered_set<Value *> parallel_map_block_args;
+  std::unordered_set<Value*> parallel_map_block_args;
 
   for (auto input_ : node->blocks()[0]->inputs()) {
     parallel_map_block_args.insert(input_);
@@ -78,7 +83,7 @@ static Node *GetParallelFunctorByParallelMap(
   // Get Fusion Group in ParallelMap
   auto fusion_group = node->blocks()[0]->nodes().front();
 
-  std::unordered_set<Value *> parallelled_args;
+  std::unordered_set<Value*> parallelled_args;
   for (auto input_ : node->blocks()[0]->inputs())
     parallelled_args.insert(input_);
 
@@ -105,13 +110,13 @@ static Node *GetParallelFunctorByParallelMap(
   }
 
   for (auto fusion_group_node : fusion_group->blocks()[0]->nodes()) {
-    Node *in_graph =
-        subgraph->createClone(fusion_group_node, [&](Value *k) -> Value * {
+    Node* in_graph =
+        subgraph->createClone(fusion_group_node, [&](Value* k) -> Value* {
           if (k->node()->owningBlock() == fusion_group->blocks()[0])
             return values_map[k];
           if (k->node()->kind() == prim::Constant) {
-            Node *constant = subgraph->createClone(
-                k->node(), [](Value *k) { return nullptr; });
+            Node* constant = subgraph->createClone(
+                k->node(), [](Value* k) { return nullptr; });
             constant->insertBefore(subgraph->nodes().front());
             return constant->output();
           }
@@ -133,9 +138,9 @@ static Node *GetParallelFunctorByParallelMap(
 }
 
 void MapFunctorToParallelization(
-    const std::shared_ptr<Graph> &graph,
-    std::unordered_map<Value *, TypePtr> &refine_types) {
-  rewrite(graph->block(), [&](Node *node) -> Node * {
+    const std::shared_ptr<Graph>& graph,
+    std::unordered_map<Value*, TypePtr>& refine_types) {
+  rewrite(graph->block(), [&](Node* node) -> Node* {
     if (node->kind() == prim::ParallelMap) {
       auto parallel_functor_op =
           GetParallelFunctorByParallelMap(node, refine_types);
@@ -145,8 +150,9 @@ void MapFunctorToParallelization(
   });
 }
 
-static Node *GetParallelFunctorByFusedOp(
-    Node *node, std::unordered_map<Value *, TypePtr> &refine_types) {
+static Node* GetParallelFunctorByFusedOp(
+    Node* node,
+    std::unordered_map<Value*, TypePtr>& refine_types) {
   // Construct an op
   auto functor_op =
       node->owningGraph()->createWithSubgraph(tssa::ParallelFunctor);
@@ -171,9 +177,9 @@ static Node *GetParallelFunctorByFusedOp(
     functor_op_output->copyMetadata(output);
   }
 
-  std::unordered_map<Value *, Value *> values_map;
+  std::unordered_map<Value*, Value*> values_map;
 
-  std::unordered_set<Value *> parallel_map_block_args;
+  std::unordered_set<Value*> parallel_map_block_args;
 
   for (auto input_ : node->blocks()[0]->inputs()) {
     parallel_map_block_args.insert(input_);
@@ -181,7 +187,7 @@ static Node *GetParallelFunctorByFusedOp(
   // Get Fusion Group in ParallelMap
   //   auto fusion_group = node->blocks()[0]->nodes().front();
 
-  std::unordered_set<Value *> parallelled_args;
+  std::unordered_set<Value*> parallelled_args;
   for (auto input_ : node->blocks()[0]->inputs())
     parallelled_args.insert(input_);
 
@@ -196,13 +202,13 @@ static Node *GetParallelFunctorByFusedOp(
     values_map[input_] = subgraph_input;
   }
   for (auto fusion_group_node : node->blocks()[0]->nodes()) {
-    Node *in_graph =
-        subgraph->createClone(fusion_group_node, [&](Value *k) -> Value * {
+    Node* in_graph =
+        subgraph->createClone(fusion_group_node, [&](Value* k) -> Value* {
           if (k->node()->owningBlock() == node->blocks()[0])
             return values_map[k];
           if (k->node()->kind() == prim::Constant) {
-            Node *constant = subgraph->createClone(
-                k->node(), [](Value *k) { return nullptr; });
+            Node* constant = subgraph->createClone(
+                k->node(), [](Value* k) { return nullptr; });
             constant->insertBefore(subgraph->nodes().front());
             return constant->output();
           }
@@ -223,9 +229,9 @@ static Node *GetParallelFunctorByFusedOp(
 }
 
 void FusedOpToParallelization(
-    const std::shared_ptr<Graph> &graph,
-    std::unordered_map<Value *, TypePtr> &refine_types) {
-  rewrite(graph->block(), [&](Node *node) -> Node * {
+    const std::shared_ptr<Graph>& graph,
+    std::unordered_map<Value*, TypePtr>& refine_types) {
+  rewrite(graph->block(), [&](Node* node) -> Node* {
     if (node->kind() == prim::FusionGroup) {
       auto parallelled_functor_op =
           GetParallelFunctorByFusedOp(node, refine_types);
@@ -235,17 +241,19 @@ void FusedOpToParallelization(
   });
 }
 
-static Operation CreateTeOperator(const Node *node) {
+static Operation CreateTeOperator(const Node* node) {
   auto graph_builder = std::make_shared<GraphBuilder>(node);
-  return [graph_builder](Stack &stack) -> int {
+  return [graph_builder](Stack& stack) -> int {
     graph_builder->run(stack);
     return 0;
   };
 }
 
 RegisterOperators ParallelOps({
-    torch::jit::Operator(tssa::ParallelFunctor, CreateTeOperator,
-                         AliasAnalysisKind::PURE_FUNCTION),
+    torch::jit::Operator(
+        tssa::ParallelFunctor,
+        CreateTeOperator,
+        AliasAnalysisKind::PURE_FUNCTION),
 });
 
 } // namespace jit

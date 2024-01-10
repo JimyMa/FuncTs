@@ -1,14 +1,14 @@
 #include "canonicalize.h"
 
+#include "functs/csrc/jit/utils/ir.h"
 #include "type_utils.h"
-#include "util/ir.h"
 
 namespace torch {
 namespace jit {
 
 #define REWRITE_PARAMS Node *node, Graph *graph
 
-Node *rewriteArange(REWRITE_PARAMS) {
+Node* rewriteArange(REWRITE_PARAMS) {
   // Add `start` if it is not provided
   auto zero = graph->insertConstant(int64_t(0));
   auto inputs = node->inputs().vec();
@@ -19,17 +19,17 @@ Node *rewriteArange(REWRITE_PARAMS) {
   return replace(node, newNode);
 }
 
-Node *rewriteMaxOther(REWRITE_PARAMS) {
+Node* rewriteMaxOther(REWRITE_PARAMS) {
   node->replaceWithNewSymbol(aten::maximum);
   return nullptr;
 }
 
-Node *rewriteMinOther(REWRITE_PARAMS) {
+Node* rewriteMinOther(REWRITE_PARAMS) {
   node->replaceWithNewSymbol(aten::minimum);
   return nullptr;
 }
 
-Node *rewriteNew(REWRITE_PARAMS) {
+Node* rewriteNew(REWRITE_PARAMS) {
   // Convert `aten::new_xxxs` to `aten::xxxs`
   auto self = node->input(0), size = node->input(1), dtype = node->input(2),
        device = node->input(4);
@@ -39,20 +39,22 @@ Node *rewriteNew(REWRITE_PARAMS) {
     device = graph->insert(prim::device, {self});
   auto symbol =
       Symbol::aten(std::string(node->kind().toUnqualString()).substr(4));
-  auto newOut =
-      graph->insert(symbol, {size}, {{"dtype", dtype}, {"device", device}},
-                    node->sourceRange());
+  auto newOut = graph->insert(
+      symbol,
+      {size},
+      {{"dtype", dtype}, {"device", device}},
+      node->sourceRange());
   node->output(0)->replaceAllUsesWith(newOut);
   return remove(node);
 }
 
-Node *rewritePowTensorScalar(REWRITE_PARAMS) {
+Node* rewritePowTensorScalar(REWRITE_PARAMS) {
   // Replace with a series of multiplication if exponent is constant
   auto self = node->input(0);
   auto exp = constant_as<int64_t>(node->input(1));
   if (!exp)
     return nullptr;
-  Value *base = nullptr;
+  Value* base = nullptr;
   while (*exp > 0) {
     if ((*exp & 1) && base)
       self = graph->insert(aten::mul, {self, base});
@@ -67,7 +69,7 @@ Node *rewritePowTensorScalar(REWRITE_PARAMS) {
   return remove(node);
 }
 
-Node *rewriteSlice(REWRITE_PARAMS) {
+Node* rewriteSlice(REWRITE_PARAMS) {
   // Remove if both start and end are not specified
   auto start = toIValue(node->input(2)), end = toIValue(node->input(3));
   if (start && start->isNone() && end && end->isNone()) {
@@ -77,17 +79,17 @@ Node *rewriteSlice(REWRITE_PARAMS) {
   return nullptr;
 }
 
-Node *rewriteT(REWRITE_PARAMS) {
+Node* rewriteT(REWRITE_PARAMS) {
   auto self = node->input(0);
   auto zero = graph->insertConstant(int64_t(0));
   auto one = graph->insertConstant(int64_t(1));
-  auto newOut = graph->insert(aten::transpose, {self, zero, one}, {},
-                              node->sourceRange());
+  auto newOut = graph->insert(
+      aten::transpose, {self, zero, one}, {}, node->sourceRange());
   node->output(0)->replaceAllUsesWith(newOut);
   return remove(node);
 }
 
-Node *rewriteToDtype(REWRITE_PARAMS) {
+Node* rewriteToDtype(REWRITE_PARAMS) {
   auto self = node->input(0), dtype = node->input(1);
   auto device = graph->insert(prim::device, {self}, {});
   auto newOut =
@@ -96,7 +98,7 @@ Node *rewriteToDtype(REWRITE_PARAMS) {
   return remove(node);
 }
 
-Node *rewriteToOther(REWRITE_PARAMS) {
+Node* rewriteToOther(REWRITE_PARAMS) {
   // Explicitly define dtype and device
   auto self = node->input(0), other = node->input(1);
   auto device = graph->insert(prim::device, {other}, {});
@@ -107,12 +109,12 @@ Node *rewriteToOther(REWRITE_PARAMS) {
   return remove(node);
 }
 
-Node *rewriteView(REWRITE_PARAMS) {
+Node* rewriteView(REWRITE_PARAMS) {
   node->replaceWithNewSymbol(aten::reshape);
   return nullptr;
 }
 
-OperatorMap<Node *(*)(REWRITE_PARAMS)> rewriteFuncs{
+OperatorMap<Node* (*)(REWRITE_PARAMS)> rewriteFuncs{
     {"aten::arange(Scalar end, *, ScalarType? dtype=None, Layout? layout=None, "
      "Device? device=None, bool? pin_memory=None) -> Tensor",
      rewriteArange},
@@ -145,8 +147,8 @@ OperatorMap<Node *(*)(REWRITE_PARAMS)> rewriteFuncs{
     {"aten::view(Tensor(a) self, SymInt[] size) -> Tensor(a)", rewriteView},
 };
 
-void CanonicalizeOps(const std::shared_ptr<Graph> &graph) {
-  rewrite(graph->block(), [&](Node *node) -> Node * {
+void CanonicalizeOps(const std::shared_ptr<Graph>& graph) {
+  rewrite(graph->block(), [&](Node* node) -> Node* {
     if (node->isMemberOf(rewriteFuncs)) {
       auto func = rewriteFuncs.find(node->getOperator());
       graph->setInsertPoint(node);

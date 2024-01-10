@@ -1,9 +1,9 @@
 #include "tensor_ssa.h"
 
 #include "common_passes.h"
+#include "functs/csrc/jit/utils/ir.h"
 #include "parallelize_loops.h"
 #include "util/disjoint_set.h"
-#include "util/ir.h"
 #include "util/traits.h"
 
 namespace torch {
@@ -12,21 +12,24 @@ namespace jit {
 static bool _registered = false;
 
 RegisterOperators registerTssaOps() {
-  if (_registered) return {};
+  if (_registered)
+    return {};
   _registered = true;
   return RegisterOperators()
       .op("tssa::Assign(Tensor self, Tensor src) -> Tensor")
       .op("tssa::Update(Tensor self, Tensor cause) -> Tensor");
 }
 
-static Node *rewriteMutating(
-    Node *node, Graph *graph, DisjointSets<Value *> &aliasSets,
-    std::vector<Value *> &mutValues,
-    std::unordered_map<Value *, std::vector<Node *>> &mutNodes) {
+static Node* rewriteMutating(
+    Node* node,
+    Graph* graph,
+    DisjointSets<Value*>& aliasSets,
+    std::vector<Value*>& mutValues,
+    std::unordered_map<Value*, std::vector<Node*>>& mutNodes) {
   // Replace mutating operations with non-mutating ones
   auto block = node->owningBlock();
   auto mutated = node->input(0);
-  Node *assignNode = nullptr;
+  Node* assignNode = nullptr;
   switch (node->kind()) {
     case aten::copy_: {
       assignNode =
@@ -95,10 +98,14 @@ static Node *rewriteMutating(
 }
 
 static void addMutatedValueToBlock(
-    Value *mutated, Block *block, std::unordered_set<Block *> &visitedBlocks,
-    std::unordered_map<Value *, Value *> &valueToMut, bool handleNode = true) {
+    Value* mutated,
+    Block* block,
+    std::unordered_set<Block*>& visitedBlocks,
+    std::unordered_map<Value*, Value*>& valueToMut,
+    bool handleNode = true) {
   // Skip if this block if visited before
-  if (visitedBlocks.count(block)) return;
+  if (visitedBlocks.count(block))
+    return;
   visitedBlocks.insert(block);
 
   // Add to block and node returns
@@ -123,21 +130,22 @@ static void addMutatedValueToBlock(
     case prim::If: {
       // add to the block of the other branch
       auto blockId = block == node->blocks()[1];
-      addMutatedValueToBlock(mutated, node->blocks()[!blockId], visitedBlocks,
-                             valueToMut, false);
+      addMutatedValueToBlock(
+          mutated, node->blocks()[!blockId], visitedBlocks, valueToMut, false);
       break;
     }
   }
 }
 
 static void renameValues(
-    Block *block, std::unordered_map<Value *, Value *> &valueToMut,
-    std::unordered_map<Value *, std::vector<Value *>> &renameStacks) {
+    Block* block,
+    std::unordered_map<Value*, Value*>& valueToMut,
+    std::unordered_map<Value*, std::vector<Value*>>& renameStacks) {
   // Initialize rename counts in current scope
-  std::unordered_map<Value *, size_t> renameCounts;
-  auto updateValue = [&](Value *value) {
+  std::unordered_map<Value*, size_t> renameCounts;
+  auto updateValue = [&](Value* value) {
     // find mutated version of this value
-    Value *mutated = nullptr;
+    Value* mutated = nullptr;
     if (valueToMut.count(value))
       mutated = valueToMut[value];
     else {
@@ -148,7 +156,8 @@ static void renameValues(
         valueToMut.insert({value, mutated});
       }
     }
-    if (!mutated) return;
+    if (!mutated)
+      return;
     // add to rename stack
     renameStacks[mutated].push_back(value);
     // add to rename counts
@@ -157,10 +166,11 @@ static void renameValues(
     else
       renameCounts.insert({mutated, 1});
   };
-  auto replaceInputsOf = [&](Node *node) {
+  auto replaceInputsOf = [&](Node* node) {
     for (auto i = 0u; i < node->inputs().size(); i++) {
       auto input = node->input(i);
-      if (!valueToMut.count(input)) continue;
+      if (!valueToMut.count(input))
+        continue;
       auto mutated = valueToMut[input];
       auto latest = renameStacks[mutated].back();
       node->replaceInput(i, latest);
@@ -168,7 +178,8 @@ static void renameValues(
   };
 
   // Add parameters to rename stack
-  for (auto param : block->inputs()) updateValue(param);
+  for (auto param : block->inputs())
+    updateValue(param);
 
   // Process each node
   for (auto node : block->nodes()) {
@@ -178,28 +189,33 @@ static void renameValues(
     for (auto nested : node->blocks())
       renameValues(nested, valueToMut, renameStacks);
     // update outputs
-    for (auto output : node->outputs()) updateValue(output);
+    for (auto output : node->outputs())
+      updateValue(output);
   }
 
   // Process return node
   replaceInputsOf(block->return_node());
 
   // Restore rename stack
-  for (auto &pair : renameCounts) {
-    for (auto i = 0u; i < pair.second; i++) renameStacks[pair.first].pop_back();
+  for (auto& pair : renameCounts) {
+    for (auto i = 0u; i < pair.second; i++)
+      renameStacks[pair.first].pop_back();
   }
 }
 
-static void removeDeadUpdateInLoop(Node *loop) {
+static void removeDeadUpdateInLoop(Node* loop) {
   auto block = loop->blocks().front();
   for (auto i = 0; i < loop->outputs().size(); i++) {
     // Check if the value is dead
     auto loopOut = loop->output(i);
-    if (loopOut->hasUses()) continue;
+    if (loopOut->hasUses())
+      continue;
     auto blockRet = block->outputs()[i + 1];
     auto update = blockRet->node();
-    if (update->kind() != tssa::Update) continue;
-    if (update->input(0) != block->inputs()[i + 1]) continue;
+    if (update->kind() != tssa::Update)
+      continue;
+    if (update->input(0) != block->inputs()[i + 1])
+      continue;
 
     // Erase dead update
     loop->eraseOutput(i);
@@ -211,14 +227,15 @@ static void removeDeadUpdateInLoop(Node *loop) {
   }
 }
 
-void ToTensorSSA(const std::shared_ptr<Graph> &graph) {
+void ToTensorSSA(const std::shared_ptr<Graph>& graph) {
   // Find all mutated tensors and remove mutation
-  DisjointSets<Value *> aliasSets;
-  std::vector<Value *> mutValues;
-  std::unordered_map<Value *, std::vector<Node *>> mutNodes;
-  rewrite(graph->block(), [&](Node *node) -> Node * {
+  DisjointSets<Value*> aliasSets;
+  std::vector<Value*> mutValues;
+  std::unordered_map<Value*, std::vector<Node*>> mutNodes;
+  rewrite(graph->block(), [&](Node* node) -> Node* {
     // Skip non-tensor operations
-    if (node->inputs().empty() || node->outputs().empty()) return nullptr;
+    if (node->inputs().empty() || node->outputs().empty())
+      return nullptr;
     if (node->input(0)->type()->kind() != TypeKind::TensorType ||
         node->output(0)->type()->kind() != TypeKind::TensorType)
       return nullptr;
@@ -229,18 +246,19 @@ void ToTensorSSA(const std::shared_ptr<Graph> &graph) {
     }
 
     // Extend tensor alias graph if the node is aliasing
-    if (isAliasing(node)) aliasSets.merge(node->input(0), node->output(0));
+    if (isAliasing(node))
+      aliasSets.merge(node->input(0), node->output(0));
 
     return nullptr;
   });
 
   // Add block parameters and returns for out-of-block mutation
-  std::unordered_map<Value *, Value *> valueToMut;
+  std::unordered_map<Value*, Value*> valueToMut;
   for (auto mutated : mutValues) {
     valueToMut.insert({mutated, mutated});
     auto defBlock = mutated->node()->owningBlock();
-    std::unordered_set<Block *> visitedBlocks;
-    auto &nodes = mutNodes[mutated];
+    std::unordered_set<Block*> visitedBlocks;
+    auto& nodes = mutNodes[mutated];
     for (auto node : nodes) {
       for (auto block = node->owningBlock(); block != defBlock;
            block = block->owningNode()->owningBlock()) {
@@ -250,30 +268,34 @@ void ToTensorSSA(const std::shared_ptr<Graph> &graph) {
   }
 
   // Replace placeholders with real SSA values
-  std::unordered_map<Value *, std::vector<Value *>> renameStacks;
-  for (auto value : mutValues) renameStacks.insert({value, {}});
+  std::unordered_map<Value*, std::vector<Value*>> renameStacks;
+  for (auto value : mutValues)
+    renameStacks.insert({value, {}});
   renameValues(graph->block(), valueToMut, renameStacks);
 
   // Eliminate redundant updates
   EliminateDeadCodeTSSA(graph);
-  traversePostOrder(graph->block(), [](Node *loop) {
-    if (loop->kind() == prim::Loop) removeDeadUpdateInLoop(loop);
+  traversePostOrder(graph->block(), [](Node* loop) {
+    if (loop->kind() == prim::Loop)
+      removeDeadUpdateInLoop(loop);
     return true;
   });
 
   // Eliminate redundant assignment
-  rewrite(graph->block(), [](Node *node) -> Node * {
-    if (node->kind() != tssa::Assign) return nullptr;
+  rewrite(graph->block(), [](Node* node) -> Node* {
+    if (node->kind() != tssa::Assign)
+      return nullptr;
     auto output = node->output(0);
-    for (auto &use : output->uses()) {
-      if (use.user->kind() == tssa::Update) return nullptr;
+    for (auto& use : output->uses()) {
+      if (use.user->kind() == tssa::Update)
+        return nullptr;
     }
     output->replaceAllUsesWith(node->input(1));
     return remove(node);
   });
 }
 
-static void toMutableTensorsIn(Block *block) {
+static void toMutableTensorsIn(Block* block) {
   auto graph = block->owningGraph();
   for (auto node = block->nodes().front(); node != block->nodes().back();
        node = node->next()) {
@@ -282,7 +304,7 @@ static void toMutableTensorsIn(Block *block) {
       auto dst = node->input(0), src = node->input(1);
       auto dstDef = dst->node();
       graph->setInsertPoint(node->next());
-      if (dstDef->kind() == aten::index) {  // advanced indexing
+      if (dstDef->kind() == aten::index) { // advanced indexing
         auto self = dstDef->input(0), indices = dstDef->input(1);
         graph->insert(aten::index_put_, {self, indices, src});
         node->output(0)->replaceAllUsesWith(self);
@@ -294,15 +316,16 @@ static void toMutableTensorsIn(Block *block) {
       node->output(0)->replaceAllUsesWith(node->input(0));
     }
     if (kind != prim::FusionGroup) {
-      for (auto subBlock : node->blocks()) toMutableTensorsIn(subBlock);
+      for (auto subBlock : node->blocks())
+        toMutableTensorsIn(subBlock);
     }
   }
 }
 
-void ToMutableTensors(const std::shared_ptr<Graph> &graph) {
+void ToMutableTensors(const std::shared_ptr<Graph>& graph) {
   toMutableTensorsIn(graph->block());
   EliminateDeadCodeTSSA(graph);
 }
 
-}  // namespace jit
-}  // namespace torch
+} // namespace jit
+} // namespace torch
