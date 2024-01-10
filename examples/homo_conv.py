@@ -53,15 +53,11 @@ with torch.no_grad():
     homo_conv_functs = functs.jit.script(
         functs.jit.freeze(torch.jit.script(homo_conv)), backend="aot"
     )
+    print(homo_conv_functs.graph)
 
     type_hint = functs.jit.extract_type_hint([ins])
-    # functs._C._jit_pass_fait_gen_parallel_map(homo_conv_functs.graph, type_hint)
-    # print(homo_conv_functs.graph)
-    # functs._C._jit_pass_fait_gen_homo_conv(homo_conv_functs.graph, type_hint)
-    # print(homo_conv_functs.graph)
+    functs._C._jit_pass_fait_gen_parallel_map(homo_conv_functs.graph, type_hint)
+    print(homo_conv_functs.graph)
 
-    # functs.jit.build(homo_conv_functs, example_input=[ins])
-
-    # print(homo_conv_functs.graph)
-
-    # print(homo_conv(ins))
+    functs._C._jit_pass_fait_gen_homo_conv(homo_conv_functs.graph, type_hint)
+    print(homo_conv_functs.graph)

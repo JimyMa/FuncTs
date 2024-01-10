@@ -6,6 +6,7 @@
 #include <functs/csrc/jit/passes/remove_inplace.h>
 #include <functs/csrc/jit/passes/shape_analysis.h>
 #include <functs/csrc/jit/python/init.h>
+#include <functs/csrc/parallel/ops/homo_conv.h>
 #include <passes/freeze_module.h>
 
 #include <memory>
@@ -62,6 +63,7 @@ void initJITFuncTsBindings(PyObject* module) {
   m.def("_jit_pass_rewrite_mutation", TensorSSARewriteMutation);
   m.def("_jit_pass_block_propagation", TensorSSAPropagation);
   m.def("_jit_pass_rename", TensorSSARename);
+  m.def("invoke_homo_conv", &homo_invoke);
   // m.def("_jit_run_code", [](Code code, const py::tuple &inputs) {
   //   PyGILState_STATE gstate;
   //   gstate = PyGILState_Ensure();

@@ -8,6 +8,7 @@ project(functs)
 cmake_policy(SET CMP0074 NEW)
 
 option(ENABLE_FUNCTS_PYTHON "enable functs python wrapper" OFF)
+option(ENABLE_FUNCTS_PARALLEL_CUDA_RUNTIME "enable functs parallel cuda" ON)
 option(ENABLE_NNC_INT_LIST "need to revise pytorch code to support List[int] in NNC" OFF)
 
 # Packages
@@ -38,10 +39,12 @@ file(GLOB SOURCES
   ${PROJECT_SOURCE_DIR}/functs/csrc/jit/runtime/*.cpp
   ${PROJECT_SOURCE_DIR}/functs/csrc/jit/tensorexpr/*.cpp
   ${PROJECT_SOURCE_DIR}/functs/csrc/jit/utils/*.cpp
-  ${PROJECT_SOURCE_DIR}/functs/csrc/parallel/*.cpp
+  ${PROJECT_SOURCE_DIR}/functs/csrc/parallel/ops/*.cpp
+  ${PROJECT_SOURCE_DIR}/functs/csrc/parallel/ops/*.cu
   ${PROJECT_SOURCE_DIR}/functs/csrc/parallel/runtime/*.cpp
   ${PROJECT_SOURCE_DIR}/functs/csrc/parallel/runtime/schema/*.cpp
-  ${PROJECT_SOURCE_DIR}/functs/csrc/parallel/runtime/cpu/*.cpp)
+  ${PROJECT_SOURCE_DIR}/functs/csrc/parallel/runtime/cpu/*.cpp
+  ${PROJECT_SOURCE_DIR}/functs/csrc/parallel/runtime/cuda/*.cpp)
 
 file(GLOB FAIT_SOURCES
   ${PROJECT_SOURCE_DIR}/functs/csrc/jit/passes/fait/*.cpp
@@ -82,6 +85,7 @@ target_link_libraries(functs ${FUNCTS_LINK_LIBS})
 if(ENABLE_NNC_INT_LIST)
 target_compile_definitions(functs PRIVATE ENABLE_NNC_INT_LIST)
 endif(ENABLE_NNC_INT_LIST)
+
 
 install(TARGETS functs
   DESTINATION lib

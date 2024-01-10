@@ -1,5 +1,6 @@
 #pragma once
 
+#include <torch/extension.h>
 #include "torch/csrc/jit/ir/ir.h"
 
 namespace c10 {
@@ -14,3 +15,12 @@ static auto HomoConv = Symbol::fromQualString("functs_parallel::homo_conv");
 namespace attr {} // namespace attr
 
 } // namespace c10
+namespace torch {
+namespace jit {
+void homo_invoke(
+    const std::vector<at::Tensor>& feats,
+    const std::vector<at::Tensor>& outs,
+    torch::Tensor& weight,
+    torch::Tensor& bias);
+} // namespace jit
+} // namespace torch
