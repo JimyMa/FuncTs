@@ -63,7 +63,6 @@ void initJITFuncTsBindings(PyObject* module) {
   m.def("_jit_pass_rewrite_mutation", TensorSSARewriteMutation);
   m.def("_jit_pass_block_propagation", TensorSSAPropagation);
   m.def("_jit_pass_rename", TensorSSARename);
-  m.def("invoke_homo_conv", &homo_invoke);
   // m.def("_jit_run_code", [](Code code, const py::tuple &inputs) {
   //   PyGILState_STATE gstate;
   //   gstate = PyGILState_Ensure();

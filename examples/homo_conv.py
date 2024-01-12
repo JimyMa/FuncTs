@@ -3,6 +3,7 @@ from typing import List
 import functs
 
 import torch
+import torch.fx
 
 
 class HomoConv(torch.nn.Module):
@@ -13,10 +14,8 @@ class HomoConv(torch.nn.Module):
             in_channels,
             out_channels,
             kernel_size,
-            padding=[1, 1],
-            stride=[2, 2],
-            dilation=[3, 3],
-            bias=False,
+            padding=padding,
+            bias=True,
         )
 
     def forward(self, inputs: List[torch.Tensor]):
@@ -28,7 +27,7 @@ class HomoConv(torch.nn.Module):
         return outs
 
 
-parallel_level = 3
+parallel_level = 2
 
 # conv config
 channels = 8
@@ -44,20 +43,59 @@ with torch.no_grad():
         HomoConv(parallel_level, channels, channels, kernel_size, pads).cuda().eval()
     )
 
-    ins = (
-        torch.rand(bs, channels, *feat_size).cuda(),
-        torch.rand(bs, channels, *feat_size).cuda(),
-        torch.rand(bs, channels, *feat_size).cuda(),
-    )
-
     homo_conv_functs = functs.jit.script(
         functs.jit.freeze(torch.jit.script(homo_conv)), backend="aot"
     )
     print(homo_conv_functs.graph)
+    in_0 = torch.ones([4, 8, 32, 32]).cuda()
+    in_1 = torch.ones([4, 8, 32, 32]).cuda()
 
-    type_hint = functs.jit.extract_type_hint([ins])
+    out_0 = torch.ones([4, 8, 32, 32]).cuda()
+    out_1 = torch.ones([4, 8, 32, 32]).cuda()
+
+    weight_0 = torch.ones([8, 8, 3, 3]).cuda()
+    weight_1 = torch.ones([8, 8, 3, 3]).cuda()
+
+    bias_0 = torch.ones([8]).cuda()
+    bias_1 = torch.ones([8]).cuda()
+
+    type_hint = functs.jit.extract_type_hint([[in_0, in_1]])
     functs._C._jit_pass_fait_gen_parallel_map(homo_conv_functs.graph, type_hint)
     print(homo_conv_functs.graph)
 
     functs._C._jit_pass_fait_gen_homo_conv(homo_conv_functs.graph, type_hint)
     print(homo_conv_functs.graph)
+
+    # run cuda kernel
+    print(homo_conv.conv.weight.shape)
+    print(homo_conv.conv.bias.shape)
+
+    def functs_homo_conv(
+        ins: List[torch.Tensor],
+        outs: List[torch.Tensor],
+        weights: List[torch.Tensor],
+        bias: List[torch.Tensor],
+    ):
+        functs._C.invoke_homo_conv(
+            [ins[0], ins[1]],
+            [out_0, out_1],
+            [weight_0, weight_1],
+            [bias_0, bias_1],
+        )
+        return out_0, out_1
+
+    torch.cuda.synchronize()
+    functs.utils.evaluate_func(
+        functs_homo_conv,
+        [[in_0, in_1], [out_0, out_1], [weight_0, weight_1], [bias_0, bias_1]],
+        run_duration=2.0,
+        name="functs_homo",
+    )
+
+    torch.cuda.synchronize()
+    functs.utils.evaluate_func(
+        homo_conv,
+        [[in_0, in_1]],
+        run_duration=2.0,
+        name="pytorch_homo",
+    )

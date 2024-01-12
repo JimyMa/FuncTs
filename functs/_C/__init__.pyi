@@ -45,3 +45,11 @@ def _jit_get_code(g: torch.Graph) -> torch._C.Code: ...
 
 # functs script init
 def _create_function_from_graph(g: torch.Graph) -> functs._C.ScriptFunction: ...
+
+# functs parallel init
+def invoke_homo_conv(
+    inputs: List[torch.Tensor],
+    outs: List[torch.Tensor],
+    weight: torch.Tensor,
+    bias: torch.Tensor,
+) -> None: ...

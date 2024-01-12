@@ -104,6 +104,7 @@ if(ENABLE_FUNCTS_PYTHON)
   find_library(TORCH_PYTHON_LIBRARY torch_python PATHS "${TORCH_INSTALL_PREFIX}/lib")
   file(GLOB PY_SOURCES
     ${PROJECT_SOURCE_DIR}/functs/csrc/jit/python/*.cpp
+    ${PROJECT_SOURCE_DIR}/functs/csrc/parallel/python/*.cpp
     ${PROJECT_SOURCE_DIR}/functs/csrc/*.cpp
   )
   add_library(functs_python SHARED ${PY_SOURCES})

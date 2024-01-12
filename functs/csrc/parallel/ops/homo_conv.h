@@ -20,7 +20,7 @@ namespace jit {
 void homo_invoke(
     const std::vector<at::Tensor>& feats,
     const std::vector<at::Tensor>& outs,
-    torch::Tensor& weight,
-    torch::Tensor& bias);
+    const std::vector<at::Tensor>& weight,
+    const std::vector<at::Tensor>& bias);
 } // namespace jit
 } // namespace torch
