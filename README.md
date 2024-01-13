@@ -1,4 +1,5 @@
 # try ParallelMap
+
 - pytorch code
 
 ```python
@@ -24,6 +25,7 @@ class HomoConv(torch.nn.Module):
 ```
 
 - TorchScript code
+
 ```python
 graph(%self : __torch__.___torch_mangle_0.HomoConv,
       %inputs.1 : Tensor[]):
@@ -77,6 +79,6 @@ graph(%self : __torch__.___torch_mangle_0.HomoConv,
 ```
 
 ```
-functs_homo: 88202 iters, min = 20.27us, max = 4.198ms, avg = 22.68us
-pytorch_homo: 39291 iters, min = 47.49us, max = 4.707ms, avg = 50.9us
+functs_try_brt_homo_conv: 10001 iters, min = 19.35us, max = 33.54us, avg = 20.61us
+pytorch_homo_conv: 10001 iters, min = 79.24us, max = 287.3us, avg = 88.25us
 ```

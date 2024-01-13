@@ -3,10 +3,14 @@ import json
 import os
 import shutil
 import tempfile
+
+import time
 from collections import OrderedDict
 from dataclasses import dataclass
 from time import perf_counter
 from typing import Callable
+
+import numpy as np
 
 import torch
 from torch.autograd import DeviceType
@@ -60,52 +64,67 @@ def fmt_duration(dur: float, round_to=None, split=False):
     if not split:
         return "{:.4}{}".format(dur, units[idx])
     else:
-        return "{:.4}".format(dur), "{}".format(units[idx])
+        return dur, "{}".format(units[idx])
+
+
+MAX_ITER_DEFAULT = 10000
 
 
 class Timer:
-    def __init__(self, name="", color=True):
+    def __init__(self, name="", color=True, max_iters=MAX_ITER_DEFAULT):
         self.name = name
         self.clear()
         self.color = color
+        self.max_iters = max_iters
+        self.time_points = []
+        self.ignore_cnts = []
+        self.cnt = -1
 
     def clear(self):
-        self.start_time = None
-        self.end_time = None
-        self.observation = None
-        self.min = 1e9
-        self.max = 0
-        self.sum = 0
+        self.ignore_cnts = []
+        self.time_points = []
         self.cnt = 0
 
     def start(self):
-        self.start_time = perf_counter()
-        self.observation = self.start_time
-        return self.start_time
+        time_start = perf_counter()
+        self.time_points.append(time_start)
+        self.cnt = 0
+        return time_start
 
-    def end(self):
-        self.end_time = perf_counter()
-        duration = self.end_time - self.start_time
-        return duration
+    def observe(self, ignore=False):
+        time_observe = perf_counter()
+        if self.cnt <= self.max_iters:
+            self.time_points.append(time_observe)
+            self.cnt += 1
+            if ignore:
+                self.ignore_cnts.append(self.cnt)
+        return time_observe
 
-    def time(self):
-        return perf_counter()
+    @property
+    def time_durations(self):
+        start = np.array(self.time_points[0:-1])
+        end = np.array(self.time_points[1:])
+        ignore_cnt = np.array(self.ignore_cnts) - 1
+        return np.delete((end - start), list(ignore_cnt))
 
-    def unobserve(self):
-        new_observation = self.time()
-        self.observation = new_observation
+    @property
+    def avg(self):
+        return np.mean(self.time_durations)
+        # return fmt_duration(
+        #     np.mean(self.time_durations), round_to=round_to, split=True
+        # )[0]
 
-    def observe(self):
-        new_observation = self.time()
-        duration = new_observation - self.observation
-        self.min = min(self.min, duration)
-        self.max = max(self.max, duration)
-        self.sum += duration
-        self.cnt += 1
-        self.observation = new_observation
+    @property
+    def iters(self):
+        return self.time_durations.size
 
-    def avg(self, round_to=None):
-        return fmt_duration(self.sum / self.cnt, round_to=round_to, split=True)[0]
+    @property
+    def min(self):
+        return np.min(self.time_durations)
+
+    @property
+    def max(self):
+        return np.max(self.time_durations)
 
     def report(self, color=None, clear=True):
         if color is None:
@@ -114,20 +133,20 @@ class Timer:
             print(
                 "{}: \033[31m{} iters, min = {}, max = {}, avg = {}\033[m".format(
                     self.name,
-                    self.cnt,
+                    self.iters,
                     fmt_duration(self.min),
                     fmt_duration(self.max),
-                    fmt_duration(self.sum / self.cnt),
+                    fmt_duration(self.avg),
                 )
             )
         else:
             print(
                 "{}: {} iters, min = {} {}, max = {:.4f} {}, avg = {} {}".format(
                     self.name,
-                    self.cnt,
+                    self.iters,
                     fmt_duration(self.min),
                     fmt_duration(self.max),
-                    fmt_duration(self.sum / self.cnt),
+                    fmt_duration(self.avg),
                 )
             )
         if clear:
@@ -155,12 +174,13 @@ def evaluate_task(
     torch.cuda.synchronize()
     timer = Timer(name)
     begin = timer.start()
+    observation = begin
     enable_profiling()
     cnt = 0
-    while timer.time() - begin < run_duration:
+    while observation - begin < run_duration:
         task(cnt)
         cnt += 1
-        timer.observe()
+        observation = timer.observe()
         torch.cuda.synchronize()
     timer.report(clear=False)
     disable_profiling()
@@ -188,22 +208,21 @@ def evaluate_func(
     enable_profiling()
     timer = Timer(name)
     begin = timer.start()
-    while timer.time() - begin < run_duration:
+    observation = begin
+    while observation - begin < run_duration:
         if not enable_cudagraph:
             func(*args)
-            timer.observe()
+            torch.cuda.synchronize()
+            observation = timer.observe()
         else:
             # g = torch_cuda_graph_pool[graph_cnt] if graph_cnt < cuda_graph_caputure_pool_num else torch.cuda.CUDAGraph()
             g = torch.cuda.CUDAGraph()
             with torch.cuda.graph(g):
                 for i in range(iter_per_capture):
                     func(*args)
-                    observation = timer.observation
-                    if i == 0:
-                        timer.unobserve()
-                    else:
-                        timer.observe()
-            torch.cuda.synchronize()
+                    torch.cuda.synchronize()
+                    observation = timer.observe(ignore=True if i == 0 else False)
+
     timer.report(clear=False)
     disable_profiling()
     print_profiling_results(timer.cnt)

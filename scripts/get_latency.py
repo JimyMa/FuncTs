@@ -9,7 +9,7 @@ import torch
 from functs.benchmark.ai_model import fcos, lstm, nasrnn, seq2seq, ssd, yolact, yolov3
 from functs.benchmark.simpleops import attention
 from functs.benchmark.utils import process_feat_batch
-from functs.utils import evaluate_func, evaluate_task
+from functs.utils import evaluate_func, evaluate_task, fmt_duration
 
 torch._dynamo.reset()
 
@@ -57,13 +57,15 @@ with torch.no_grad():
 
     eager_mode_latency = np.array(
         [
-            float(
+            fmt_duration(
                 evaluate_task(
                     task(model, feats),
                     name="{}_eager".format(cv_model_name),
                     run_duration=3.0,
-                ).avg(round_to="ms")
-            )
+                ).avg,
+                round_to="ms",
+                split=True,
+            )[0]
             + backbone_time
             for model, cv_model_name, feats, backbone_time in zip(
                 cv_model, cv_model_name, feats, backbone_time
@@ -72,13 +74,15 @@ with torch.no_grad():
     )
     jit_mode_latency = np.array(
         [
-            float(
+            fmt_duration(
                 evaluate_task(
                     task(model, feats),
                     name="{}_jit".format(cv_model_name),
                     run_duration=3.0,
-                ).avg(round_to="ms")
-            )
+                ).avg,
+                round_to="ms",
+                split=True,
+            )[0]
             + backbone_time
             for model, cv_model_name, feats, backbone_time in zip(
                 cv_jit_model, cv_model_name, feats, backbone_time
@@ -87,13 +91,15 @@ with torch.no_grad():
     )
     functs_mode_latency = np.array(
         [
-            float(
+            fmt_duration(
                 evaluate_task(
                     task(model, feats),
                     name="{}_functs".format(cv_model_name),
                     run_duration=3.0,
-                ).avg(round_to="ms")
-            )
+                ).avg,
+                round_to="ms",
+                split=True,
+            )[0]
             + backbone_time
             for model, cv_model_name, feats, backbone_time in zip(
                 cv_functs_model, cv_model_name, feats, backbone_time
@@ -102,13 +108,15 @@ with torch.no_grad():
     )
     dynamo_mode_latency = np.array(
         [
-            float(
+            fmt_duration(
                 evaluate_task(
                     task(model, feats),
                     name="{}_dynamo".format(cv_model_name),
                     run_duration=3.0,
-                ).avg(round_to="ms")
-            )
+                ).avg,
+                round_to="ms",
+                split=True,
+            )[0]
             + backbone_time
             for model, cv_model_name, feats, backbone_time in zip(
                 cv_dynamo_model, cv_model_name, feats, backbone_time
@@ -119,13 +127,15 @@ with torch.no_grad():
     torch._C._jit_set_nvfuser_enabled(True)
     nvfuser_mode_latency = np.array(
         [
-            float(
+            fmt_duration(
                 evaluate_task(
                     task(model, feats),
                     name="{}_nvfuser".format(cv_model_name),
                     run_duration=3.0,
-                ).avg(round_to="ms")
-            )
+                ).avg,
+                round_to="ms",
+                split=True,
+            )[0]
             + backbone_time
             for model, cv_model_name, feats, backbone_time in zip(
                 cv_nvfuser_model, cv_model_name, feats, backbone_time
@@ -267,27 +277,31 @@ with torch.no_grad():
 
     eager_mode_latency = np.array(
         [
-            float(
+            fmt_duration(
                 evaluate_func(
                     model,
                     inputs,
                     name="{}_eager".format(nlp_model_name),
                     run_duration=3.0,
-                ).avg(round_to="ms")
-            )
+                ).avg,
+                round_to="ms",
+                split=True,
+            )[0]
             for model, nlp_model_name, inputs in zip(nlp_model, nlp_model_name, inputs)
         ]
     )
     jit_mode_latency = np.array(
         [
-            float(
+            fmt_duration(
                 evaluate_func(
                     model,
                     inputs,
                     name="{}_jit".format(nlp_model_name),
                     run_duration=3.0,
-                ).avg(round_to="ms")
-            )
+                ).avg,
+                round_to="ms",
+                split=True,
+            )[0]
             for model, nlp_model_name, inputs in zip(
                 nlp_jit_model, nlp_model_name, inputs
             )
@@ -295,14 +309,16 @@ with torch.no_grad():
     )
     functs_mode_latency = np.array(
         [
-            float(
+            fmt_duration(
                 evaluate_func(
                     model,
                     inputs,
                     name="{}_functs".format(nlp_model_name),
                     run_duration=3.0,
-                ).avg(round_to="ms")
-            )
+                ).avg,
+                round_to="ms",
+                split=True,
+            )[0]
             for model, nlp_model_name, inputs in zip(
                 nlp_functs_model, nlp_model_name, inputs
             )
@@ -310,14 +326,16 @@ with torch.no_grad():
     )
     dynamo_mode_latency = np.array(
         [
-            float(
+            fmt_duration(
                 evaluate_func(
                     model,
                     inputs,
                     name="{}_dynamo".format(nlp_model_name),
                     run_duration=3.0,
-                ).avg(round_to="ms")
-            )
+                ).avg,
+                round_to="ms",
+                split=True,
+            )[0]
             for model, nlp_model_name, inputs in zip(
                 nlp_dynamo_model, nlp_model_name, inputs
             )
@@ -326,14 +344,16 @@ with torch.no_grad():
     torch._C._jit_set_nvfuser_enabled(True)
     nvfuser_mode_latency = np.array(
         [
-            float(
+            fmt_duration(
                 evaluate_func(
                     model,
                     inputs,
                     name="{}_nvfuser".format(nlp_model_name),
                     run_duration=3.0,
-                ).avg(round_to="ms")
-            )
+                ).avg,
+                round_to="ms",
+                split=True,
+            )[0]
             for model, nlp_model_name, inputs in zip(
                 nlp_nvfuser_model, nlp_model_name, inputs
             )

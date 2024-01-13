@@ -99,7 +99,7 @@ void FaitPipeline(
   FuseOps(graph, refinedTypes);
   dumpGraphToFile(graph, "after_fuse.rb");
 
-  extractHomoFromPmap(graph);
+  // extractHomoFromPmap(graph);
 
   UnrollLoopsWithDeps(graph, refinedTypes);
   UnrollSimpleMaps(graph, refinedTypes);

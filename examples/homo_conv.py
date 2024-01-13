@@ -17,13 +17,14 @@ class HomoConv(torch.nn.Module):
             padding=padding,
             bias=True,
         )
+        self.relu = torch.nn.ReLU()
 
     def forward(self, inputs: List[torch.Tensor]):
         assert len(inputs) == self.parallel_level
         outs: List[torch.Tensor] = []
         for in_ in inputs:
             out = self.conv(in_)
-            outs.append(out)
+            outs.append(self.relu(out))
         return outs
 
 
@@ -43,10 +44,10 @@ with torch.no_grad():
         HomoConv(parallel_level, channels, channels, kernel_size, pads).cuda().eval()
     )
 
-    homo_conv_functs = functs.jit.script(
-        functs.jit.freeze(torch.jit.script(homo_conv)), backend="aot"
-    )
-    print(homo_conv_functs.graph)
+    # homo_conv_functs = functs.jit.script(
+    #     functs.jit.freeze(torch.jit.script(homo_conv)), backend="aot"
+    # )
+    # print(homo_conv_functs.graph)
     in_0 = torch.ones([4, 8, 32, 32]).cuda()
     in_1 = torch.ones([4, 8, 32, 32]).cuda()
 
@@ -59,12 +60,12 @@ with torch.no_grad():
     bias_0 = torch.ones([8]).cuda()
     bias_1 = torch.ones([8]).cuda()
 
-    type_hint = functs.jit.extract_type_hint([[in_0, in_1]])
-    functs._C._jit_pass_fait_gen_parallel_map(homo_conv_functs.graph, type_hint)
-    print(homo_conv_functs.graph)
+    # type_hint = functs.jit.extract_type_hint([[in_0, in_1]])
+    # functs._C._jit_pass_fait_gen_parallel_map(homo_conv_functs.graph, type_hint)
+    # print(homo_conv_functs.graph)
 
-    functs._C._jit_pass_fait_gen_homo_conv(homo_conv_functs.graph, type_hint)
-    print(homo_conv_functs.graph)
+    # functs._C._jit_pass_fait_gen_homo_conv(homo_conv_functs.graph, type_hint)
+    # print(homo_conv_functs.graph)
 
     # run cuda kernel
     print(homo_conv.conv.weight.shape)
@@ -89,7 +90,7 @@ with torch.no_grad():
         functs_homo_conv,
         [[in_0, in_1], [out_0, out_1], [weight_0, weight_1], [bias_0, bias_1]],
         run_duration=2.0,
-        name="functs_homo",
+        name="functs_try_brt_homo_conv",
     )
 
     torch.cuda.synchronize()
@@ -97,5 +98,5 @@ with torch.no_grad():
         homo_conv,
         [[in_0, in_1]],
         run_duration=2.0,
-        name="pytorch_homo",
+        name="pytorch_homo_conv",
     )
